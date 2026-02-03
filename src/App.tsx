@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { getItemIcon } from "./domain/categories";
 import { sortItemsForList } from "./domain/sort";
 import { useStore } from "./state/useStore";
@@ -16,14 +16,19 @@ const App = () => {
     renameList,
     setActiveList,
     addItem,
-    toggleItem
+    toggleItem,
+    updateItem
   } = useStore();
 
   const [newListName, setNewListName] = useState("");
   const [editingTitle, setEditingTitle] = useState(false);
   const [itemName, setItemName] = useState("");
-  const [quantityOrUnit, setQuantityOrUnit] = useState("");
-  const [isAddOpen, setIsAddOpen] = useState(false);
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
+  const [editItemName, setEditItemName] = useState("");
+  const [editItemQuantity, setEditItemQuantity] = useState("");
+  const addInputRef = useRef<HTMLInputElement | null>(null);
+  const longPressTimerRef = useRef<number | null>(null);
+  const longPressTriggeredRef = useRef(false);
 
   useEffect(() => {
     void load();
@@ -37,7 +42,7 @@ const App = () => {
 
   const activeList = lists.find((list) => list.id === activeListId);
   const listItems = useMemo(() => {
-    const filtered = items.filter((item) => item.listId === activeListId);
+    const filtered = items.filter((item) => item.listId === activeListId && !item.checked);
     return sortItemsForList(filtered);
   }, [items, activeListId]);
 
@@ -75,10 +80,8 @@ const App = () => {
     if (!activeListId) return;
     const trimmed = itemName.trim();
     if (!trimmed) return;
-    await addItem(activeListId, trimmed, quantityOrUnit.trim() || undefined);
+    await addItem(activeListId, trimmed);
     setItemName("");
-    setQuantityOrUnit("");
-    setIsAddOpen(false);
   };
 
   const handleRenameList = async () => {
@@ -87,6 +90,52 @@ const App = () => {
     if (!trimmed) return;
     await renameList(activeListId, trimmed);
     setEditingTitle(false);
+  };
+
+  const openEditItem = (itemId: string, name: string, quantityOrUnit?: string) => {
+    setEditingItemId(itemId);
+    setEditItemName(name);
+    setEditItemQuantity(quantityOrUnit ?? "");
+  };
+
+  const handleSaveItem = async () => {
+    if (!editingItemId) return;
+    const trimmed = editItemName.trim();
+    if (!trimmed) return;
+    await updateItem(
+      editingItemId,
+      trimmed,
+      editItemQuantity.trim() ? editItemQuantity.trim() : undefined
+    );
+    setEditingItemId(null);
+  };
+
+  const handleItemPointerDown = (itemId: string, name: string, quantityOrUnit?: string) => {
+    if (longPressTimerRef.current) {
+      window.clearTimeout(longPressTimerRef.current);
+    }
+    longPressTriggeredRef.current = false;
+    longPressTimerRef.current = window.setTimeout(() => {
+      longPressTriggeredRef.current = true;
+      openEditItem(itemId, name, quantityOrUnit);
+    }, 600);
+  };
+
+  const handleItemPointerUp = async (itemId: string) => {
+    if (longPressTimerRef.current) {
+      window.clearTimeout(longPressTimerRef.current);
+    }
+    if (!longPressTriggeredRef.current) {
+      await toggleItem(itemId);
+    }
+    longPressTriggeredRef.current = false;
+  };
+
+  const handleItemPointerCancel = () => {
+    if (longPressTimerRef.current) {
+      window.clearTimeout(longPressTimerRef.current);
+    }
+    longPressTriggeredRef.current = false;
   };
 
   return (
@@ -141,6 +190,32 @@ const App = () => {
             </button>
           )}
         </div>
+        <form
+          className="add-panel"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void handleAddItem();
+          }}
+        >
+          <div className="input-stack">
+            <input
+              ref={addInputRef}
+              value={itemName}
+              onChange={(event) => setItemName(event.target.value)}
+              placeholder="Was möchtest du einkaufen?"
+              aria-label="Item name"
+            />
+            {suggestions.length > 0 && (
+              <div className="suggestions">
+                {suggestions.map((name) => (
+                  <button key={name} type="button" onClick={() => setItemName(name)}>
+                    {name}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </form>
       </header>
 
       <main className="list-grid">
@@ -149,7 +224,15 @@ const App = () => {
             key={item.id}
             type="button"
             className={`item-card ${item.checked ? "item-card--checked" : ""}`}
-            onClick={() => toggleItem(item.id)}
+            onPointerDown={() => handleItemPointerDown(item.id, item.name, item.quantityOrUnit)}
+            onPointerUp={() => void handleItemPointerUp(item.id)}
+            onPointerLeave={handleItemPointerCancel}
+            onPointerCancel={handleItemPointerCancel}
+            onClick={(event) => {
+              if (longPressTriggeredRef.current) {
+                event.preventDefault();
+              }
+            }}
           >
             <span className="item-icon" aria-hidden="true">
               {getItemIcon(item.name)}
@@ -165,60 +248,56 @@ const App = () => {
       </main>
 
       <footer className="bottom-bar">
-        <button className="fab" type="button" onClick={() => setIsAddOpen(true)}>
+        <button className="bottom-icon" type="button" aria-label="Open list menu">
+          ≡
+        </button>
+        <button
+          className="fab"
+          type="button"
+          onClick={() => addInputRef.current?.focus()}
+          aria-label="Add item"
+        >
           +
+        </button>
+        <button className="bottom-icon" type="button" aria-label="Share list">
+          ↗
         </button>
       </footer>
 
-      {isAddOpen && (
+      {editingItemId && (
         <div className="modal-backdrop" role="dialog" aria-modal="true">
           <div className="modal">
             <div className="modal__header">
-              <h2>Add item</h2>
+              <h2>Edit item</h2>
               <button
                 type="button"
                 className="icon-button"
-                onClick={() => setIsAddOpen(false)}
-                aria-label="Close add item"
+                onClick={() => setEditingItemId(null)}
+                aria-label="Close edit item"
               >
                 ✕
               </button>
             </div>
             <div className="modal__body">
-              <div className="input-stack">
-                <input
-                  value={itemName}
-                  onChange={(event) => setItemName(event.target.value)}
-                  placeholder="Add item"
-                  aria-label="Item name"
-                />
-                {suggestions.length > 0 && (
-                  <div className="suggestions">
-                    {suggestions.map((name) => (
-                      <button
-                        key={name}
-                        type="button"
-                        onClick={() => setItemName(name)}
-                      >
-                        {name}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
               <input
-                value={quantityOrUnit}
-                onChange={(event) => setQuantityOrUnit(event.target.value)}
+                value={editItemName}
+                onChange={(event) => setEditItemName(event.target.value)}
+                placeholder="Item name"
+                aria-label="Item name"
+              />
+              <input
+                value={editItemQuantity}
+                onChange={(event) => setEditItemQuantity(event.target.value)}
                 placeholder="Qty / unit (optional)"
                 aria-label="Quantity or unit"
               />
             </div>
             <div className="modal__actions">
-              <button type="button" className="ghost-button" onClick={() => setIsAddOpen(false)}>
+              <button type="button" className="ghost-button" onClick={() => setEditingItemId(null)}>
                 Cancel
               </button>
-              <button type="button" className="primary-button" onClick={handleAddItem}>
-                Add
+              <button type="button" className="primary-button" onClick={handleSaveItem}>
+                Save
               </button>
             </div>
           </div>
