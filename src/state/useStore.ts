@@ -17,6 +17,7 @@ type StoreState = {
   setActiveList: (listId: string) => void;
   addItem: (listId: string, name: string, quantityOrUnit?: string) => Promise<void>;
   toggleItem: (itemId: string) => Promise<void>;
+  updateItem: (itemId: string, name: string, quantityOrUnit?: string) => Promise<void>;
 };
 
 export const useStore = create<StoreState>((set, get) => ({
@@ -84,6 +85,21 @@ export const useStore = create<StoreState>((set, get) => ({
     const item = items.find((entry) => entry.id === itemId);
     if (!item) return;
     const updated = { ...item, checked: !item.checked, updatedAt: Date.now() };
+    await db.items.put(updated);
+    set((state) => ({
+      items: state.items.map((entry) => (entry.id === itemId ? updated : entry))
+    }));
+  },
+  updateItem: async (itemId: string, name: string, quantityOrUnit?: string) => {
+    const { items } = get();
+    const item = items.find((entry) => entry.id === itemId);
+    if (!item) return;
+    const updated = {
+      ...item,
+      name,
+      quantityOrUnit,
+      updatedAt: Date.now()
+    };
     await db.items.put(updated);
     set((state) => ({
       items: state.items.map((entry) => (entry.id === itemId ? updated : entry))
