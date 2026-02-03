@@ -16,5 +16,7 @@ export type Item = {
 };
 
 export type AppMetadata = {
+  id: string;
+  appVersion: string;
   lastOpenedAt: number;
 };

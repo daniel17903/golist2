@@ -1,12 +1,14 @@
 import { create } from "zustand";
-import type { Item, List } from "../domain/types";
+import type { AppMetadata, Item, List } from "../domain/types";
 import { db } from "../storage/db";
 
 const createId = () => crypto.randomUUID();
+const appVersion = __APP_VERSION__;
 
 type StoreState = {
   lists: List[];
   items: Item[];
+  metadata?: AppMetadata;
   activeListId?: string;
   isLoaded: boolean;
   load: () => Promise<void>;
@@ -25,10 +27,17 @@ export const useStore = create<StoreState>((set, get) => ({
   load: async () => {
     const [lists, items] = await Promise.all([db.lists.toArray(), db.items.toArray()]);
     const sortedLists = lists.sort((a, b) => a.createdAt - b.createdAt);
+    const metadata: AppMetadata = {
+      id: "app",
+      appVersion,
+      lastOpenedAt: Date.now()
+    };
+    await db.metadata.put(metadata);
     set({
       lists: sortedLists,
       items,
       activeListId: sortedLists[0]?.id,
+      metadata,
       isLoaded: true
     });
   },
