@@ -1,0 +1,250 @@
+:root {
+  font-family: "Inter", system-ui, -apple-system, sans-serif;
+  color: #0b1f2a;
+  background: linear-gradient(180deg, #0b3d5c 0%, #d6edc6 50%, #cceef7 100%);
+  min-height: 100vh;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+.app {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  padding: 24px 20px 120px;
+}
+
+.app__header {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  color: #f3f8f6;
+}
+
+.list-selector {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.list-selector select {
+  padding: 8px 12px;
+  border-radius: 12px;
+  border: none;
+  background: rgba(255, 255, 255, 0.2);
+  color: #f3f8f6;
+  backdrop-filter: blur(8px);
+}
+
+.ghost-button {
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  background: transparent;
+  color: #f3f8f6;
+  border-radius: 999px;
+  padding: 6px 12px;
+}
+
+.title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.title-row h1 {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 600;
+}
+
+.title-edit {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.title-edit input {
+  padding: 8px 12px;
+  border-radius: 12px;
+  border: none;
+}
+
+.title-edit button {
+  border-radius: 999px;
+  border: none;
+  padding: 6px 12px;
+}
+
+.icon-button {
+  background: transparent;
+  border: none;
+  font-size: 20px;
+  color: #f3f8f6;
+}
+
+.list-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 16px;
+  margin-top: 20px;
+}
+
+.item-card {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  border-radius: 18px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  min-height: 140px;
+  color: #f3f8f6;
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.15);
+  text-align: left;
+}
+
+.item-card--checked {
+  opacity: 0.6;
+  text-decoration: line-through;
+}
+
+.item-icon {
+  font-size: 32px;
+}
+
+.item-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.item-name {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.item-quantity {
+  font-size: 13px;
+  opacity: 0.8;
+}
+
+.bottom-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 16px 20px 24px;
+  background: rgba(11, 61, 92, 0.9);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
+  backdrop-filter: blur(12px);
+}
+
+.input-stack {
+  position: relative;
+}
+
+.suggestions {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 44px;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.2);
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  z-index: 10;
+}
+
+.suggestions button {
+  border: none;
+  background: transparent;
+  text-align: left;
+  padding: 6px 8px;
+  border-radius: 8px;
+}
+
+.suggestions button:hover {
+  background: rgba(11, 61, 92, 0.1);
+}
+
+.fab {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: none;
+  background: #f0f5f3;
+  font-size: 28px;
+  color: #0b3d5c;
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.2);
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(5, 18, 28, 0.6);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 24px 20px 80px;
+}
+
+.modal {
+  width: min(520px, 100%);
+  background: #f4f7f5;
+  border-radius: 24px;
+  padding: 20px;
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.25);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.modal__header h2 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.modal__body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.modal__body input {
+  border-radius: 12px;
+  border: 1px solid rgba(11, 61, 92, 0.2);
+  padding: 10px 12px;
+  font-size: 14px;
+}
+
+.modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.primary-button {
+  border: none;
+  border-radius: 999px;
+  background: #0b3d5c;
+  color: #f4f7f5;
+  padding: 8px 16px;
+}
