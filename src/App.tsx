@@ -151,38 +151,23 @@ const App = () => {
     <div className="app">
       <header className="app__header">
         <div className="title-row">
-          {editingTitle ? (
-            <div className="title-edit">
-              <input
-                value={newListName}
-                onChange={(event) => setNewListName(event.target.value)}
-                placeholder="Listenname"
+          <h1>{activeList?.name ?? ""}</h1>
+          <button
+            type="button"
+            className="icon-button"
+            onClick={() => {
+              setNewListName(activeList?.name ?? "");
+              setEditingTitle(true);
+            }}
+            aria-label="Edit list name"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M3 17.25V21h3.75l11.06-11.06-3.75-3.75L3 17.25zm17.71-10.04c.39-.39.39-1.02 0-1.41l-2.51-2.5c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.99-1.67z"
+                fill="currentColor"
               />
-              <button type="button" className="ghost-button" onClick={handleRenameList}>
-                Speichern
-              </button>
-            </div>
-          ) : (
-            <h1>{activeList?.name ?? ""}</h1>
-          )}
-          {!editingTitle && (
-            <button
-              type="button"
-              className="icon-button"
-              onClick={() => {
-                setNewListName(activeList?.name ?? "");
-                setEditingTitle(true);
-              }}
-              aria-label="Edit list name"
-            >
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path
-                  d="M3 17.25V21h3.75l11.06-11.06-3.75-3.75L3 17.25zm17.71-10.04c.39-.39.39-1.02 0-1.41l-2.51-2.5c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.99-1.67z"
-                  fill="currentColor"
-                />
-              </svg>
-            </button>
-          )}
+            </svg>
+          </button>
         </div>
       </header>
 
@@ -384,40 +369,71 @@ const App = () => {
         </div>
       )}
 
+      {editingTitle && (
+        <div className="modal-backdrop" role="dialog" aria-modal="true">
+          <div className="modal">
+            <div className="modal__header">
+              <h2>Liste bearbeiten</h2>
+            </div>
+            <div className="modal__body">
+              <div className="modal__field">
+                <label htmlFor="list-name">Name</label>
+                <input
+                  id="list-name"
+                  value={newListName}
+                  onChange={(event) => setNewListName(event.target.value)}
+                  placeholder="Listenname"
+                />
+              </div>
+            </div>
+            <div className="modal__actions">
+              <button
+                type="button"
+                className="text-button"
+                onClick={() => setEditingTitle(false)}
+              >
+                Abbrechen
+              </button>
+              <button type="button" className="text-button" onClick={handleRenameList}>
+                Speichern
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {editingItemId && (
         <div className="modal-backdrop" role="dialog" aria-modal="true">
           <div className="modal">
             <div className="modal__header">
-              <h2>Edit item</h2>
-              <button
-                type="button"
-                className="icon-button"
-                onClick={() => setEditingItemId(null)}
-                aria-label="Close edit item"
-              >
-                ✕
-              </button>
+              <h2>Eintrag bearbeiten</h2>
             </div>
             <div className="modal__body">
-              <input
-                value={editItemName}
-                onChange={(event) => setEditItemName(event.target.value)}
-                placeholder="Item name"
-                aria-label="Item name"
-              />
-              <input
-                value={editItemQuantity}
-                onChange={(event) => setEditItemQuantity(event.target.value)}
-                placeholder="Qty / unit (optional)"
-                aria-label="Quantity or unit"
-              />
+              <div className="modal__field">
+                <label htmlFor="item-name">Name</label>
+                <input
+                  id="item-name"
+                  value={editItemName}
+                  onChange={(event) => setEditItemName(event.target.value)}
+                  placeholder="Name"
+                />
+              </div>
+              <div className="modal__field">
+                <label htmlFor="item-quantity">Menge</label>
+                <input
+                  id="item-quantity"
+                  value={editItemQuantity}
+                  onChange={(event) => setEditItemQuantity(event.target.value)}
+                  placeholder="Menge"
+                />
+              </div>
             </div>
             <div className="modal__actions">
-              <button type="button" className="ghost-button" onClick={() => setEditingItemId(null)}>
-                Cancel
+              <button type="button" className="text-button" onClick={() => setEditingItemId(null)}>
+                Abbrechen
               </button>
-              <button type="button" className="primary-button" onClick={handleSaveItem}>
-                Save
+              <button type="button" className="text-button" onClick={handleSaveItem}>
+                Speichern
               </button>
             </div>
           </div>
