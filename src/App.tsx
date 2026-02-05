@@ -66,18 +66,38 @@ const App = () => {
     return Array.from(stats.entries()).map(([name, data]) => ({ name, ...data }));
   }, [items, activeListId]);
 
+  const currentItemNames = useMemo(() => {
+    const names = new Set<string>();
+    listItems.forEach((item) => {
+      const key = item.name.trim().toLowerCase();
+      if (key) {
+        names.add(key);
+      }
+    });
+    return names;
+  }, [listItems]);
+
   const suggestions = useMemo(() => {
-    const query = itemName.trim().toLowerCase();
+    const trimmed = itemName.trim();
+    const query = trimmed.toLowerCase();
     const sorted = suggestionPool
       .slice()
       .sort((a, b) => {
         if (a.count !== b.count) return b.count - a.count;
         return b.lastUsed - a.lastUsed;
       })
-      .map((entry) => entry.name);
+      .map((entry) => entry.name)
+      .filter((name) => !currentItemNames.has(name.trim().toLowerCase()));
     if (!query) return sorted.slice(0, 12);
-    return sorted.filter((name) => name.toLowerCase().includes(query)).slice(0, 12);
-  }, [itemName, suggestionPool]);
+    const filtered = sorted.filter((name) => name.toLowerCase().includes(query));
+    if (trimmed && !currentItemNames.has(query)) {
+      const alreadySuggested = filtered.some((name) => name.toLowerCase() === query);
+      if (!alreadySuggested) {
+        filtered.unshift(trimmed);
+      }
+    }
+    return filtered.slice(0, 12);
+  }, [itemName, suggestionPool, currentItemNames]);
 
   const handleAddItem = async () => {
     if (!activeListId) return;
