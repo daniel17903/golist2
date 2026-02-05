@@ -755,6 +755,9 @@ const categoryEntries: CategoryEntry[] = [
 
 const itemCategoryMap = new Map<string, string>();
 const itemAssetMap = new Map<string, string>();
+const iconBasePath = "/icons";
+const defaultIconName = "default";
+const buildIconPath = (iconName: string) => `${iconBasePath}/${iconName}.png`;
 
 categoryEntries.forEach((entry) => {
   entry.matchingNames.forEach((name) => {
@@ -768,86 +771,6 @@ categoryEntries.forEach((entry) => {
     }
   });
 });
-
-const assetIconMap: Record<string, string> = {
-  apple: "🍎",
-  banana: "🍌",
-  bottle: "🍾",
-  box: "📦",
-  flour: "🌾",
-  bread: "🥖",
-  can: "🥫",
-  carrot: "🥕",
-  corn: "🌽",
-  cup: "🥛",
-  glas: "🫙",
-  leek: "🧅",
-  peanut: "🥜",
-  almonds: "🌰",
-  round_fruit: "🍑",
-  dead_cow: "🥩",
-  dead_pig: "🥓",
-  dead_chicken: "🍗",
-  fish: "🐟",
-  cookie: "🍪",
-  pepper: "🫑",
-  onion: "🧅",
-  pear: "🍐",
-  cabbage: "🥬",
-  broccoli: "🥦",
-  eggplant: "🍆",
-  salad: "🥗",
-  chocolate: "🍫",
-  ice: "🍦",
-  berries: "🫐",
-  strawberry: "🍓",
-  block: "🧈",
-  burger: "🍔",
-  herbs: "🌿",
-  pizza_cake: "🍕",
-  yeast: "🧫",
-  package: "🧁",
-  pasta: "🍝",
-  lemon: "🍋",
-  potatos: "🥔",
-  garlic: "🧄",
-  spice: "🧂",
-  rice: "🍚",
-  paper_towel: "🧻",
-  toilet_paper: "🧻",
-  baking_paper: "📄",
-  mushroom: "🍄",
-  papaya: "🥭",
-  rhubarb: "🌱",
-  tetrapack: "🧃",
-  egg: "🥚",
-  coffee_beans: "☕",
-  tea: "🍵",
-  sugar: "🍚",
-  cheese: "🧀",
-  asparagus: "🥬",
-  gnocchi: "🥟",
-  pumpkin: "🎃",
-  beetroot: "🫒",
-  radish: "🫒",
-  cucumber: "🥒",
-  dates: "🌴",
-  lime: "🍋",
-  paper_bag: "🛍️",
-  raisins: "🍇",
-  round_fruit_small: "🍑",
-  seeds: "🌻",
-  sponge: "🧽",
-  zucchini: "🥒",
-  avocado: "🥑",
-  melon: "🍈",
-  tampon: "🧻",
-  pineapple: "🍍",
-  sweets: "🍬",
-  cream: "🧴",
-  shower_gel: "🧴",
-  dish_soap: "🧼"
-};
 
 export const getCategoryForItem = (name: string): Category | undefined => {
   const key = name.trim().toLowerCase();
@@ -863,9 +786,8 @@ export const getCategoryOrder = (name: string): number | undefined => {
 export const getItemIcon = (name: string): string => {
   const key = name.trim().toLowerCase();
   const asset = itemAssetMap.get(key);
-  if (asset && assetIconMap[asset]) {
-    return assetIconMap[asset];
+  if (asset) {
+    return buildIconPath(asset);
   }
-  const category = getCategoryForItem(name);
-  return category?.icon ?? "🛒";
+  return buildIconPath(defaultIconName);
 };

@@ -28,7 +28,7 @@ const { GoListDatabase } = await import("./db");
 
 describe("GoListDatabase", () => {
   it("initializes schema versions with expected tables", () => {
-    const db = new GoListDatabase() as {
+    const db = new GoListDatabase() as unknown as {
       name: string;
       versions: Array<{ number: number; stores: Record<string, string> | null }>;
     };

@@ -14,6 +14,7 @@ type StoreState = {
   load: () => Promise<void>;
   addList: (name: string) => Promise<void>;
   renameList: (listId: string, name: string) => Promise<void>;
+  deleteList: (listId: string) => Promise<void>;
   setActiveList: (listId: string) => void;
   addItem: (listId: string, name: string, quantityOrUnit?: string) => Promise<void>;
   toggleItem: (itemId: string) => Promise<void>;
@@ -64,6 +65,20 @@ export const useStore = create<StoreState>((set, get) => ({
         list.id === listId ? { ...list, name, updatedAt: now } : list
       )
     }));
+  },
+  deleteList: async (listId: string) => {
+    await db.items.where("listId").equals(listId).delete();
+    await db.lists.delete(listId);
+    set((state) => {
+      const remainingLists = state.lists.filter((list) => list.id !== listId);
+      const nextActiveListId =
+        state.activeListId === listId ? remainingLists[0]?.id : state.activeListId;
+      return {
+        lists: remainingLists,
+        items: state.items.filter((item) => item.listId !== listId),
+        activeListId: nextActiveListId
+      };
+    });
   },
   setActiveList: (listId: string) => set({ activeListId: listId }),
   addItem: async (listId: string, name: string, quantityOrUnit?: string) => {

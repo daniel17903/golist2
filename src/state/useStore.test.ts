@@ -13,6 +13,9 @@ const listAdd = vi.fn(async (list: List) => {
 const listUpdate = vi.fn(async (id: string, updates: Partial<List>) => {
   listsData = listsData.map((list) => (list.id === id ? { ...list, ...updates } : list));
 });
+const listDelete = vi.fn(async (id: string) => {
+  listsData = listsData.filter((list) => list.id !== id);
+});
 const itemAdd = vi.fn(async (item: Item) => {
   itemsData.push(item);
   return item.id;
@@ -20,18 +23,29 @@ const itemAdd = vi.fn(async (item: Item) => {
 const itemPut = vi.fn(async (item: Item) => {
   itemsData = itemsData.map((entry) => (entry.id === item.id ? item : entry));
 });
+const itemsWhere = vi.fn((field: keyof Item) => ({
+  equals: (value: Item[keyof Item]) => ({
+    delete: vi.fn(async () => {
+      if (field === "listId") {
+        itemsData = itemsData.filter((item) => item.listId !== value);
+      }
+    })
+  })
+}));
 
 vi.mock("../storage/db", () => ({
   db: {
     lists: {
       toArray: vi.fn(async () => [...listsData]),
       add: listAdd,
-      update: listUpdate
+      update: listUpdate,
+      delete: listDelete
     },
     items: {
       toArray: vi.fn(async () => [...itemsData]),
       add: itemAdd,
-      put: itemPut
+      put: itemPut,
+      where: itemsWhere
     },
     metadata: {
       put: metadataPut
@@ -58,8 +72,10 @@ describe("useStore", () => {
     metadataPut.mockClear();
     listAdd.mockClear();
     listUpdate.mockClear();
+    listDelete.mockClear();
     itemAdd.mockClear();
     itemPut.mockClear();
+    itemsWhere.mockClear();
     resetStore();
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2024-01-01T00:00:00Z"));
@@ -97,14 +113,16 @@ describe("useStore", () => {
   });
 
   it("adds a list and sets it active", async () => {
-    const uuidSpy = vi.spyOn(globalThis.crypto, "randomUUID").mockReturnValue("list-id");
+    const uuidSpy = vi
+      .spyOn(globalThis.crypto, "randomUUID")
+      .mockReturnValue("00000000-0000-0000-0000-000000000001");
 
     await useStore.getState().addList("Groceries");
 
     const state = useStore.getState();
     expect(state.lists).toHaveLength(1);
     expect(state.lists[0]?.name).toBe("Groceries");
-    expect(state.activeListId).toBe("list-id");
+    expect(state.activeListId).toBe("00000000-0000-0000-0000-000000000001");
     expect(listAdd).toHaveBeenCalledTimes(1);
 
     uuidSpy.mockRestore();
@@ -126,7 +144,9 @@ describe("useStore", () => {
   });
 
   it("adds an item to the list", async () => {
-    const uuidSpy = vi.spyOn(globalThis.crypto, "randomUUID").mockReturnValue("item-id");
+    const uuidSpy = vi
+      .spyOn(globalThis.crypto, "randomUUID")
+      .mockReturnValue("00000000-0000-0000-0000-000000000002");
 
     await useStore.getState().addItem("list-1", "Milk", "2L");
 
@@ -161,5 +181,40 @@ describe("useStore", () => {
         checked: true
       })
     );
+  });
+
+  it("deletes a list with its items and updates active list", async () => {
+    listsData = [
+      { id: "list-1", name: "One", createdAt: 1, updatedAt: 1 },
+      { id: "list-2", name: "Two", createdAt: 2, updatedAt: 2 }
+    ];
+    itemsData = [
+      {
+        id: "item-1",
+        listId: "list-1",
+        name: "Milk",
+        checked: false,
+        createdAt: 1,
+        updatedAt: 1
+      },
+      {
+        id: "item-2",
+        listId: "list-2",
+        name: "Apples",
+        checked: false,
+        createdAt: 2,
+        updatedAt: 2
+      }
+    ];
+    useStore.setState({ lists: [...listsData], items: [...itemsData], activeListId: "list-1" });
+
+    await useStore.getState().deleteList("list-1");
+
+    const state = useStore.getState();
+    expect(state.lists.map((list) => list.id)).toEqual(["list-2"]);
+    expect(state.items.map((item) => item.id)).toEqual(["item-2"]);
+    expect(state.activeListId).toBe("list-2");
+    expect(listDelete).toHaveBeenCalledWith("list-1");
+    expect(itemsWhere).toHaveBeenCalledWith("listId");
   });
 });
