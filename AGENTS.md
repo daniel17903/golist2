@@ -18,12 +18,11 @@
 - `npm run lint`
 - `npm run typecheck`
 - `npm run build`
-
-> Note: In this environment, `npm install` may fail with a registry 403. If so, rely on CI once registry access is configured.
+- `npm run test`
 
 ## CI/CD
-- GitHub Actions workflow validates `lint`, `typecheck`, and `build` on PRs.
-- Deploy workflow builds and deploys to Vercel on `main`.
+- GitHub Actions workflow validates `lint`, `typecheck`, `test` and `build` on PRs.
+- Deploy workflow builds on `main`.
 
 ## PWA assets
 - `public/favicon.svg`.
