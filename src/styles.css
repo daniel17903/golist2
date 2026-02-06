@@ -120,6 +120,7 @@ body {
   color: #f3f8f6;
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
   text-align: center;
+  overflow: hidden;
 }
 
 .item-card--checked {
@@ -148,6 +149,8 @@ body {
   gap: 4px;
   align-items: center;
   width: 100%;
+  flex: 1;
+  overflow: hidden;
 }
 
 .item-name {
@@ -156,7 +159,7 @@ body {
   max-width: 100%;
   overflow: hidden;
   display: -webkit-box;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 1;
   -webkit-box-orient: vertical;
   word-break: break-word;
 }
