@@ -757,7 +757,7 @@ const itemCategoryMap = new Map<string, string>();
 const itemAssetMap = new Map<string, string>();
 const iconBasePath = "/icons";
 const defaultIconName = "default";
-const buildIconPath = (iconName: string) => `${iconBasePath}/${iconName}.png`;
+const buildIconPath = (iconName: string) => `${iconBasePath}/${iconName}.svg`;
 
 categoryEntries.forEach((entry) => {
   entry.matchingNames.forEach((name) => {

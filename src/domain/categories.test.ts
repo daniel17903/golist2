@@ -13,10 +13,10 @@ describe("categories helpers", () => {
   });
 
   it("returns a specific icon when an asset match exists", () => {
-    expect(getItemIcon("apple")).toBe("/icons/apple.png");
+    expect(getItemIcon("apple")).toBe("/icons/apple.svg");
   });
 
   it("falls back to the default icon when no match exists", () => {
-    expect(getItemIcon("mystery item")).toBe("/icons/default.png");
+    expect(getItemIcon("mystery item")).toBe("/icons/default.svg");
   });
 });
