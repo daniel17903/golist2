@@ -288,7 +288,7 @@ const App = () => {
                         />
                       </svg>
                     </span>
-                    <span>{list.name}</span>
+                    <span className="drawer__item-label">{list.name}</span>
                   </button>
                   <button
                     type="button"
