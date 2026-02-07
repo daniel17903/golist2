@@ -144,8 +144,8 @@ body {
 }
 
 .item-text {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-rows: minmax(0, calc(1.2em * 2)) auto;
   gap: 4px;
   align-items: center;
   width: 100%;
