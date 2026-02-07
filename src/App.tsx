@@ -367,26 +367,34 @@ const App = () => {
               />
             </form>
             <div className="modal__grid">
-              {suggestions.map((name) => (
-                <button
-                  key={name}
-                  type="button"
-                  className="item-card item-card--dialog"
-                  onClick={async () => {
-                    if (!activeListId) return;
-                    const parsed = parseItemInput(name);
-                    if (!parsed.name) return;
-                    await addItem(activeListId, parsed.name, parsed.quantityOrUnit);
-                    setItemName("");
-                    setIsAddDialogOpen(false);
-                  }}
-                >
-                  <span className="item-icon" aria-hidden="true">
-                    <img src={getItemIcon(name)} alt="" />
-                  </span>
-                  <span className="item-name">{name}</span>
-                </button>
-              ))}
+              {suggestions.map((name) => {
+                const parsed = parseItemInput(name);
+                const displayName = parsed.name || name;
+                return (
+                  <button
+                    key={name}
+                    type="button"
+                    className="item-card item-card--dialog"
+                    onClick={async () => {
+                      if (!activeListId) return;
+                      if (!parsed.name) return;
+                      await addItem(activeListId, parsed.name, parsed.quantityOrUnit);
+                      setItemName("");
+                      setIsAddDialogOpen(false);
+                    }}
+                  >
+                    <span className="item-icon" aria-hidden="true">
+                      <img src={getItemIcon(displayName)} alt="" />
+                    </span>
+                    <div className="item-text">
+                      <span className="item-name">{displayName}</span>
+                      {parsed.quantityOrUnit && (
+                        <span className="item-quantity">{parsed.quantityOrUnit}</span>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>
