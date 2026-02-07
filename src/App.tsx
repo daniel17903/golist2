@@ -102,10 +102,8 @@ const App = () => {
 
   const handleAddItem = async () => {
     if (!activeListId) return;
-    const trimmed = itemName.trim();
-    if (!trimmed) return;
-    const parsed = parseItemInput(trimmed);
-    if (!parsed.name) return;
+    const parsed = parseItemInput(itemName);
+    if (!parsed.name.trim()) return;
     await addItem(activeListId, parsed.name, parsed.quantityOrUnit);
     setItemName("");
     setIsAddDialogOpen(false);
