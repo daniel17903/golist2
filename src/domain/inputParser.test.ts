@@ -1,32 +1,44 @@
 import { describe, expect, it } from "vitest";
-import { parseItemInput } from "./inputParser";
+import { parseAmount, parseItemInput } from "./inputParser";
+
+describe("parseAmount", () => {
+  const inputsToExpected: Record<string, string | undefined> = {
+    efwefwg: undefined,
+    "1Liter wefwg": "1Liter",
+    "1 Liter wefwg": "1 Liter",
+    "1 fwefew": "1",
+    "1 dose fwefew": "1 dose",
+    "2 dosen fwefew": "2 dosen",
+    fwef2geweg: undefined,
+    efwef2literwegwg: undefined,
+    "2literwrgwg": undefined,
+    "kuchen 2 Stück": "2 Stück",
+    "kuchen 2": "2",
+    "2.5 liter wasser": "2.5 liter",
+    "2,5 liter wasser": "2,5 liter",
+    "mehl typ 630": undefined,
+    "mehl Typ 630": undefined
+  };
+
+  Object.entries(inputsToExpected).forEach(([input, expected]) => {
+    it(`${input} -> ${expected ?? "no amount"}`, () => {
+      expect(parseAmount(input)).toBe(expected);
+    });
+  });
+});
 
 describe("parseItemInput", () => {
-  const inputsToExpected: Array<{
-    input: string;
-    name: string;
-    quantityOrUnit?: string;
-  }> = [
-    { input: "efwefwg", name: "efwefwg" },
-    { input: "1Liter wefwg", name: "wefwg", quantityOrUnit: "1Liter" },
-    { input: "1 Liter wefwg", name: "wefwg", quantityOrUnit: "1 Liter" },
-    { input: "1 fwefew", name: "fwefew", quantityOrUnit: "1" },
-    { input: "1 dose fwefew", name: "fwefew", quantityOrUnit: "1 dose" },
-    { input: "2 dosen fwefew", name: "fwefew", quantityOrUnit: "2 dosen" },
-    { input: "fwef2geweg", name: "fwef2geweg" },
-    { input: "efwef2literwegwg", name: "efwef2literwegwg" },
-    { input: "2literwrgwg", name: "2literwrgwg" },
-    { input: "kuchen 2 Stück", name: "kuchen", quantityOrUnit: "2 Stück" },
-    { input: "kuchen 2", name: "kuchen", quantityOrUnit: "2" },
-    { input: "2.5 liter wasser", name: "wasser", quantityOrUnit: "2.5 liter" },
-    { input: "2,5 liter wasser", name: "wasser", quantityOrUnit: "2,5 liter" },
-    { input: "mehl typ 630", name: "mehl typ 630" },
-    { input: "mehl Typ 630", name: "mehl Typ 630" }
-  ];
+  it("returns parsed name and quantityOrUnit", () => {
+    expect(parseItemInput("2 Liter Milch")).toEqual({
+      name: "Milch",
+      quantityOrUnit: "2 Liter"
+    });
+  });
 
-  inputsToExpected.forEach(({ input, name, quantityOrUnit }) => {
-    it(`${input} -> ${quantityOrUnit ?? "no amount"}`, () => {
-      expect(parseItemInput(input)).toEqual({ name, quantityOrUnit });
+  it("returns the full input when no amount is present", () => {
+    expect(parseItemInput("Äpfel")).toEqual({
+      name: "Äpfel",
+      quantityOrUnit: undefined
     });
   });
 });

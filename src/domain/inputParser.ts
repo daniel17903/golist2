@@ -6,7 +6,7 @@ export type ParsedItemInput = {
   quantityOrUnit?: string;
 };
 
-const parseAmount = (input: string): string | undefined => {
+export const parseAmount = (input: string): string | undefined => {
   const cleanedInput = input.replace(/typ +[0-9]+/gi, "");
   const match = cleanedInput.match(new RegExp(amountPattern, "i"));
   return match?.[2];
