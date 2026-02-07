@@ -376,7 +376,9 @@ const App = () => {
                   className="item-card item-card--dialog"
                   onClick={async () => {
                     if (!activeListId) return;
-                    await addItem(activeListId, name);
+                    const parsed = parseItemInput(name);
+                    if (!parsed.name) return;
+                    await addItem(activeListId, parsed.name, parsed.quantityOrUnit);
                     setItemName("");
                     setIsAddDialogOpen(false);
                   }}
