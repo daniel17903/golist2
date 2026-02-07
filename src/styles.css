@@ -356,7 +356,7 @@ body {
   display: flex;
   align-items: flex-start;
   justify-content: flex-start;
-  background-image: url("/icons/icon_foreground.png");
+  background-image: url("/icons/icon_new.svg");
   background-repeat: no-repeat;
   background-position: bottom right;
   background-size: 180px;
