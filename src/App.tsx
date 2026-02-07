@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getItemIcon } from "./domain/categories";
+import { parseItemInput } from "./domain/inputParser";
 import { sortItemsForList } from "./domain/sort";
 import { useStore } from "./state/useStore";
 
@@ -103,7 +104,9 @@ const App = () => {
     if (!activeListId) return;
     const trimmed = itemName.trim();
     if (!trimmed) return;
-    await addItem(activeListId, trimmed);
+    const parsed = parseItemInput(trimmed);
+    if (!parsed.name) return;
+    await addItem(activeListId, parsed.name, parsed.quantityOrUnit);
     setItemName("");
     setIsAddDialogOpen(false);
   };
