@@ -5,6 +5,7 @@
 - **Entry points**: `index.html`, `src/main.tsx`, `src/App.tsx`.
 - **State + storage**: `src/state/useStore.ts` (Zustand) + `src/storage/db.ts` (Dexie).
 - **Domain logic**: `src/domain/` (types, categories, sorting).
+- **UI composition**: `src/components/` (shared UI building blocks) + `src/hooks/` (UI state/behavior).
 - **Styling**: `src/styles.css`.
 
 ## Quickstart
