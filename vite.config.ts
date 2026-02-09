@@ -10,7 +10,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: "autoUpdate",
-      includeAssets: ["favicon.svg"],
+      includeAssets: ["favicon.svg", "icons/*.svg"],
       manifest: {
         name: "GoList",
         short_name: "GoList",
@@ -22,7 +22,30 @@ export default defineConfig({
           {
             src: "/favicon.svg",
             sizes: "any",
-            type: "image/svg+xml"
+            type: "image/svg+xml",
+            purpose: "any maskable"
+          },
+          {
+            src: "/icons/icon_new.svg",
+            sizes: "any",
+            type: "image/svg+xml",
+            purpose: "any maskable"
+          }
+        ]
+      },
+      workbox: {
+        globPatterns: ["**/*.{ico,png,svg,jpg,jpeg,webp,gif}"],
+        runtimeCaching: [
+          {
+            urlPattern: ({ request }) => request.destination === "image",
+            handler: "CacheFirst",
+            options: {
+              cacheName: "images",
+              expiration: {
+                maxEntries: 200,
+                maxAgeSeconds: 60 * 60 * 24 * 30
+              }
+            }
           }
         ]
       }
