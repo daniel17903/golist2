@@ -207,7 +207,7 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: none;
+  border: 4px solid transparent;
 }
 
 .bottom-icon {
