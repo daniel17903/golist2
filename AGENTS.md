@@ -48,3 +48,6 @@
 ## Common pitfalls
 - The PWA service worker can cache aggressively; use hard refresh or clear site data
   when debugging PWA changes.
+
+## Tooling note
+- Use the Context7 MCP server for quick library/API references when needed.
