@@ -14,10 +14,14 @@ export default defineConfig({
       manifest: {
         name: "GoList",
         short_name: "GoList",
+        description: "Smart grocery lists with list-specific suggestions and category sorting.",
+        categories: ["shopping", "productivity", "utilities"],
         theme_color: "#0b3d5c",
         background_color: "#cfe8d6",
         display: "standalone",
         start_url: "/",
+        id: "/",
+        scope: "/",
         icons: [
           {
             src: "/favicon.svg",
