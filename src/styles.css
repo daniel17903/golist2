@@ -223,7 +223,7 @@ body {
   left: 0;
   right: 0;
   padding: 6px 18px 10px;
-  background: radial-gradient(circle at 50% 4px, transparent 36px, #005382 37px);
+  background: radial-gradient(circle at 50% 2px, transparent 31px, #005382 32px);
   display: flex;
   justify-content: space-between;
   align-items: center;
