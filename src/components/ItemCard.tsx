@@ -4,6 +4,7 @@ import type { Item } from "../domain/types";
 
 type ItemCardProps = {
   item: Item;
+  isExiting: boolean;
   onPointerDown: (itemId: string, name: string, quantityOrUnit?: string) => void;
   onPointerUp: (itemId: string) => void;
   onPointerLeave: () => void;
@@ -13,6 +14,7 @@ type ItemCardProps = {
 
 const ItemCard = ({
   item,
+  isExiting,
   onPointerDown,
   onPointerUp,
   onPointerLeave,
@@ -22,7 +24,9 @@ const ItemCard = ({
   return (
     <button
       type="button"
-      className={`item-card ${item.checked ? "item-card--checked" : ""}`}
+      className={`item-card ${item.checked ? "item-card--checked" : ""} ${
+        isExiting ? "item-card--exit" : ""
+      }`}
       onPointerDown={() => onPointerDown(item.id, item.name, item.quantityOrUnit)}
       onPointerUp={() => onPointerUp(item.id)}
       onPointerLeave={onPointerLeave}

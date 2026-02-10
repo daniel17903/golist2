@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import AppHeader from "./components/AppHeader";
 import BottomBar from "./components/BottomBar";
 import AddItemDialog from "./components/AddItemDialog";
@@ -43,10 +44,33 @@ const App = () => {
     handleDeleteList
   } = useAppState();
 
+  const [exitingItemIds, setExitingItemIds] = useState<Set<string>>(new Set());
+  const exitingItemIdsRef = useRef(exitingItemIds);
+
+  useEffect(() => {
+    exitingItemIdsRef.current = exitingItemIds;
+  }, [exitingItemIds]);
+
+  const handleToggleItem = async (itemId: string) => {
+    if (exitingItemIdsRef.current.has(itemId)) return;
+    setExitingItemIds((current) => {
+      const next = new Set(current);
+      next.add(itemId);
+      return next;
+    });
+    await new Promise((resolve) => window.setTimeout(resolve, 280));
+    await toggleItem(itemId);
+    setExitingItemIds((current) => {
+      const next = new Set(current);
+      next.delete(itemId);
+      return next;
+    });
+  };
+
   const { handlePointerDown, handlePointerUp, handlePointerCancel, longPressTriggeredRef } =
     useLongPressItem({
       onLongPress: openEditItem,
-      onShortPress: toggleItem
+      onShortPress: handleToggleItem
     });
 
   return (
@@ -61,6 +85,7 @@ const App = () => {
 
       <ItemGrid
         items={listItems}
+        exitingItemIds={exitingItemIds}
         longPressTriggeredRef={longPressTriggeredRef}
         onPointerDown={handlePointerDown}
         onPointerUp={handlePointerUp}
