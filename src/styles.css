@@ -348,6 +348,14 @@ body {
   padding: 6px 4px;
 }
 
+.drawer-edge-swipe-zone {
+  position: fixed;
+  inset: 0 auto 0 0;
+  width: 28px;
+  z-index: 29;
+  touch-action: none;
+}
+
 .drawer-overlay {
   position: fixed;
   inset: 0;
@@ -381,6 +389,7 @@ body {
   transition: transform 0.3s ease;
   display: flex;
   flex-direction: column;
+  touch-action: none;
 }
 
 .drawer--open {

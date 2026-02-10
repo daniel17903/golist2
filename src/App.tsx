@@ -98,6 +98,7 @@ const App = () => {
         lists={lists}
         activeListId={activeListId}
         onClose={() => setIsDrawerOpen(false)}
+        onOpen={() => setIsDrawerOpen(true)}
         onSelectList={(listId) => {
           setActiveList(listId);
           setIsDrawerOpen(false);

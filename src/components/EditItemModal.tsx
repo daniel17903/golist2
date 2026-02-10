@@ -20,8 +20,12 @@ const EditItemModal = ({
   if (!isOpen) return null;
 
   return (
-    <div className="modal-backdrop" role="dialog" aria-modal="true">
-      <div className="modal">
+    <div className="modal-backdrop" role="dialog" aria-modal="true" onClick={onCancel}>
+      <div className="modal"
+        onClick={(event) => {
+          event.stopPropagation();
+        }}
+      >
         <div className="modal__header">
           <h2>Eintrag bearbeiten</h2>
         </div>
