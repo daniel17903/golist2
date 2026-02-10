@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import AppHeader from "./components/AppHeader";
 import BottomBar from "./components/BottomBar";
 import AddItemDialog from "./components/AddItemDialog";
@@ -45,20 +45,18 @@ const App = () => {
   } = useAppState();
 
   const [exitingItemIds, setExitingItemIds] = useState<Set<string>>(new Set());
-  const exitingItemIdsRef = useRef(exitingItemIds);
-
-  useEffect(() => {
-    exitingItemIdsRef.current = exitingItemIds;
-  }, [exitingItemIds]);
 
   const handleToggleItem = async (itemId: string) => {
-    if (exitingItemIdsRef.current.has(itemId)) return;
-    setExitingItemIds((current) => {
-      const next = new Set(current);
-      next.add(itemId);
-      return next;
-    });
-    await new Promise((resolve) => window.setTimeout(resolve, 280));
+    if (exitingItemIds.has(itemId)) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      await toggleItem(itemId);
+      return;
+    }
+    setExitingItemIds((current) => new Set(current).add(itemId));
+  };
+
+  const handleExitComplete = async (itemId: string) => {
+    if (!exitingItemIds.has(itemId)) return;
     await toggleItem(itemId);
     setExitingItemIds((current) => {
       const next = new Set(current);
@@ -86,6 +84,7 @@ const App = () => {
       <ItemGrid
         items={listItems}
         exitingItemIds={exitingItemIds}
+        onExitComplete={handleExitComplete}
         longPressTriggeredRef={longPressTriggeredRef}
         onPointerDown={handlePointerDown}
         onPointerUp={handlePointerUp}

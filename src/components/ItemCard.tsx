@@ -5,6 +5,7 @@ import type { Item } from "../domain/types";
 type ItemCardProps = {
   item: Item;
   isExiting: boolean;
+  onExitComplete: (itemId: string) => void;
   onPointerDown: (itemId: string, name: string, quantityOrUnit?: string) => void;
   onPointerUp: (itemId: string) => void;
   onPointerLeave: () => void;
@@ -15,6 +16,7 @@ type ItemCardProps = {
 const ItemCard = ({
   item,
   isExiting,
+  onExitComplete,
   onPointerDown,
   onPointerUp,
   onPointerLeave,
@@ -31,6 +33,11 @@ const ItemCard = ({
       onPointerUp={() => onPointerUp(item.id)}
       onPointerLeave={onPointerLeave}
       onPointerCancel={onPointerCancel}
+      onAnimationEnd={() => {
+        if (isExiting) {
+          onExitComplete(item.id);
+        }
+      }}
       onClick={onClick}
     >
       <span className="item-icon" aria-hidden="true">
