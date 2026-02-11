@@ -22,7 +22,7 @@ const ItemGrid = ({
   onPointerCancel
 }: ItemGridProps) => {
   return (
-    <main className="list-grid">
+    <section className="list-grid" aria-label="Items">
       {items.map((item) => (
         <ItemCard
           key={item.id}
@@ -40,7 +40,7 @@ const ItemGrid = ({
           }}
         />
       ))}
-    </main>
+    </section>
   );
 };
 

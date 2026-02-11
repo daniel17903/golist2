@@ -26,7 +26,12 @@ body {
   min-height: 100svh;
   display: flex;
   flex-direction: column;
-  padding: 24px 18px 96px;
+  padding: 24px 18px 16px;
+}
+
+.app__main {
+  flex: 1;
+  min-height: 0;
 }
 
 .app__header {
@@ -506,4 +511,8 @@ body {
   max-height: 420px;
   overflow-y: auto;
   padding-bottom: 4px;
+}
+
+.bottom-bar-offset {
+  min-height: 56px;
 }

@@ -73,23 +73,25 @@ const App = () => {
 
   return (
     <div className="app">
-      <AppHeader
-        activeListName={activeList?.name ?? ""}
-        onEditListName={() => {
-          setNewListName(activeList?.name ?? "");
-          setEditingTitle(true);
-        }}
-      />
+      <main className="app__main">
+        <AppHeader
+          activeListName={activeList?.name ?? ""}
+          onEditListName={() => {
+            setNewListName(activeList?.name ?? "");
+            setEditingTitle(true);
+          }}
+        />
 
-      <ItemGrid
-        items={listItems}
-        exitingItemIds={exitingItemIds}
-        onExitComplete={handleExitComplete}
-        longPressTriggeredRef={longPressTriggeredRef}
-        onPointerDown={handlePointerDown}
-        onPointerUp={handlePointerUp}
-        onPointerCancel={handlePointerCancel}
-      />
+        <ItemGrid
+          items={listItems}
+          exitingItemIds={exitingItemIds}
+          onExitComplete={handleExitComplete}
+          longPressTriggeredRef={longPressTriggeredRef}
+          onPointerDown={handlePointerDown}
+          onPointerUp={handlePointerUp}
+          onPointerCancel={handlePointerCancel}
+        />
+      </main>
 
       <BottomBar onOpenDrawer={() => setIsDrawerOpen(true)} onAddItem={openAddDialog} />
 

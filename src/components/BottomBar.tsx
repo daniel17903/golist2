@@ -14,47 +14,50 @@ type BottomBarProps = {
 
 const BottomBar = ({ onOpenDrawer, onAddItem }: BottomBarProps) => {
   return (
-    <AppBar
-      position="fixed"
-      color="primary"
-      sx={{
-        top: "auto",
-        bottom: 0,
-        background: "radial-gradient(circle at 50% -6px, transparent 33px, #005382 34px)",
-        overflow: "visible"
-      }}
-    >
-      <Toolbar sx={{ position: "relative" }}>
-        <IconButton color="inherit" aria-label="Open list menu" onClick={onOpenDrawer}>
-          <MenuIcon />
-        </IconButton>
+    <>
+      <AppBar
+        position="fixed"
+        color="primary"
+        sx={{
+          top: "auto",
+          bottom: 0,
+          background: "radial-gradient(circle at 50% -6px, transparent 33px, #005382 34px)",
+          overflow: "visible"
+        }}
+      >
+        <Toolbar sx={{ position: "relative" }}>
+          <IconButton color="inherit" aria-label="Open list menu" onClick={onOpenDrawer}>
+            <MenuIcon />
+          </IconButton>
 
-        <Fab
-          color="secondary"
-          aria-label="Add item"
-          onClick={onAddItem}
-          sx={{
-            position: "absolute",
-            zIndex: 1,
-            top: -30,
-            left: 0,
-            right: 0,
-            margin: "0 auto",
-            bgcolor: "#005382",
-            color: "#ffffff",
-            "&:hover": { bgcolor: "#00466f" }
-          }}
-        >
-          <AddIcon />
-        </Fab>
+          <Fab
+            color="secondary"
+            aria-label="Add item"
+            onClick={onAddItem}
+            sx={{
+              position: "absolute",
+              zIndex: 1,
+              top: -30,
+              left: 0,
+              right: 0,
+              margin: "0 auto",
+              bgcolor: "#005382",
+              color: "#ffffff",
+              "&:hover": { bgcolor: "#00466f" }
+            }}
+          >
+            <AddIcon />
+          </Fab>
 
-        <Box sx={{ flexGrow: 1 }} />
+          <Box sx={{ flexGrow: 1 }} />
 
-        <IconButton color="inherit" aria-label="Share list">
-          <ShareIcon />
-        </IconButton>
-      </Toolbar>
-    </AppBar>
+          <IconButton color="inherit" aria-label="Share list">
+            <ShareIcon />
+          </IconButton>
+        </Toolbar>
+      </AppBar>
+      <Toolbar className="bottom-bar-offset" />
+    </>
   );
 };
 
