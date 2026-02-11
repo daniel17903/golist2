@@ -1,5 +1,5 @@
 import Box from "@mui/material/Box";
-import Drawer from "@mui/material/Drawer";
+import SwipeableDrawer from "@mui/material/SwipeableDrawer";
 import type { List } from "../domain/types";
 
 type ListsDrawerProps = {
@@ -7,6 +7,7 @@ type ListsDrawerProps = {
   lists: List[];
   activeListId: string | null | undefined;
   onClose: () => void;
+  onOpen: () => void;
   onSelectList: (listId: string) => void;
   onDeleteList: (listId: string) => void;
   onCreateList: () => void;
@@ -19,16 +20,19 @@ const ListsDrawer = ({
   lists,
   activeListId,
   onClose,
+  onOpen,
   onSelectList,
   onDeleteList,
   onCreateList
 }: ListsDrawerProps) => {
   return (
-    <Drawer
-      variant="persistent"
+    <SwipeableDrawer
       anchor="left"
       open={isOpen}
       onClose={onClose}
+      onOpen={onOpen}
+      disableDiscovery={false}
+      disableSwipeToOpen={false}
       ModalProps={{ keepMounted: true }}
       PaperProps={{
         className: `drawer ${isOpen ? "drawer--open" : ""}`,
@@ -101,7 +105,7 @@ const ListsDrawer = ({
           />
         </svg>
       </button>
-    </Drawer>
+    </SwipeableDrawer>
   );
 };
 
