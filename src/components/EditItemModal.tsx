@@ -1,3 +1,11 @@
+import Button from "@mui/material/Button";
+import Dialog from "@mui/material/Dialog";
+import DialogActions from "@mui/material/DialogActions";
+import DialogContent from "@mui/material/DialogContent";
+import DialogTitle from "@mui/material/DialogTitle";
+import TextField from "@mui/material/TextField";
+import type { ChangeEvent } from "react";
+
 type EditItemModalProps = {
   isOpen: boolean;
   name: string;
@@ -17,48 +25,58 @@ const EditItemModal = ({
   onCancel,
   onSave
 }: EditItemModalProps) => {
-  if (!isOpen) return null;
-
   return (
-    <div className="modal-backdrop" role="dialog" aria-modal="true" onClick={onCancel}>
-      <div className="modal"
-        onClick={(event) => {
-          event.stopPropagation();
-        }}
-      >
-        <div className="modal__header">
-          <h2>Eintrag bearbeiten</h2>
+    <Dialog
+      open={isOpen}
+      onClose={onCancel}
+      fullWidth
+      maxWidth="xs"
+      slotProps={{
+        paper: {
+          className: "modal"
+        }
+      }}
+    >
+      <DialogTitle className="modal__header">
+        <h2>Eintrag bearbeiten</h2>
+      </DialogTitle>
+      <DialogContent className="modal__body">
+        <div className="modal__field">
+          <label htmlFor="item-name">Name</label>
+          <TextField
+            id="item-name"
+            fullWidth
+            value={name}
+            onChange={(event: ChangeEvent<HTMLInputElement>) => onNameChange(event.target.value)}
+            placeholder="Name"
+            variant="outlined"
+            size="small"
+          />
         </div>
-        <div className="modal__body">
-          <div className="modal__field">
-            <label htmlFor="item-name">Name</label>
-            <input
-              id="item-name"
-              value={name}
-              onChange={(event) => onNameChange(event.target.value)}
-              placeholder="Name"
-            />
-          </div>
-          <div className="modal__field">
-            <label htmlFor="item-quantity">Menge</label>
-            <input
-              id="item-quantity"
-              value={quantity}
-              onChange={(event) => onQuantityChange(event.target.value)}
-              placeholder="Menge"
-            />
-          </div>
+        <div className="modal__field">
+          <label htmlFor="item-quantity">Menge</label>
+          <TextField
+            id="item-quantity"
+            fullWidth
+            value={quantity}
+            onChange={(event: ChangeEvent<HTMLInputElement>) =>
+              onQuantityChange(event.target.value)
+            }
+            placeholder="Menge"
+            variant="outlined"
+            size="small"
+          />
         </div>
-        <div className="modal__actions">
-          <button type="button" className="text-button" onClick={onCancel}>
-            Abbrechen
-          </button>
-          <button type="button" className="text-button" onClick={onSave}>
-            Speichern
-          </button>
-        </div>
-      </div>
-    </div>
+      </DialogContent>
+      <DialogActions className="modal__actions">
+        <Button type="button" className="text-button" onClick={onCancel}>
+          Abbrechen
+        </Button>
+        <Button type="button" className="text-button" onClick={onSave}>
+          Speichern
+        </Button>
+      </DialogActions>
+    </Dialog>
   );
 };
 

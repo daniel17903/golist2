@@ -1,3 +1,5 @@
+import Dialog from "@mui/material/Dialog";
+import DialogContent from "@mui/material/DialogContent";
 import { useEffect, useRef } from "react";
 import { getItemIcon } from "../domain/categories";
 import { parseItemInput } from "../domain/inputParser";
@@ -29,16 +31,20 @@ const AddItemDialog = ({
     return () => window.clearTimeout(timer);
   }, [isOpen]);
 
-  if (!isOpen) return null;
-
   return (
-    <div className="modal-backdrop add-dialog" role="dialog" aria-modal="true" onClick={onClose}>
-      <div
-        className="modal"
-        onClick={(event) => {
-          event.stopPropagation();
-        }}
-      >
+    <Dialog
+      open={isOpen}
+      onClose={onClose}
+      fullWidth
+      maxWidth="sm"
+      className="add-dialog"
+      slotProps={{
+        paper: {
+          className: "modal"
+        }
+      }}
+    >
+      <DialogContent className="modal__body">
         <form
           className="add-panel"
           onSubmit={(event) => {
@@ -81,8 +87,8 @@ const AddItemDialog = ({
             );
           })}
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 };
 
