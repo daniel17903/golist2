@@ -50,7 +50,7 @@ components:
           format: date-time
     ListDocument:
       type: object
-      required: [listId, name, items, createdAt, updatedAt, createdBy, shareTokens]
+      required: [listId, name, items, createdAt, updatedAt, createdBy]
       properties:
         listId:
           type: string
@@ -68,10 +68,6 @@ components:
           format: date-time
         createdBy:
           type: string
-        shareTokens:
-          type: array
-          items:
-            type: string
     ListCreateRequest:
       type: object
       required: [name]
