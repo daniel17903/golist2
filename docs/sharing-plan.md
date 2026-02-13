@@ -78,7 +78,6 @@ create table list_share_tokens (
 ```json
 {
   "listId": "uuid",
-  "shareToken": "random-token",
   "name": "Groceries",
   "items": [
     {
@@ -93,7 +92,7 @@ create table list_share_tokens (
   "createdAt": "2026-02-12T10:00:00Z",
   "updatedAt": "2026-02-12T10:00:00Z",
   "createdBy": "device-uuid",
-  "shareTokenIds": ["uuid", "uuid"]
+  "shareTokens": ["uuid", "uuid"]
 }
 ```
 
@@ -160,11 +159,9 @@ components:
           format: date-time
     ListDocument:
       type: object
-      required: [listId, shareToken, name, items, createdAt, updatedAt, createdBy, shareTokenIds]
+      required: [listId, name, items, createdAt, updatedAt, createdBy, shareTokens]
       properties:
         listId:
-          type: string
-        shareToken:
           type: string
         name:
           type: string
@@ -180,7 +177,7 @@ components:
           format: date-time
         createdBy:
           type: string
-        shareTokenIds:
+        shareTokens:
           type: array
           items:
             type: string
@@ -189,8 +186,6 @@ components:
       required: [listId, shareToken]
       properties:
         listId:
-          type: string
-        shareToken:
           type: string
     ListCreateRequest:
       type: object
