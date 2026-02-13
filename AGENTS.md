@@ -60,3 +60,4 @@
 ## Tooling note
 - Use the Context7 MCP server for quick library/API references when needed.
 - When introducing new tools or dependencies, always use the latest stable version.
+- Never use dependency tags like `@latest` in scripts, workflows, or install commands; always pin an explicit version.
