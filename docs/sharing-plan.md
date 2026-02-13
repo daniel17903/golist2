@@ -91,8 +91,7 @@ create table list_share_tokens (
   ],
   "createdAt": "2026-02-12T10:00:00Z",
   "updatedAt": "2026-02-12T10:00:00Z",
-  "createdBy": "device-uuid",
-  "shareTokens": ["uuid", "uuid"]
+  "createdBy": "device-uuid"
 }
 ```
 
@@ -159,7 +158,7 @@ components:
           format: date-time
     ListDocument:
       type: object
-      required: [listId, name, items, createdAt, updatedAt, createdBy, shareTokens]
+      required: [listId, name, items, createdAt, updatedAt, createdBy]
       properties:
         listId:
           type: string
@@ -177,10 +176,6 @@ components:
           format: date-time
         createdBy:
           type: string
-        shareTokens:
-          type: array
-          items:
-            type: string
     ListCreateResponse:
       type: object
       required: [listId, shareToken]
