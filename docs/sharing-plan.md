@@ -68,7 +68,7 @@ create table list_share_tokens (
   token_id uuid primary key,
   list_id uuid not null,
   created_at timestamptz not null,
-  redeemed_by uuid
+  redeemed_by uuid[] not null default '{}'
 );
 ```
 
@@ -92,201 +92,23 @@ create table list_share_tokens (
   ],
   "createdAt": "2026-02-12T10:00:00Z",
   "updatedAt": "2026-02-12T10:00:00Z",
-  "createdBy": "device-uuid"
-}
-```
-
-### Endpoints
-
-#### Create share token for a list
-`POST /v1/lists`
-
-**Request body**
-```json
-{
-  "name": "Groceries"
-}
-```
-
-**Response**
-```json
-{
-  "listId": "uuid",
-  "shareToken": "random-token"
-}
-```
-
----
-
-#### Fetch list by share token
-`GET /v1/lists/{shareToken}`
-
-**Headers**
-```
-Authorization: Bearer {shareToken}
-X-Device-Id: {deviceId}
-```
-
-**Response**
-```json
-{
-  "listId": "uuid",
-  "shareToken": "random-token",
-  "name": "Groceries",
-  "items": [],
-  "createdAt": "2026-02-12T10:00:00Z",
-  "updatedAt": "2026-02-12T10:00:00Z",
-  "createdBy": "device-uuid"
-}
-```
-
----
-
-#### Create additional share token for a list
-`POST /v1/lists/{shareToken}/share-tokens`
-
-**Headers**
-```
-Authorization: Bearer {shareToken}
-X-Device-Id: {deviceId}
-```
-
-**Response**
-```json
-{
-  "tokenId": "uuid",
-  "listId": "uuid",
-  "createdAt": "2026-02-12T10:00:03Z",
-  "redeemedBy": null,
-  "shareToken": "another-random-token"
-}
-```
-
----
-
-#### Fetch items updated after a timestamp
-`GET /v1/lists/{shareToken}/items?updatedAfter={date-time}`
-
-**Headers**
-```
-Authorization: Bearer {shareToken}
-X-Device-Id: {deviceId}
-```
-
-**Query parameters**
-- `updatedAfter` (required): RFC3339 timestamp (for example `2026-02-12T10:00:00Z`).
-
-**Response**
-```json
-{
-  "items": [
+  "createdBy": "device-uuid",
+  "shareTokens": [
     {
-      "id": "uuid",
-      "name": "Milk",
-      "category": "Dairy",
-      "deleted": true,
+      "tokenId": "uuid",
+      "listId": "uuid",
       "createdAt": "2026-02-12T10:00:00Z",
-      "updatedAt": "2026-02-12T10:00:01Z"
+      "redeemedBy": ["device-uuid", "another-device-uuid"]
     }
   ]
 }
 ```
 
----
-
-#### Add item to list
-`POST /v1/lists/{shareToken}/items`
-
-**Headers**
-```
-Authorization: Bearer {shareToken}
-X-Device-Id: {deviceId}
-```
-
-**Request body**
-```json
-{
-  "name": "Milk",
-  "category": "Dairy",
-  "deleted": false
-}
-```
-
-**Response**
-```json
-{
-  "itemId": "uuid"
-}
-```
-
----
-
-#### Update item in list
-`PUT /v1/lists/{shareToken}/items/{itemId}`
-
-**Headers**
-```
-Authorization: Bearer {shareToken}
-X-Device-Id: {deviceId}
-```
-
-**Request body**
-```json
-{
-  "name": "Milk",
-  "category": "Dairy",
-  "deleted": true
-}
-```
-
-**Response**
-- `204 No Content`
-- Empty body.
-
----
-
-#### Update list name
-`PATCH /v1/lists/{shareToken}/name`
-
-**Headers**
-```
-Authorization: Bearer {shareToken}
-X-Device-Id: {deviceId}
-```
-
-**Request body**
-```json
-{
-  "name": "Weekly Groceries"
-}
-```
-
-**Response**
-- `204 No Content`
-- Empty body.
-
----
-
-#### Delete list
-`DELETE /v1/lists/{shareToken}`
-
-**Headers**
-```
-Authorization: Bearer {shareToken}
-X-Device-Id: {deviceId}
-```
-
-**Response**
-- `204 No Content`
-- Empty body.
-
----
-
 ## Notes
 - **Share link security**: treat share tokens like passwords. Use a long random token.
 - **Rate limiting**: optional per deviceId to mitigate abuse.
 - **Conflict safety**: use `SELECT ... FOR UPDATE` for list mutations and commit merged results atomically.
-- **Token redemption**: set `redeemed_by` when a device successfully uses a token for the first time.
+- **Token redemption**: append the requesting `deviceId` to `redeemed_by` when a token is used by a new device.
 
 ---
 
@@ -345,7 +167,7 @@ components:
           format: date-time
     ListDocument:
       type: object
-      required: [listId, shareToken, name, items, createdAt, updatedAt, createdBy]
+      required: [listId, shareToken, name, items, createdAt, updatedAt, createdBy, shareTokens]
       properties:
         listId:
           type: string
@@ -365,6 +187,10 @@ components:
           format: date-time
         createdBy:
           type: string
+        shareTokens:
+          type: array
+          items:
+            $ref: "#/components/schemas/ShareTokenEntry"
     ListCreateResponse:
       type: object
       required: [listId, shareToken]
@@ -419,9 +245,9 @@ components:
       properties:
         name:
           type: string
-    ShareTokenCreateResponse:
+    ShareTokenEntry:
       type: object
-      required: [tokenId, shareToken, listId, createdAt, redeemedBy]
+      required: [tokenId, listId, createdAt, redeemedBy]
       properties:
         tokenId:
           type: string
@@ -431,10 +257,17 @@ components:
           type: string
           format: date-time
         redeemedBy:
-          type: string
-          nullable: true
-        shareToken:
-          type: string
+          type: array
+          items:
+            type: string
+    ShareTokenCreateResponse:
+      allOf:
+        - $ref: "#/components/schemas/ShareTokenEntry"
+        - type: object
+          required: [shareToken]
+          properties:
+            shareToken:
+              type: string
 security:
   - BearerAuth: []
 paths:
@@ -489,8 +322,9 @@ paths:
   /v1/lists/{shareToken}/items:
     parameters:
       - $ref: "#/components/parameters/ShareToken"
-      - $ref: "#/components/parameters/UpdatedAfter"
     get:
+      parameters:
+        - $ref: "#/components/parameters/UpdatedAfter"
       summary: Fetch items updated after timestamp
       responses:
         "200":
@@ -530,6 +364,15 @@ paths:
         "204":
           description: Item updated
 
+
+  /v1/share-tokens/{shareToken}/redeem:
+    parameters:
+      - $ref: "#/components/parameters/ShareToken"
+    post:
+      summary: Redeem a share token for the requesting device
+      responses:
+        "204":
+          description: Share token redeemed
   /v1/lists/{shareToken}/share-tokens:
     parameters:
       - $ref: "#/components/parameters/ShareToken"
