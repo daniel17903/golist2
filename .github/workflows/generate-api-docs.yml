@@ -22,7 +22,7 @@ jobs:
           node-version: 20
 
       - name: Install Redocly CLI
-        run: npm install -g @redocly/cli@latest
+        run: npm install -g @redocly/cli@2.18.0
 
       - name: Build OpenAPI HTML docs
         run: redocly build-docs apps/api-spec/openapi.yaml -o apps/api-spec/openapi.html
