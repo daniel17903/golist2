@@ -93,14 +93,7 @@ create table list_share_tokens (
   "createdAt": "2026-02-12T10:00:00Z",
   "updatedAt": "2026-02-12T10:00:00Z",
   "createdBy": "device-uuid",
-  "shareTokens": [
-    {
-      "tokenId": "uuid",
-      "listId": "uuid",
-      "createdAt": "2026-02-12T10:00:00Z",
-      "redeemedBy": ["device-uuid", "another-device-uuid"]
-    }
-  ]
+  "shareTokenIds": ["uuid", "uuid"]
 }
 ```
 
@@ -167,7 +160,7 @@ components:
           format: date-time
     ListDocument:
       type: object
-      required: [listId, shareToken, name, items, createdAt, updatedAt, createdBy, shareTokens]
+      required: [listId, shareToken, name, items, createdAt, updatedAt, createdBy, shareTokenIds]
       properties:
         listId:
           type: string
@@ -187,10 +180,10 @@ components:
           format: date-time
         createdBy:
           type: string
-        shareTokens:
+        shareTokenIds:
           type: array
           items:
-            $ref: "#/components/schemas/ShareTokenEntry"
+            type: string
     ListCreateResponse:
       type: object
       required: [listId, shareToken]
@@ -273,7 +266,7 @@ security:
 paths:
   /v1/lists:
     post:
-      summary: Create share token for a list
+      summary: Create list and initial share token
       security: []
       requestBody:
         required: true
