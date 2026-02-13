@@ -57,6 +57,12 @@
 - The PWA service worker can cache aggressively; use hard refresh or clear site data
   when debugging PWA changes.
 
+
+## Documentation maintenance
+- Keep `docs/sharing-plan.md` up to date when backend sharing architecture, sequencing, or CI expectations change.
+- Keep this `AGENTS.md` file up to date when repo layout, commands, workflows, or testing expectations change.
+- For backend-sharing related PRs, include doc updates as part of the definition of done when behavior or process changes.
+
 ## Tooling note
 - Use the Context7 MCP server for quick library/API references when needed.
 - When introducing new tools or dependencies, always use the latest stable version.
