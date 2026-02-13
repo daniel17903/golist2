@@ -52,3 +52,4 @@
 
 ## Tooling note
 - Use the Context7 MCP server for quick library/API references when needed.
+- When introducing new tools or dependencies, always use the latest stable version.
