@@ -19,7 +19,7 @@ export const useLongPressItem = ({
   onShortPress,
   delay = 600
 }: LongPressHandlers): LongPressReturn => {
-  const longPressTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
+  const longPressTimerRef = useRef<number | null>(null);
   const longPressTriggeredRef = useRef(false);
 
   const handlePointerDown = (itemId: string, name: string, quantityOrUnit?: string) => {
