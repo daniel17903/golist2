@@ -1,0 +1,12 @@
+{
+  "name": "@golist/api-spec",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "redocly build-docs openapi.yaml --output dist/index.html"
+  },
+  "devDependencies": {
+    "@redocly/cli": "^2.18.0"
+  }
+}
