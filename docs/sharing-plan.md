@@ -259,6 +259,52 @@ X-Device-Id: {deviceId}
 
 ---
 
+## Share token model improvements (revocable, multi-token)
+
+To support **multiple share tokens per list**, per-device visibility, and revocation, model access as grants instead of a single static token.
+
+### Proposed model
+- A list has one immutable `listId`.
+- Access is granted through **share grants** (tokens), where each token maps to one list and can be revoked independently.
+- Each successful request associates `X-Device-Id` with the token that was used.
+- The server tracks which devices have accessed which list/token.
+
+### Suggested tables
+```sql
+create table list_share_tokens (
+  token_id uuid primary key,
+  list_id uuid not null,
+  token_hash text not null unique,
+  label text,
+  created_by uuid not null,
+  created_at timestamptz not null,
+  revoked_at timestamptz
+);
+
+create table list_device_access (
+  list_id uuid not null,
+  device_id uuid not null,
+  first_seen_at timestamptz not null,
+  last_seen_at timestamptz not null,
+  via_token_id uuid,
+  primary key (list_id, device_id)
+);
+```
+
+### Behavior
+- Use random high-entropy opaque tokens; store only a hash server-side.
+- Revoking one token should not impact other active tokens for the same list.
+- Optionally revoke per device by denying future requests from a specific `deviceId`.
+- Support short-lived invite tokens and long-lived owner/admin tokens.
+
+### API additions
+- `POST /v1/lists/{shareToken}/share-tokens` → create another token for the same list.
+- `GET /v1/lists/{shareToken}/access` → return active tokens and known devices.
+- `DELETE /v1/lists/{shareToken}/share-tokens/{tokenId}` → revoke a specific token.
+- `DELETE /v1/lists/{shareToken}/devices/{deviceId}` → revoke device access.
+
+---
+
 ## OpenAPI (v1)
 
 ```yaml
@@ -293,6 +339,18 @@ components:
       schema:
         type: string
         format: date-time
+    TokenId:
+      name: tokenId
+      in: path
+      required: true
+      schema:
+        type: string
+    DeviceId:
+      name: deviceId
+      in: path
+      required: true
+      schema:
+        type: string
   schemas:
     ListItem:
       type: object
@@ -388,6 +446,54 @@ components:
       properties:
         name:
           type: string
+    ShareTokenCreateResponse:
+      type: object
+      required: [tokenId, shareToken]
+      properties:
+        tokenId:
+          type: string
+        shareToken:
+          type: string
+    ShareTokenListEntry:
+      type: object
+      required: [tokenId, label, createdAt, revokedAt]
+      properties:
+        tokenId:
+          type: string
+        label:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        revokedAt:
+          type: string
+          format: date-time
+          nullable: true
+    DeviceAccessEntry:
+      type: object
+      required: [deviceId, firstSeenAt, lastSeenAt]
+      properties:
+        deviceId:
+          type: string
+        firstSeenAt:
+          type: string
+          format: date-time
+        lastSeenAt:
+          type: string
+          format: date-time
+    AccessOverviewResponse:
+      type: object
+      required: [tokens, devices]
+      properties:
+        tokens:
+          type: array
+          items:
+            $ref: "#/components/schemas/ShareTokenListEntry"
+        devices:
+          type: array
+          items:
+            $ref: "#/components/schemas/DeviceAccessEntry"
 security:
   - BearerAuth: []
 paths:
@@ -482,4 +588,47 @@ paths:
       responses:
         "204":
           description: Item updated
+
+  /v1/lists/{shareToken}/share-tokens:
+    parameters:
+      - $ref: "#/components/parameters/ShareToken"
+    post:
+      summary: Create additional share token for a list
+      responses:
+        "201":
+          description: Share token created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ShareTokenCreateResponse"
+  /v1/lists/{shareToken}/access:
+    parameters:
+      - $ref: "#/components/parameters/ShareToken"
+    get:
+      summary: List active share tokens and known devices
+      responses:
+        "200":
+          description: Access overview
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccessOverviewResponse"
+  /v1/lists/{shareToken}/share-tokens/{tokenId}:
+    parameters:
+      - $ref: "#/components/parameters/ShareToken"
+      - $ref: "#/components/parameters/TokenId"
+    delete:
+      summary: Revoke a specific share token
+      responses:
+        "204":
+          description: Share token revoked
+  /v1/lists/{shareToken}/devices/{deviceId}:
+    parameters:
+      - $ref: "#/components/parameters/ShareToken"
+      - $ref: "#/components/parameters/DeviceId"
+    delete:
+      summary: Revoke a device from list access
+      responses:
+        "204":
+          description: Device access revoked
 ```
