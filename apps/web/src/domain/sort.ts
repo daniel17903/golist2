@@ -1,5 +1,5 @@
 import { getCategoryOrder } from "./categories";
-import type { Item } from "./types";
+import type { Item } from "@golist/shared/domain/types";
 
 export const sortItemsForList = (items: Item[]): Item[] => {
   return [...items].sort((a, b) => {

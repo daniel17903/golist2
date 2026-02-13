@@ -1,5 +1,5 @@
 import { useRef, useState, type PointerEvent } from "react";
-import type { List } from "../domain/types";
+import type { List } from "@golist/shared/domain/types";
 
 type ListsDrawerProps = {
   isOpen: boolean;

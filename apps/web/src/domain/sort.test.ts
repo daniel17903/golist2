@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { sortItemsForList } from "./sort";
-import type { Item } from "./types";
+import type { Item } from "@golist/shared/domain/types";
 
 describe("sortItemsForList", () => {
   it("sorts by category order then createdAt", () => {

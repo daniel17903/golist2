@@ -1,5 +1,5 @@
 import Dexie, { type Table } from "dexie";
-import type { AppMetadata, Item, List } from "../domain/types";
+import type { AppMetadata, Item, List } from "@golist/shared/domain/types";
 
 export class GoListDatabase extends Dexie {
   lists!: Table<List, string>;

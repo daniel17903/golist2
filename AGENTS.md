@@ -1,16 +1,23 @@
 # Agent notes for GoList PWA
 
-## Project snapshot
+## Repository layout (monorepo)
+- `apps/web/` contains the existing React + TypeScript + Vite PWA.
+- `apps/backend/` is scaffolded as an empty backend folder (no implementation files yet).
+- `packages/shared/` contains shared domain code that can be reused by web and backend (currently shared types).
+- Root `package.json` is a workspace manifest with scripts that proxy to `apps/web`.
+
+## Project snapshot (web app)
 - **Stack**: React + TypeScript + Vite, Dexie (IndexedDB), Zustand, Vite PWA plugin.
-- **Entry points**: `index.html`, `src/main.tsx`, `src/App.tsx`.
-- **State + storage**: `src/state/useStore.ts` (Zustand) + `src/storage/db.ts` (Dexie).
-- **Domain logic**: `src/domain/` (types, categories, sorting).
-- **UI composition**: `src/components/` (shared UI building blocks) + `src/hooks/` (UI state/behavior).
-- **Styling**: `src/styles.css`.
+- **Entry points**: `apps/web/index.html`, `apps/web/src/main.tsx`, `apps/web/src/App.tsx`.
+- **State + storage**: `apps/web/src/state/useStore.ts` (Zustand) + `apps/web/src/storage/db.ts` (Dexie).
+- **Domain logic**: `apps/web/src/domain/` (categories, sorting) plus shared types in `packages/shared/src/domain/types.ts`.
+- **UI composition**: `apps/web/src/components/` (shared UI building blocks) + `apps/web/src/hooks/` (UI state/behavior).
+- **Styling**: `apps/web/src/styles.css`.
 
 ## Quickstart
 - `npm install`
-- `npm run dev` (Vite dev server, default http://localhost:5173)
+- `npm run dev` (runs web app dev server via workspace script, default http://localhost:5173)
+- Direct web command equivalent: `npm run dev -w apps/web`
 
 ## Key behaviors
 - **Multi-list** support with a list selector and inline rename.
@@ -36,15 +43,15 @@
 
 ## Testing expectations
 - Run `npm run lint` and `npm run typecheck` before commit when possible.
-- Run `npm run test` for changes to `src/domain/`, `src/state/`, or `src/storage/`.
-- Run `npm run build` for any changes that touch PWA assets or build config.
+- Run `npm run test` for changes to `apps/web/src/domain/`, `apps/web/src/state/`, or `apps/web/src/storage/`.
+- Run `npm run build` for changes that touch PWA assets or build config.
 
 ## PWA assets
-- `public/favicon.svg`.
-- PWA manifest configured in `vite.config.ts`.
+- `apps/web/public/favicon.svg`.
+- PWA manifest configured in `apps/web/vite.config.ts`.
 
 ## Storage/migrations
-- Dexie schema lives in `src/storage/db.ts`. Keep migrations backward-compatible.
+- Dexie schema lives in `apps/web/src/storage/db.ts`. Keep migrations backward-compatible.
 
 ## Common pitfalls
 - The PWA service worker can cache aggressively; use hard refresh or clear site data

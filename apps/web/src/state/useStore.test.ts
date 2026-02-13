@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { Item, List } from "../domain/types";
+import type { Item, List } from "@golist/shared/domain/types";
 
 vi.stubGlobal("__APP_VERSION__", "test-version");
 

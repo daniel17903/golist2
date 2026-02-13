@@ -1,6 +1,6 @@
 import type { MouseEvent } from "react";
 import { getItemIcon } from "../domain/categories";
-import type { Item } from "../domain/types";
+import type { Item } from "@golist/shared/domain/types";
 
 type ItemCardProps = {
   item: Item;
