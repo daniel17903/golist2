@@ -1,0 +1,266 @@
+openapi: 3.1.0
+info:
+  title: GoList Sharing API
+  version: v1
+servers:
+  - url: https://api.example.com
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+  parameters:
+    ShareToken:
+      name: shareToken
+      in: path
+      required: true
+      schema:
+        type: string
+    ItemId:
+      name: itemId
+      in: path
+      required: true
+      schema:
+        type: string
+    UpdatedAfter:
+      name: updatedAfter
+      in: query
+      required: true
+      schema:
+        type: string
+        format: date-time
+  schemas:
+    ListItem:
+      type: object
+      required: [id, name, category, deleted, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        category:
+          type: string
+        deleted:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    ListDocument:
+      type: object
+      required: [listId, name, items, createdAt, updatedAt, createdBy, shareTokens]
+      properties:
+        listId:
+          type: string
+        name:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ListItem"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        createdBy:
+          type: string
+        shareTokens:
+          type: array
+          items:
+            type: string
+    ListCreateRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+    ListCreateResponse:
+      type: object
+      required: [listId, shareToken]
+      properties:
+        listId:
+          type: string
+        shareToken:
+          type: string
+    ItemCreateRequest:
+      type: object
+      required: [name, category, deleted]
+      properties:
+        name:
+          type: string
+        category:
+          type: string
+        deleted:
+          type: boolean
+    ItemCreateResponse:
+      type: object
+      required: [itemId]
+      properties:
+        itemId:
+          type: string
+    ItemUpdateRequest:
+      type: object
+      required: [name, category, deleted]
+      properties:
+        name:
+          type: string
+        category:
+          type: string
+        deleted:
+          type: boolean
+    UpdatedItemsResponse:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ListItem"
+    ListNameUpdateRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+    ShareTokenEntry:
+      type: object
+      required: [tokenId, listId, createdAt, redeemedBy]
+      properties:
+        tokenId:
+          type: string
+        listId:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        redeemedBy:
+          type: array
+          items:
+            type: string
+    ShareTokenCreateResponse:
+      allOf:
+        - $ref: "#/components/schemas/ShareTokenEntry"
+        - type: object
+          required: [shareToken]
+          properties:
+            shareToken:
+              type: string
+security:
+  - BearerAuth: []
+paths:
+  /v1/lists:
+    post:
+      summary: Create list and initial share token
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ListCreateRequest"
+      responses:
+        "201":
+          description: List created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListCreateResponse"
+  /v1/lists/{shareToken}:
+    parameters:
+      - $ref: "#/components/parameters/ShareToken"
+    get:
+      summary: Fetch list by share token
+      responses:
+        "200":
+          description: List document
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListDocument"
+    delete:
+      summary: Delete list
+      responses:
+        "204":
+          description: List deleted
+  /v1/lists/{shareToken}/name:
+    parameters:
+      - $ref: "#/components/parameters/ShareToken"
+    patch:
+      summary: Update list name
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ListNameUpdateRequest"
+      responses:
+        "204":
+          description: List name updated
+  /v1/lists/{shareToken}/items:
+    parameters:
+      - $ref: "#/components/parameters/ShareToken"
+    get:
+      summary: Fetch items updated after timestamp
+      parameters:
+        - $ref: "#/components/parameters/UpdatedAfter"
+      responses:
+        "200":
+          description: Updated items
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UpdatedItemsResponse"
+    post:
+      summary: Add item to list
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ItemCreateRequest"
+      responses:
+        "201":
+          description: Item created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ItemCreateResponse"
+  /v1/lists/{shareToken}/items/{itemId}:
+    parameters:
+      - $ref: "#/components/parameters/ShareToken"
+      - $ref: "#/components/parameters/ItemId"
+    put:
+      summary: Update item in list
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ItemUpdateRequest"
+      responses:
+        "204":
+          description: Item updated
+  /v1/share-tokens/{shareToken}/redeem:
+    parameters:
+      - $ref: "#/components/parameters/ShareToken"
+    post:
+      summary: Redeem a share token for the requesting device
+      responses:
+        "204":
+          description: Share token redeemed
+  /v1/lists/{shareToken}/share-tokens:
+    parameters:
+      - $ref: "#/components/parameters/ShareToken"
+    post:
+      summary: Create additional share token for a list
+      responses:
+        "201":
+          description: Share token created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ShareTokenCreateResponse"
