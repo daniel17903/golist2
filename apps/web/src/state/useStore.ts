@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { AppMetadata, Item, List } from "../domain/types";
+import type { AppMetadata, Item, List } from "@golist/shared/domain/types";
 import { db } from "../storage/db";
 
 const createId = () => crypto.randomUUID();

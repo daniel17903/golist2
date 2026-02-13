@@ -3,14 +3,14 @@
 ## Repository layout (monorepo)
 - `apps/web/` contains the existing React + TypeScript + Vite PWA.
 - `apps/backend/` is scaffolded as an empty backend folder (no implementation files yet).
-- `packages/shared/` is scaffolded for shared domain code.
+- `packages/shared/` contains shared domain code that can be reused by web and backend (currently shared types).
 - Root `package.json` is a workspace manifest with scripts that proxy to `apps/web`.
 
 ## Project snapshot (web app)
 - **Stack**: React + TypeScript + Vite, Dexie (IndexedDB), Zustand, Vite PWA plugin.
 - **Entry points**: `apps/web/index.html`, `apps/web/src/main.tsx`, `apps/web/src/App.tsx`.
 - **State + storage**: `apps/web/src/state/useStore.ts` (Zustand) + `apps/web/src/storage/db.ts` (Dexie).
-- **Domain logic**: `apps/web/src/domain/` (types, categories, sorting).
+- **Domain logic**: `apps/web/src/domain/` (categories, sorting) plus shared types in `packages/shared/src/domain/types.ts`.
 - **UI composition**: `apps/web/src/components/` (shared UI building blocks) + `apps/web/src/hooks/` (UI state/behavior).
 - **Styling**: `apps/web/src/styles.css`.
 

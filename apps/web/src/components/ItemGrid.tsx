@@ -1,5 +1,5 @@
 import type { MutableRefObject } from "react";
-import type { Item } from "../domain/types";
+import type { Item } from "@golist/shared/domain/types";
 import ItemCard from "./ItemCard";
 
 type ItemGridProps = {
