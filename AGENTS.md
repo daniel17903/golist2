@@ -41,7 +41,7 @@
 
 ## CI/CD
 - GitHub Actions `ci.yml` workflow validates `lint`, `typecheck`, `test` and `build` for the web workspace on PRs.
-- GitHub Actions `backend-bootstrap.yml` runs backend `lint` + `typecheck` + `db:migrate` (against ephemeral Postgres) on PRs that touch `apps/backend/**`.
+- GitHub Actions `backend-bootstrap.yml` runs backend `lint` + `typecheck` + `db:migrate` + `test` (against ephemeral Postgres) on PRs that touch `apps/backend/**`.
 - Deploy workflow builds on `main`.
 
 ## Testing expectations

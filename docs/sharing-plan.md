@@ -57,9 +57,9 @@ The API contract is maintained in `apps/api-spec/openapi.yaml` (and related file
 4. Transaction helpers are implemented in `apps/backend/src/db/client.ts` via `withTransaction(...)` for atomic writes.
 5. **GitHub Actions update**: `.github/workflows/backend-bootstrap.yml` now runs `db:migrate` against an ephemeral Postgres service.
 
-### Phase 2 — API v1 implementation
-1. Implement endpoints defined by `apps/api-spec/openapi.yaml`.
-2. Add middleware for:
+### Phase 2 — API v1 implementation ✅ Implemented
+1. API v1 endpoints from `apps/api-spec/openapi.yaml` are implemented in `apps/backend/src/server.ts`.
+2. Middleware/hook behavior is implemented for:
    - bearer token auth
    - request/response logging
    - error normalization
@@ -72,7 +72,7 @@ The API contract is maintained in `apps/api-spec/openapi.yaml` (and related file
    - generate token
    - redeem token
    - track redemptions/devices
-5. **GitHub Actions update**: add API contract tests to CI to verify backend responses match OpenAPI behavior.
+5. **GitHub Actions update**: backend bootstrap workflow now runs backend tests (including API contract baseline tests in `apps/backend/src/server.contract.test.ts`).
 
 ### Phase 3 — Sync semantics and conflict safety
 1. Define merge rules (last-write-wins by `updatedAt` with deterministic tie-break).
