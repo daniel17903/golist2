@@ -18,7 +18,7 @@ export const useAppState = () => {
     addItem,
     toggleItem,
     updateItem,
-    deleteList
+    deleteList,
   } = useStore();
 
   const [newListName, setNewListName] = useState("");
@@ -47,17 +47,17 @@ export const useAppState = () => {
   }, [items, activeListId]);
 
   const suggestionPool = useMemo(() => {
-    if (!activeListId) return [];
+    if (!activeListId) {return [];}
     const stats = new Map<string, { count: number; lastUsed: number }>();
     items
       .filter((item) => item.listId === activeListId)
       .forEach((item) => {
         const key = item.name.trim();
-        if (!key) return;
+        if (!key) {return;}
         const existing = stats.get(key) ?? { count: 0, lastUsed: 0 };
         stats.set(key, {
           count: existing.count + 1,
-          lastUsed: Math.max(existing.lastUsed, item.updatedAt)
+          lastUsed: Math.max(existing.lastUsed, item.updatedAt),
         });
       });
     return Array.from(stats.entries()).map(([name, data]) => ({ name, ...data }));
@@ -80,12 +80,12 @@ export const useAppState = () => {
     const sorted = suggestionPool
       .slice()
       .sort((a, b) => {
-        if (a.count !== b.count) return b.count - a.count;
+        if (a.count !== b.count) {return b.count - a.count;}
         return b.lastUsed - a.lastUsed;
       })
       .map((entry) => entry.name)
       .filter((name) => !currentItemNames.has(name.trim().toLowerCase()));
-    if (!query) return sorted.slice(0, 12);
+    if (!query) {return sorted.slice(0, 12);}
     const filtered = sorted.filter((name) => name.toLowerCase().includes(query));
     if (trimmed && !currentItemNames.has(query)) {
       const alreadySuggested = filtered.some((name) => name.toLowerCase() === query);
@@ -97,26 +97,26 @@ export const useAppState = () => {
   }, [itemName, suggestionPool, currentItemNames]);
 
   const handleAddItem = async () => {
-    if (!activeListId) return;
+    if (!activeListId) {return;}
     const parsed = parseItemInput(itemName);
-    if (!parsed.name.trim()) return;
+    if (!parsed.name.trim()) {return;}
     await addItem(activeListId, parsed.name, parsed.quantityOrUnit);
     setItemName("");
     setIsAddDialogOpen(false);
   };
 
   const handleAddSuggestion = async (name: string, quantityOrUnit?: string) => {
-    if (!activeListId) return;
-    if (!name.trim()) return;
+    if (!activeListId) {return;}
+    if (!name.trim()) {return;}
     await addItem(activeListId, name, quantityOrUnit);
     setItemName("");
     setIsAddDialogOpen(false);
   };
 
   const handleRenameList = async () => {
-    if (!activeListId) return;
+    if (!activeListId) {return;}
     const trimmed = newListName.trim();
-    if (!trimmed) return;
+    if (!trimmed) {return;}
     await renameList(activeListId, trimmed);
     setEditingTitle(false);
   };
@@ -128,13 +128,13 @@ export const useAppState = () => {
   };
 
   const handleSaveItem = async () => {
-    if (!editingItemId) return;
+    if (!editingItemId) {return;}
     const trimmed = editItemName.trim();
-    if (!trimmed) return;
+    if (!trimmed) {return;}
     await updateItem(
       editingItemId,
       trimmed,
-      editItemQuantity.trim() ? editItemQuantity.trim() : undefined
+      editItemQuantity.trim() ? editItemQuantity.trim() : undefined,
     );
     setEditingItemId(null);
   };
@@ -185,6 +185,6 @@ export const useAppState = () => {
     handleSaveItem,
     openAddDialog,
     handleCreateList,
-    handleDeleteList
+    handleDeleteList,
   };
 };

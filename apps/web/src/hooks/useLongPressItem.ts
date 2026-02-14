@@ -17,7 +17,7 @@ type LongPressReturn = {
 export const useLongPressItem = ({
   onLongPress,
   onShortPress,
-  delay = 600
+  delay = 600,
 }: LongPressHandlers): LongPressReturn => {
   const longPressTimerRef = useRef<number | null>(null);
   const longPressTriggeredRef = useRef(false);
@@ -54,6 +54,6 @@ export const useLongPressItem = ({
     handlePointerDown,
     handlePointerUp,
     handlePointerCancel,
-    longPressTriggeredRef
+    longPressTriggeredRef,
   };
 };

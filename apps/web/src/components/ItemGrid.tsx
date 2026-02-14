@@ -19,7 +19,7 @@ const ItemGrid = ({
   longPressTriggeredRef,
   onPointerDown,
   onPointerUp,
-  onPointerCancel
+  onPointerCancel,
 }: ItemGridProps) => {
   return (
     <main className="list-grid">

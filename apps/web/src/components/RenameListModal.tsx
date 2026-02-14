@@ -11,9 +11,9 @@ const RenameListModal = ({
   value,
   onChange,
   onCancel,
-  onSave
+  onSave,
 }: RenameListModalProps) => {
-  if (!isOpen) return null;
+  if (!isOpen) {return null;}
 
   return (
     <div className="modal-backdrop" role="dialog" aria-modal="true" onClick={onCancel}>

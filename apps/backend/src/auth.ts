@@ -20,6 +20,7 @@ declare module 'fastify' {
 
 const uuidSchema = z.uuid()
 const authQuerySchema = z.object({ deviceId: z.uuid() })
+const shareTokenParamsSchema = z.object({ shareToken: z.string().min(1) })
 
 function getBearerToken(request: FastifyRequest): string | null {
   const authHeader = request.headers.authorization
@@ -44,10 +45,11 @@ export function normalizeDeviceId(value: unknown): string {
 async function requireTokenInternal(
   request: FastifyRequest,
   reply: FastifyReply,
-  requireRedeemedAccess: boolean
+  requireRedeemedAccess: boolean,
 ) {
   const bearerToken = getBearerToken(request)
-  const shareToken = (request.params as { shareToken?: string }).shareToken
+  const params = shareTokenParamsSchema.safeParse(request.params)
+  const shareToken = params.success ? params.data.shareToken : null
 
   if (!bearerToken || !shareToken || bearerToken !== shareToken) {
     reply.code(401).send({ message: 'Unauthorized' })
@@ -68,7 +70,7 @@ async function requireTokenInternal(
         AND revoked_at IS NULL
         AND (expires_at IS NULL OR expires_at > NOW())
       LIMIT 1`,
-    [shareToken]
+    [shareToken],
   )
 
   if (!tokenResult.rowCount) {
@@ -82,7 +84,7 @@ async function requireTokenInternal(
          FROM share_token_redemptions
         WHERE token_id = $1 AND device_id = $2
         LIMIT 1`,
-      [tokenResult.rows[0].token_id, querystring.data.deviceId]
+      [tokenResult.rows[0].token_id, querystring.data.deviceId],
     )
 
     if (!redeemedResult.rowCount) {
@@ -95,7 +97,7 @@ async function requireTokenInternal(
     listId: tokenResult.rows[0].list_id,
     tokenId: tokenResult.rows[0].token_id,
     shareToken,
-    deviceId: querystring.data.deviceId
+    deviceId: querystring.data.deviceId,
   }
 }
 

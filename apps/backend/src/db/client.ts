@@ -3,12 +3,12 @@ import { Pool, type PoolClient, type QueryResult, type QueryResultRow } from 'pg
 import { env } from '../config/env.js'
 
 export const pool = new Pool({
-  connectionString: env.DATABASE_URL
+  connectionString: env.DATABASE_URL,
 })
 
 export async function query<T extends QueryResultRow>(
   text: string,
-  values?: unknown[]
+  values?: unknown[],
 ): Promise<QueryResult<T>> {
   return pool.query<T>(text, values)
 }

@@ -17,7 +17,7 @@ describe("parseAmount", () => {
     "2.5 liter wasser": "2.5 liter",
     "2,5 liter wasser": "2,5 liter",
     "mehl typ 630": undefined,
-    "mehl Typ 630": undefined
+    "mehl Typ 630": undefined,
   };
 
   Object.entries(inputsToExpected).forEach(([input, expected]) => {
@@ -31,14 +31,14 @@ describe("parseItemInput", () => {
   it("returns parsed name and quantityOrUnit", () => {
     expect(parseItemInput("2 Liter Milch")).toEqual({
       name: "Milch",
-      quantityOrUnit: "2 Liter"
+      quantityOrUnit: "2 Liter",
     });
   });
 
   it("returns the full input when no amount is present", () => {
     expect(parseItemInput("Äpfel")).toEqual({
       name: "Äpfel",
-      quantityOrUnit: undefined
+      quantityOrUnit: undefined,
     });
   });
 });
