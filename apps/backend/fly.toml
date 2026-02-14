@@ -4,6 +4,9 @@ primary_region = "iad"
 [build]
   dockerfile = "Dockerfile"
 
+[deploy]
+  release_command = "node apps/backend/dist/db/cli.js migrate"
+
 [env]
   NODE_ENV = "production"
   HOST = "0.0.0.0"
@@ -24,3 +27,8 @@ primary_region = "iad"
     path = "/health"
     protocol = "http"
     timeout = "5s"
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory_mb = 256

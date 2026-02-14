@@ -20,4 +20,4 @@ COPY --from=build /app/apps/backend/src/db/migrations ./apps/backend/dist/db/mig
 RUN addgroup -g 1001 -S nodejs && adduser -S backend -u 1001
 USER backend
 EXPOSE 3000
-CMD ["sh", "-c", "node apps/backend/dist/db/cli.js migrate && node apps/backend/dist/index.js"]
+CMD ["node", "apps/backend/dist/index.js"]
