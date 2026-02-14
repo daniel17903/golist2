@@ -192,10 +192,10 @@ export function registerListRoutes(app: FastifyInstance) {
           SET text = $1,
               category = $2,
               deleted = $3,
-              updated_at = NOW(),
+              updated_at = $4,
               deleted_at = CASE WHEN $3 THEN NOW() ELSE NULL END
-        WHERE id = $4 AND list_id = $5`,
-      [body.name, body.category, body.deleted, params.itemId, request.auth!.listId]
+        WHERE id = $5 AND list_id = $6`,
+      [body.name, body.category, body.deleted, body.updatedAt, params.itemId, request.auth!.listId]
     )
 
     reply.code(204)
