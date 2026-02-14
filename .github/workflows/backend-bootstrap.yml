@@ -1,0 +1,20 @@
+name: Backend bootstrap checks
+
+on:
+  pull_request:
+    branches: ["main"]
+    paths:
+      - "apps/backend/**"
+
+jobs:
+  backend-bootstrap:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run lint -w apps/backend
+      - run: npm run typecheck -w apps/backend

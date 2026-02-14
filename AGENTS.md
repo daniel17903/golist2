@@ -2,9 +2,9 @@
 
 ## Repository layout (monorepo)
 - `apps/web/` contains the existing React + TypeScript + Vite PWA.
-- `apps/backend/` is scaffolded as an empty backend folder (no implementation files yet).
+- `apps/backend/` contains a Fastify + TypeScript backend scaffold with env validation and a `/health` endpoint.
 - `packages/shared/` contains shared domain code that can be reused by web and backend (currently shared types).
-- Root `package.json` is a workspace manifest with scripts that proxy to `apps/web`.
+- Root `package.json` is a workspace manifest with scripts that proxy to `apps/web`; backend scripts run from `apps/backend` or via `-w apps/backend`.
 
 ## Project snapshot (web app)
 - **Stack**: React + TypeScript + Vite, Dexie (IndexedDB), Zustand, Vite PWA plugin.
@@ -38,13 +38,15 @@
 - `npm run test`
 
 ## CI/CD
-- GitHub Actions workflow validates `lint`, `typecheck`, `test` and `build` on PRs.
+- GitHub Actions `ci.yml` workflow validates `lint`, `typecheck`, `test` and `build` for the web workspace on PRs.
+- GitHub Actions `backend-bootstrap.yml` runs backend `lint` + `typecheck` on PRs that touch `apps/backend/**`.
 - Deploy workflow builds on `main`.
 
 ## Testing expectations
-- Run `npm run lint` and `npm run typecheck` before commit when possible.
+- Run `npm run lint` and `npm run typecheck` before commit when possible (`-w apps/web` or `-w apps/backend` as appropriate).
 - Run `npm run test` for changes to `apps/web/src/domain/`, `apps/web/src/state/`, or `apps/web/src/storage/`.
-- Run `npm run build` for changes that touch PWA assets or build config.
+- Run `npm run test -w apps/backend` for backend endpoint/config changes.
+- Run `npm run build` for changes that touch PWA assets or build config; run `npm run build -w apps/backend` when backend runtime/build config changes.
 
 ## PWA assets
 - `apps/web/public/favicon.svg`.
