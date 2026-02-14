@@ -1,0 +1,13 @@
+app = "golist-postgres"
+primary_region = "iad"
+
+[build]
+  image = "postgres:17.6-alpine3.22"
+
+[env]
+  POSTGRES_DB = "golist"
+  POSTGRES_USER = "golist"
+
+[mounts]
+  source = "pg_data"
+  destination = "/var/lib/postgresql/data"
