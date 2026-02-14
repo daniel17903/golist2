@@ -1,18 +1,13 @@
-import { createHash, randomUUID } from 'node:crypto'
+import { randomUUID } from 'node:crypto'
 
 import type { PoolClient } from 'pg'
 
 import { withTransaction } from './client.js'
 
-function createTokenHash(token: string): string {
-  return createHash('sha256').update(token).digest('hex')
-}
-
 async function seedList(client: PoolClient): Promise<void> {
   const listId = randomUUID()
   const ownerDeviceId = randomUUID()
-  const redeemedByDeviceId = randomUUID()
-  const token = `seed-${randomUUID()}`
+  const tokenId = randomUUID()
 
   await client.query(
     `
@@ -25,11 +20,11 @@ async function seedList(client: PoolClient): Promise<void> {
 
   await client.query(
     `
-      INSERT INTO list_items(id, list_id, text, quantity, note, position, created_by_device_id)
+      INSERT INTO list_items(id, list_id, text, quantity, category, created_by_device_id)
       VALUES
-        ($1, $2, 'Milk', '1', NULL, 0, $3),
-        ($4, $2, 'Eggs', '12', NULL, 1, $3),
-        ($5, $2, 'Bread', '1', 'Whole wheat', 2, $3)
+        ($1, $2, 'Milk', '1', 'dairy', $3),
+        ($4, $2, 'Eggs', '12', 'dairy', $3),
+        ($5, $2, 'Bread', '1', 'bakery', $3)
       ON CONFLICT (id) DO NOTHING
     `,
     [randomUUID(), listId, ownerDeviceId, randomUUID(), randomUUID()]
@@ -40,18 +35,15 @@ async function seedList(client: PoolClient): Promise<void> {
       INSERT INTO share_tokens(
         id,
         list_id,
-        token_hash,
-        created_by_device_id,
-        redeemed_by_device_id,
-        redeemed_at
+        created_by_device_id
       )
-      VALUES ($1, $2, $3, $4, $5, NOW())
+      VALUES ($1, $2, $3)
       ON CONFLICT (id) DO NOTHING
     `,
-    [randomUUID(), listId, createTokenHash(token), ownerDeviceId, redeemedByDeviceId]
+    [tokenId, listId, ownerDeviceId]
   )
 
-  console.log(`Seeded list ${listId} with owner device ${ownerDeviceId}`)
+  console.log(`Seeded list ${listId} with share token ${tokenId}`)
 }
 
 export async function runSeed(): Promise<void> {

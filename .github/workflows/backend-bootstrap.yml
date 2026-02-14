@@ -36,3 +36,4 @@ jobs:
       - run: npm run lint -w apps/backend
       - run: npm run typecheck -w apps/backend
       - run: npm run db:migrate -w apps/backend
+      - run: npm run test -w apps/backend

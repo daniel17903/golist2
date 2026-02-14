@@ -22,15 +22,16 @@ The API contract is maintained in `apps/api-spec/openapi.yaml` (and related file
 
 ### Identity and access
 - Each client keeps a generated `deviceId` UUID for auditing and server-side token redemption tracking.
-- Share links include an unguessable token.
+- Share links use random UUID share tokens (token IDs).
 - Protected API calls use `Authorization: Bearer <shareToken>`.
 - **Do not require an `X-Device-Id` header.** If device identity is needed for an endpoint, carry it in the API payload/query per the canonical spec.
 
 ### Data model direction
 - Store each shared list as a canonical document with metadata and items.
 - Use item tombstones (`deleted: true`) instead of hard deletes.
-- Keep canonical timestamps (`createdAt`, `updatedAt`) assigned by backend.
+- Keep canonical timestamps with backend-assigned `createdAt`; persist client-provided `updatedAt` for item updates to support deterministic sync ordering.
 - **Do not include a `shareTokens` field in the list document.** Token management is handled by backend tables/relations.
+- API responses should not expose device IDs (including creator device IDs and redemption device lists).
 
 ---
 
@@ -57,9 +58,9 @@ The API contract is maintained in `apps/api-spec/openapi.yaml` (and related file
 4. Transaction helpers are implemented in `apps/backend/src/db/client.ts` via `withTransaction(...)` for atomic writes.
 5. **GitHub Actions update**: `.github/workflows/backend-bootstrap.yml` now runs `db:migrate` against an ephemeral Postgres service.
 
-### Phase 2 — API v1 implementation
-1. Implement endpoints defined by `apps/api-spec/openapi.yaml`.
-2. Add middleware for:
+### Phase 2 — API v1 implementation ✅ Implemented
+1. API v1 endpoints from `apps/api-spec/openapi.yaml` are implemented in `apps/backend/src/server.ts`.
+2. Middleware/hook behavior is implemented for:
    - bearer token auth
    - request/response logging
    - error normalization
@@ -72,7 +73,7 @@ The API contract is maintained in `apps/api-spec/openapi.yaml` (and related file
    - generate token
    - redeem token
    - track redemptions/devices
-5. **GitHub Actions update**: add API contract tests to CI to verify backend responses match OpenAPI behavior.
+5. **GitHub Actions update**: backend bootstrap workflow now runs backend tests (including API contract baseline tests in `apps/backend/src/server.contract.test.ts`).
 
 ### Phase 3 — Sync semantics and conflict safety
 1. Define merge rules (last-write-wins by `updatedAt` with deterministic tie-break).

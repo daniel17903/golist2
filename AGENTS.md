@@ -20,6 +20,7 @@
 - Direct web command equivalent: `npm run dev -w apps/web`
 
 ## Key behaviors
+- Backend sharing auth: protected sharing endpoints require a `deviceId` query param and a prior token redemption record for that device/token pair.
 - **Multi-list** support with a list selector and inline rename.
 - **Item sorting** by grocery category order, fallback to created order.
 - **Item suggestions** are **list-specific**, ranked by frequency then recency.
@@ -41,7 +42,7 @@
 
 ## CI/CD
 - GitHub Actions `ci.yml` workflow validates `lint`, `typecheck`, `test` and `build` for the web workspace on PRs.
-- GitHub Actions `backend-bootstrap.yml` runs backend `lint` + `typecheck` + `db:migrate` (against ephemeral Postgres) on PRs that touch `apps/backend/**`.
+- GitHub Actions `backend-bootstrap.yml` runs backend `lint` + `typecheck` + `db:migrate` + `test` (against ephemeral Postgres) on PRs that touch `apps/backend/**`.
 - Deploy workflow builds on `main`.
 
 ## Testing expectations
@@ -72,3 +73,4 @@
 - Use the Context7 MCP server for quick library/API references when needed.
 - When introducing new tools or dependencies, always use the latest stable version.
 - Never use dependency tags like `@latest` in scripts, workflows, or install commands; always pin an explicit version.
+- For backend ID creation, always generate IDs with random UUIDs (for example `crypto.randomUUID()`).
