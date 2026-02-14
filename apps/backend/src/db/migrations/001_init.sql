@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS list_items (
   list_id UUID NOT NULL REFERENCES shared_lists(id) ON DELETE CASCADE,
   text TEXT NOT NULL,
   quantity TEXT,
+  category TEXT NOT NULL DEFAULT 'other',
   deleted BOOLEAN NOT NULL DEFAULT FALSE,
   created_by_device_id UUID NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -30,6 +31,16 @@ CREATE TABLE IF NOT EXISTS share_tokens (
 );
 
 CREATE INDEX IF NOT EXISTS idx_share_tokens_list_id ON share_tokens(list_id);
+
+CREATE TABLE IF NOT EXISTS share_token_redemptions (
+  token_id UUID NOT NULL REFERENCES share_tokens(id) ON DELETE CASCADE,
+  device_id UUID NOT NULL,
+  redeemed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (token_id, device_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_share_token_redemptions_device_id
+  ON share_token_redemptions(device_id);
 
 CREATE TABLE IF NOT EXISTS migration_history (
   id BIGSERIAL PRIMARY KEY,
