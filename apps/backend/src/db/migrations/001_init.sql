@@ -28,15 +28,12 @@ CREATE TABLE IF NOT EXISTS share_tokens (
   list_id UUID NOT NULL REFERENCES shared_lists(id) ON DELETE CASCADE,
   token_hash TEXT NOT NULL UNIQUE,
   created_by_device_id UUID NOT NULL,
-  redeemed_by_device_id UUID,
-  redeemed_at TIMESTAMPTZ,
   revoked_at TIMESTAMPTZ,
   expires_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX IF NOT EXISTS idx_share_tokens_list_id ON share_tokens(list_id);
-CREATE INDEX IF NOT EXISTS idx_share_tokens_redeemed_by_device_id ON share_tokens(redeemed_by_device_id);
 
 CREATE TABLE IF NOT EXISTS migration_history (
   id BIGSERIAL PRIMARY KEY,
