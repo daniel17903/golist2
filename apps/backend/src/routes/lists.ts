@@ -19,8 +19,6 @@ const itemUpdateSchema = z.object({
   deleted: z.boolean(),
   updatedAt: z.iso.datetime()
 })
-const deleteListQuerySchema = z.object({ deviceId: z.uuid() })
-
 export function registerListRoutes(app: FastifyInstance) {
   app.post('/v1/lists', async (request, reply) => {
     const body = listCreateSchema.parse(request.body)
@@ -91,11 +89,9 @@ export function registerListRoutes(app: FastifyInstance) {
   })
 
   app.delete('/v1/lists/:shareToken', { preHandler: requireToken }, async (request, reply) => {
-    const querystring = deleteListQuerySchema.parse(request.query)
-
     const result = await query(
       'DELETE FROM shared_lists WHERE id = $1 AND created_by_device_id = $2',
-      [request.auth!.listId, querystring.deviceId]
+      [request.auth!.listId, request.auth!.deviceId]
     )
 
     if (!result.rowCount) {
@@ -145,7 +141,7 @@ export function registerListRoutes(app: FastifyInstance) {
   app.post('/v1/lists/:shareToken/items', { preHandler: requireToken }, async (request, reply) => {
     const body = itemCreateSchema.parse(request.body)
     const itemId = crypto.randomUUID()
-    const createdBy = normalizeDeviceId((request.query as { deviceId?: string } | undefined)?.deviceId)
+    const createdBy = request.auth!.deviceId
 
     await query(
       `INSERT INTO list_items(id, list_id, text, category, deleted, created_by_device_id, created_at, updated_at, deleted_at)

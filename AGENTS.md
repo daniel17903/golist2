@@ -20,6 +20,7 @@
 - Direct web command equivalent: `npm run dev -w apps/web`
 
 ## Key behaviors
+- Backend sharing auth: protected sharing endpoints require a `deviceId` query param and a prior token redemption record for that device/token pair.
 - **Multi-list** support with a list selector and inline rename.
 - **Item sorting** by grocery category order, fallback to created order.
 - **Item suggestions** are **list-specific**, ranked by frequency then recency.

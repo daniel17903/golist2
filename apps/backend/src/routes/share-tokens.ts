@@ -2,12 +2,12 @@ import crypto from 'node:crypto'
 
 import { type FastifyInstance } from 'fastify'
 
-import { normalizeDeviceId, requireToken } from '../auth.js'
+import { requireToken, requireTokenForRedeem } from '../auth.js'
 import { query } from '../db/client.js'
 
 export function registerShareTokenRoutes(app: FastifyInstance) {
-  app.post('/v1/share-tokens/:shareToken/redeem', { preHandler: requireToken }, async (request, reply) => {
-    const deviceId = normalizeDeviceId((request.query as { deviceId?: string } | undefined)?.deviceId)
+  app.post('/v1/share-tokens/:shareToken/redeem', { preHandler: requireTokenForRedeem }, async (request, reply) => {
+    const deviceId = request.auth!.deviceId
 
     await query(
       `INSERT INTO share_token_redemptions(token_id, device_id, redeemed_at)
@@ -21,7 +21,7 @@ export function registerShareTokenRoutes(app: FastifyInstance) {
 
   app.post('/v1/lists/:shareToken/share-tokens', { preHandler: requireToken }, async (request, reply) => {
     const tokenId = crypto.randomUUID()
-    const createdBy = normalizeDeviceId((request.query as { deviceId?: string } | undefined)?.deviceId)
+    const createdBy = request.auth!.deviceId
 
     const result = await query<{ created_at: string }>(
       `INSERT INTO share_tokens(id, list_id, created_by_device_id, created_at)

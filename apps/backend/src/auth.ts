@@ -9,6 +9,7 @@ export type AuthContext = {
   listId: string
   tokenId: string
   shareToken: string
+  deviceId: string
 }
 
 declare module 'fastify' {
@@ -18,6 +19,7 @@ declare module 'fastify' {
 }
 
 const uuidSchema = z.uuid()
+const authQuerySchema = z.object({ deviceId: z.uuid() })
 
 function getBearerToken(request: FastifyRequest): string | null {
   const authHeader = request.headers.authorization
@@ -39,12 +41,23 @@ export function normalizeDeviceId(value: unknown): string {
     : crypto.randomUUID()
 }
 
-export async function requireToken(request: FastifyRequest, reply: FastifyReply) {
+async function requireTokenInternal(
+  request: FastifyRequest,
+  reply: FastifyReply,
+  requireRedeemedAccess: boolean
+) {
   const bearerToken = getBearerToken(request)
   const shareToken = (request.params as { shareToken?: string }).shareToken
 
   if (!bearerToken || !shareToken || bearerToken !== shareToken) {
     reply.code(401).send({ message: 'Unauthorized' })
+    return
+  }
+
+  const querystring = authQuerySchema.safeParse(request.query)
+
+  if (!querystring.success) {
+    reply.code(400).send({ message: 'Invalid request' })
     return
   }
 
@@ -63,9 +76,33 @@ export async function requireToken(request: FastifyRequest, reply: FastifyReply)
     return
   }
 
+  if (requireRedeemedAccess) {
+    const redeemedResult = await query(
+      `SELECT 1
+         FROM share_token_redemptions
+        WHERE token_id = $1 AND device_id = $2
+        LIMIT 1`,
+      [tokenResult.rows[0].token_id, querystring.data.deviceId]
+    )
+
+    if (!redeemedResult.rowCount) {
+      reply.code(403).send({ message: 'Forbidden' })
+      return
+    }
+  }
+
   request.auth = {
     listId: tokenResult.rows[0].list_id,
     tokenId: tokenResult.rows[0].token_id,
-    shareToken
+    shareToken,
+    deviceId: querystring.data.deviceId
   }
+}
+
+export async function requireToken(request: FastifyRequest, reply: FastifyReply) {
+  await requireTokenInternal(request, reply, true)
+}
+
+export async function requireTokenForRedeem(request: FastifyRequest, reply: FastifyReply) {
+  await requireTokenInternal(request, reply, false)
 }
