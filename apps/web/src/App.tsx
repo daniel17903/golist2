@@ -10,6 +10,11 @@ import RenameListModal from "./components/RenameListModal";
 import { useAppState } from "./hooks/useAppState";
 import { useLongPressItem } from "./hooks/useLongPressItem";
 
+type UndoToast = {
+  id: string;
+  item: Item;
+};
+
 const App = () => {
   const {
     lists,
@@ -46,29 +51,36 @@ const App = () => {
     handleDeleteList
   } = useAppState();
 
-  const undoTimeoutRef = useRef<number | null>(null);
+  const undoTimeoutsRef = useRef<Map<string, number>>(new Map());
   const [exitingItemIds, setExitingItemIds] = useState<Set<string>>(new Set());
-  const [pendingUndoItem, setPendingUndoItem] = useState<Item | null>(null);
+  const [undoToasts, setUndoToasts] = useState<UndoToast[]>([]);
 
-  const clearUndoTimeout = () => {
-    if (undoTimeoutRef.current !== null) {
-      window.clearTimeout(undoTimeoutRef.current);
-      undoTimeoutRef.current = null;
+  const clearUndoTimeout = (toastId: string) => {
+    const timeout = undoTimeoutsRef.current.get(toastId);
+    if (timeout !== undefined) {
+      window.clearTimeout(timeout);
+      undoTimeoutsRef.current.delete(toastId);
     }
   };
 
+  const removeUndoToast = (toastId: string) => {
+    clearUndoTimeout(toastId);
+    setUndoToasts((current) => current.filter((toast) => toast.id !== toastId));
+  };
+
   const showUndo = (item: Item) => {
-    clearUndoTimeout();
-    setPendingUndoItem(item);
-    undoTimeoutRef.current = window.setTimeout(() => {
-      setPendingUndoItem(null);
-      undoTimeoutRef.current = null;
+    const toastId = crypto.randomUUID();
+    setUndoToasts((current) => [...current, { id: toastId, item }]);
+    const timeout = window.setTimeout(() => {
+      removeUndoToast(toastId);
     }, 5000);
+    undoTimeoutsRef.current.set(toastId, timeout);
   };
 
   useEffect(
     () => () => {
-      clearUndoTimeout();
+      undoTimeoutsRef.current.forEach((timeout) => window.clearTimeout(timeout));
+      undoTimeoutsRef.current.clear();
     },
     []
   );
@@ -100,11 +112,9 @@ const App = () => {
     });
   };
 
-  const handleUndoDelete = async () => {
-    if (!pendingUndoItem) return;
-    clearUndoTimeout();
-    setPendingUndoItem(null);
-    await toggleItem(pendingUndoItem.id);
+  const handleUndoDelete = async (toastId: string, itemId: string) => {
+    removeUndoToast(toastId);
+    await toggleItem(itemId);
   };
 
   const { handlePointerDown, handlePointerUp, handlePointerCancel, longPressTriggeredRef } =
@@ -135,14 +145,20 @@ const App = () => {
 
       <BottomBar onOpenDrawer={() => setIsDrawerOpen(true)} onAddItem={openAddDialog} />
 
-      {pendingUndoItem && (
-        <div className="undo-toast" role="status" aria-live="polite">
-          <span>{`„${pendingUndoItem.name}“ gelöscht.`}</span>
-          <button type="button" className="undo-toast__action" onClick={() => void handleUndoDelete()}>
-            Rückgängig
-          </button>
-        </div>
-      )}
+      <div className="undo-toast-stack" aria-live="polite" aria-atomic="false">
+        {undoToasts.map((toast) => (
+          <div key={toast.id} className="undo-toast" role="status">
+            <span className="undo-toast__text">{`„${toast.item.name}“ gelöscht.`}</span>
+            <button
+              type="button"
+              className="undo-toast__action"
+              onClick={() => void handleUndoDelete(toast.id, toast.item.id)}
+            >
+              Rückgängig
+            </button>
+          </div>
+        ))}
+      </div>
 
       <ListsDrawer
         isOpen={isDrawerOpen}
