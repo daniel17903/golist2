@@ -46,16 +46,17 @@ The API contract is maintained in `apps/api-spec/openapi.yaml` (and related file
 3. Add Dockerfile for backend (multi-stage, production target).
 4. **GitHub Actions update**: create a backend bootstrap workflow job that runs backend lint + typecheck on PRs touching `apps/backend/**`.
 
-### Phase 1 — Database and migrations
-1. Define initial Postgres schema for:
-   - shared lists
-   - list items (or list document storage)
-   - share tokens / token grants
-   - device-list membership tracking
-2. Add migration tooling and baseline migration.
-3. Add seed utilities for local development.
-4. Add transaction helpers for atomic list updates.
-5. **GitHub Actions update**: add migration validation in CI (run migrations against ephemeral Postgres in workflow).
+### Phase 1 — Database and migrations ✅ Implemented
+1. Initial Postgres schema is implemented in `apps/backend/src/db/migrations/001_init.sql` with tables for:
+   - `shared_lists`
+   - `list_items` (tombstone-friendly via `deleted` + `deleted_at`)
+   - `share_tokens`
+   - `device_list_memberships`
+   - `migration_history`
+2. Migration tooling is implemented with `apps/backend/src/db/migrate.ts` and exposed via `npm run db:migrate -w apps/backend`.
+3. Seed utilities are implemented with `apps/backend/src/db/seed.ts` and exposed via `npm run db:seed -w apps/backend`.
+4. Transaction helpers are implemented in `apps/backend/src/db/client.ts` via `withTransaction(...)` for atomic writes.
+5. **GitHub Actions update**: `.github/workflows/backend-bootstrap.yml` now runs `db:migrate` against an ephemeral Postgres service.
 
 ### Phase 2 — API v1 implementation
 1. Implement endpoints defined by `apps/api-spec/openapi.yaml`.
@@ -120,16 +121,16 @@ The API contract is maintained in `apps/api-spec/openapi.yaml` (and related file
 - Run as non-root user in production image.
 
 ### Compose setup (local)
-Create `docker-compose.yml` at repo root (or backend root) with:
+A root `docker-compose.yml` is implemented with:
 - `postgres` service
-  - pinned postgres version
-  - persistent named volume
-  - healthcheck
+  - pinned image `postgres:17.6-alpine3.22`
+  - persistent named volume `golist-postgres-data`
+  - healthcheck using `pg_isready`
 - `backend` service
   - build from `apps/backend/Dockerfile`
   - depends_on postgres health
-  - environment variables from `.env`
-  - exposed API port (e.g., 3000)
+  - explicit environment variables including `DATABASE_URL`
+  - exposed API port `3000`
 
 ### Local workflow
 1. `docker compose up --build`

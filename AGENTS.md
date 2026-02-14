@@ -36,16 +36,19 @@
 - `npm run typecheck`
 - `npm run build`
 - `npm run test`
+- `npm run db:migrate -w apps/backend`
+- `npm run db:seed -w apps/backend`
 
 ## CI/CD
 - GitHub Actions `ci.yml` workflow validates `lint`, `typecheck`, `test` and `build` for the web workspace on PRs.
-- GitHub Actions `backend-bootstrap.yml` runs backend `lint` + `typecheck` on PRs that touch `apps/backend/**`.
+- GitHub Actions `backend-bootstrap.yml` runs backend `lint` + `typecheck` + `db:migrate` (against ephemeral Postgres) on PRs that touch `apps/backend/**`.
 - Deploy workflow builds on `main`.
 
 ## Testing expectations
 - Run `npm run lint` and `npm run typecheck` before commit when possible (`-w apps/web` or `-w apps/backend` as appropriate).
 - Run `npm run test` for changes to `apps/web/src/domain/`, `apps/web/src/state/`, or `apps/web/src/storage/`.
 - Run `npm run test -w apps/backend` for backend endpoint/config changes.
+- Run `npm run db:migrate -w apps/backend` for backend schema/migration changes.
 - Run `npm run build` for changes that touch PWA assets or build config; run `npm run build -w apps/backend` when backend runtime/build config changes.
 
 ## PWA assets

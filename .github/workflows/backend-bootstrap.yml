@@ -5,10 +5,27 @@ on:
     branches: ["main"]
     paths:
       - "apps/backend/**"
+      - ".github/workflows/backend-bootstrap.yml"
 
 jobs:
   backend-bootstrap:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17.6-alpine3.22
+        env:
+          POSTGRES_DB: golist
+          POSTGRES_USER: golist
+          POSTGRES_PASSWORD: golist
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U golist -d golist"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://golist:golist@localhost:5432/golist
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
@@ -18,3 +35,4 @@ jobs:
       - run: npm ci
       - run: npm run lint -w apps/backend
       - run: npm run typecheck -w apps/backend
+      - run: npm run db:migrate -w apps/backend
