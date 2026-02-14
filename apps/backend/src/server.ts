@@ -17,3 +17,7 @@ export function buildServer() {
 
   return app
 }
+
+const server = buildServer()
+
+export default server
