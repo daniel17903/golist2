@@ -2,7 +2,7 @@ import crypto from 'node:crypto'
 
 import { type FastifyInstance } from 'fastify'
 
-import { generateShareToken, hashToken, normalizeDeviceId, requireToken } from '../auth.js'
+import { normalizeDeviceId, requireToken } from '../auth.js'
 import { query } from '../db/client.js'
 
 export function registerShareTokenRoutes(app: FastifyInstance) {
@@ -21,22 +21,13 @@ export function registerShareTokenRoutes(app: FastifyInstance) {
 
   app.post('/v1/lists/:shareToken/share-tokens', { preHandler: requireToken }, async (request, reply) => {
     const tokenId = crypto.randomUUID()
-    const shareToken = generateShareToken()
     const createdBy = normalizeDeviceId((request.query as { deviceId?: string } | undefined)?.deviceId)
 
     const result = await query<{ created_at: string }>(
-      `INSERT INTO share_tokens(id, list_id, token_hash, created_by_device_id, created_at)
-       VALUES ($1, $2, $3, $4, NOW())
+      `INSERT INTO share_tokens(id, list_id, created_by_device_id, created_at)
+       VALUES ($1, $2, $3, NOW())
        RETURNING created_at`,
-      [tokenId, request.auth!.listId, hashToken(shareToken), createdBy]
-    )
-
-    const redeemedByResult = await query<{ device_id: string }>(
-      `SELECT device_id
-         FROM share_token_redemptions
-        WHERE token_id = $1
-        ORDER BY redeemed_at ASC`,
-      [tokenId]
+      [tokenId, request.auth!.listId, createdBy]
     )
 
     reply.code(201)
@@ -44,8 +35,7 @@ export function registerShareTokenRoutes(app: FastifyInstance) {
       tokenId,
       listId: request.auth!.listId,
       createdAt: result.rows[0].created_at,
-      redeemedBy: redeemedByResult.rows.map((row) => row.device_id),
-      shareToken
+      shareToken: tokenId
     }
   })
 }

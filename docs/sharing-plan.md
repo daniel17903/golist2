@@ -22,15 +22,16 @@ The API contract is maintained in `apps/api-spec/openapi.yaml` (and related file
 
 ### Identity and access
 - Each client keeps a generated `deviceId` UUID for auditing and server-side token redemption tracking.
-- Share links include an unguessable token.
+- Share links use random UUID share tokens (token IDs).
 - Protected API calls use `Authorization: Bearer <shareToken>`.
 - **Do not require an `X-Device-Id` header.** If device identity is needed for an endpoint, carry it in the API payload/query per the canonical spec.
 
 ### Data model direction
 - Store each shared list as a canonical document with metadata and items.
 - Use item tombstones (`deleted: true`) instead of hard deletes.
-- Keep canonical timestamps (`createdAt`, `updatedAt`) assigned by backend.
+- Keep canonical timestamps with backend-assigned `createdAt`; persist client-provided `updatedAt` for item updates to support deterministic sync ordering.
 - **Do not include a `shareTokens` field in the list document.** Token management is handled by backend tables/relations.
+- API responses should not expose device IDs (including creator device IDs and redemption device lists).
 
 ---
 

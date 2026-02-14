@@ -19,14 +19,6 @@ declare module 'fastify' {
 
 const uuidSchema = z.uuid()
 
-export function hashToken(token: string): string {
-  return crypto.createHash('sha256').update(token).digest('hex')
-}
-
-export function generateShareToken(): string {
-  return crypto.randomBytes(24).toString('hex')
-}
-
 function getBearerToken(request: FastifyRequest): string | null {
   const authHeader = request.headers.authorization
   if (!authHeader) {
@@ -56,15 +48,14 @@ export async function requireToken(request: FastifyRequest, reply: FastifyReply)
     return
   }
 
-  const tokenHash = hashToken(shareToken)
   const tokenResult = await query<{ token_id: string; list_id: string }>(
     `SELECT id AS token_id, list_id
        FROM share_tokens
-      WHERE token_hash = $1
+      WHERE id = $1
         AND revoked_at IS NULL
         AND (expires_at IS NULL OR expires_at > NOW())
       LIMIT 1`,
-    [tokenHash]
+    [shareToken]
   )
 
   if (!tokenResult.rowCount) {

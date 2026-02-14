@@ -3,7 +3,7 @@ import crypto from 'node:crypto'
 import { type FastifyInstance } from 'fastify'
 import { z } from 'zod'
 
-import { generateShareToken, hashToken, normalizeDeviceId, requireToken } from '../auth.js'
+import { normalizeDeviceId, requireToken } from '../auth.js'
 import { query, withTransaction } from '../db/client.js'
 
 const listCreateSchema = z.object({ name: z.string().min(1) })
@@ -19,12 +19,12 @@ const itemUpdateSchema = z.object({
   deleted: z.boolean(),
   updatedAt: z.iso.datetime()
 })
+const deleteListQuerySchema = z.object({ deviceId: z.uuid() })
 
 export function registerListRoutes(app: FastifyInstance) {
   app.post('/v1/lists', async (request, reply) => {
     const body = listCreateSchema.parse(request.body)
     const listId = crypto.randomUUID()
-    const shareToken = generateShareToken()
     const tokenId = crypto.randomUUID()
     const createdBy = normalizeDeviceId((request.query as { deviceId?: string } | undefined)?.deviceId)
 
@@ -34,13 +34,13 @@ export function registerListRoutes(app: FastifyInstance) {
         [listId, body.name, createdBy]
       )
       await client.query(
-        'INSERT INTO share_tokens(id, list_id, token_hash, created_by_device_id, created_at) VALUES ($1, $2, $3, $4, NOW())',
-        [tokenId, listId, hashToken(shareToken), createdBy]
+        'INSERT INTO share_tokens(id, list_id, created_by_device_id, created_at) VALUES ($1, $2, $3, NOW())',
+        [tokenId, listId, createdBy]
       )
     })
 
     reply.code(201)
-    return { listId, shareToken }
+    return { listId, shareToken: tokenId }
   })
 
   app.get('/v1/lists/:shareToken', { preHandler: requireToken }, async (request) => {
@@ -51,10 +51,7 @@ export function registerListRoutes(app: FastifyInstance) {
       name: string
       created_at: string
       updated_at: string
-      created_by_device_id: string
-    }>('SELECT id, name, created_at, updated_at, created_by_device_id FROM shared_lists WHERE id = $1 LIMIT 1', [
-      auth.listId
-    ])
+    }>('SELECT id, name, created_at, updated_at FROM shared_lists WHERE id = $1 LIMIT 1', [auth.listId])
 
     if (!listResult.rowCount) {
       return {}
@@ -82,7 +79,6 @@ export function registerListRoutes(app: FastifyInstance) {
       name: list.name,
       createdAt: list.created_at,
       updatedAt: list.updated_at,
-      createdBy: list.created_by_device_id,
       items: itemsResult.rows.map((item) => ({
         id: item.id,
         name: item.name,
@@ -95,7 +91,18 @@ export function registerListRoutes(app: FastifyInstance) {
   })
 
   app.delete('/v1/lists/:shareToken', { preHandler: requireToken }, async (request, reply) => {
-    await query('DELETE FROM shared_lists WHERE id = $1', [request.auth!.listId])
+    const querystring = deleteListQuerySchema.parse(request.query)
+
+    const result = await query(
+      'DELETE FROM shared_lists WHERE id = $1 AND created_by_device_id = $2',
+      [request.auth!.listId, querystring.deviceId]
+    )
+
+    if (!result.rowCount) {
+      reply.code(403)
+      return { message: 'Forbidden' }
+    }
+
     reply.code(204)
   })
 
@@ -141,8 +148,8 @@ export function registerListRoutes(app: FastifyInstance) {
     const createdBy = normalizeDeviceId((request.query as { deviceId?: string } | undefined)?.deviceId)
 
     await query(
-      `INSERT INTO list_items(id, list_id, text, category, position, deleted, created_by_device_id, created_at, updated_at, deleted_at)
-       VALUES ($1, $2, $3, $4, COALESCE((SELECT MAX(position) + 1 FROM list_items WHERE list_id = $2), 0), $5, $6, NOW(), NOW(), CASE WHEN $5 THEN NOW() ELSE NULL END)`,
+      `INSERT INTO list_items(id, list_id, text, category, deleted, created_by_device_id, created_at, updated_at, deleted_at)
+       VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW(), CASE WHEN $5 THEN NOW() ELSE NULL END)`,
       [itemId, request.auth!.listId, body.name, body.category, body.deleted, createdBy]
     )
 

@@ -29,6 +29,13 @@ components:
       schema:
         type: string
         format: date-time
+    DeviceId:
+      name: deviceId
+      in: query
+      required: true
+      schema:
+        type: string
+        format: uuid
   schemas:
     ListItem:
       type: object
@@ -50,7 +57,7 @@ components:
           format: date-time
     ListDocument:
       type: object
-      required: [listId, name, items, createdAt, updatedAt, createdBy]
+      required: [listId, name, items, createdAt, updatedAt]
       properties:
         listId:
           type: string
@@ -66,8 +73,6 @@ components:
         updatedAt:
           type: string
           format: date-time
-        createdBy:
-          type: string
     ListCreateRequest:
       type: object
       required: [name]
@@ -127,7 +132,7 @@ components:
           type: string
     ShareTokenEntry:
       type: object
-      required: [tokenId, listId, createdAt, redeemedBy]
+      required: [tokenId, listId, createdAt]
       properties:
         tokenId:
           type: string
@@ -136,10 +141,6 @@ components:
         createdAt:
           type: string
           format: date-time
-        redeemedBy:
-          type: array
-          items:
-            type: string
     ShareTokenCreateResponse:
       allOf:
         - $ref: "#/components/schemas/ShareTokenEntry"
@@ -181,10 +182,14 @@ paths:
               schema:
                 $ref: "#/components/schemas/ListDocument"
     delete:
-      summary: Delete list
+      summary: Delete list (creator device only)
+      parameters:
+        - $ref: "#/components/parameters/DeviceId"
       responses:
         "204":
           description: List deleted
+        "403":
+          description: Only the creator device may delete the list
   /v1/lists/{shareToken}/name:
     parameters:
       - $ref: "#/components/parameters/ShareToken"
