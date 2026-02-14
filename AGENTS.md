@@ -2,7 +2,7 @@
 
 ## Repository layout (monorepo)
 - `apps/web/` contains the existing React + TypeScript + Vite PWA.
-- `apps/backend/` contains a Fastify + TypeScript backend scaffold with env validation and a `/health` endpoint.
+- `apps/backend/` contains a Fastify + TypeScript backend scaffold with env validation, a `/health` endpoint, and local Docker Compose config (`apps/backend/docker-compose.yml`).
 - `packages/shared/` contains shared domain code that can be reused by web and backend (currently shared types).
 - Root `package.json` is a workspace manifest with scripts that proxy to `apps/web`; backend scripts run from `apps/backend` or via `-w apps/backend`.
 

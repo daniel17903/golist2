@@ -21,7 +21,7 @@ The API contract is maintained in `apps/api-spec/openapi.yaml` (and related file
 - **Local orchestration**: Docker Compose to run API + Postgres together.
 
 ### Identity and access
-- Each client keeps a generated `deviceId` UUID for auditing and server-side membership tracking.
+- Each client keeps a generated `deviceId` UUID for auditing and server-side token redemption tracking.
 - Share links include an unguessable token.
 - Protected API calls use `Authorization: Bearer <shareToken>`.
 - **Do not require an `X-Device-Id` header.** If device identity is needed for an endpoint, carry it in the API payload/query per the canonical spec.
@@ -51,7 +51,6 @@ The API contract is maintained in `apps/api-spec/openapi.yaml` (and related file
    - `shared_lists`
    - `list_items` (tombstone-friendly via `deleted` + `deleted_at`)
    - `share_tokens`
-   - `device_list_memberships`
    - `migration_history`
 2. Migration tooling is implemented with `apps/backend/src/db/migrate.ts` and exposed via `npm run db:migrate -w apps/backend`.
 3. Seed utilities are implemented with `apps/backend/src/db/seed.ts` and exposed via `npm run db:seed -w apps/backend`.
@@ -121,7 +120,7 @@ The API contract is maintained in `apps/api-spec/openapi.yaml` (and related file
 - Run as non-root user in production image.
 
 ### Compose setup (local)
-A root `docker-compose.yml` is implemented with:
+`apps/backend/docker-compose.yml` is implemented with:
 - `postgres` service
   - pinned image `postgres:17.6-alpine3.22`
   - persistent named volume `golist-postgres-data`
@@ -133,7 +132,7 @@ A root `docker-compose.yml` is implemented with:
   - exposed API port `3000`
 
 ### Local workflow
-1. `docker compose up --build`
+1. `docker compose -f apps/backend/docker-compose.yml up --build`
 2. Run migrations automatically on backend startup or via one-off migration command.
 3. Access API docs/spec from `apps/api-spec` during development.
 

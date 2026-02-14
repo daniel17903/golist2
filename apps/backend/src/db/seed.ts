@@ -1,4 +1,4 @@
-import { randomUUID, createHash } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 
 import type { PoolClient } from 'pg'
 
@@ -11,6 +11,7 @@ function createTokenHash(token: string): string {
 async function seedList(client: PoolClient): Promise<void> {
   const listId = randomUUID()
   const ownerDeviceId = randomUUID()
+  const redeemedByDeviceId = randomUUID()
   const token = `seed-${randomUUID()}`
 
   await client.query(
@@ -20,15 +21,6 @@ async function seedList(client: PoolClient): Promise<void> {
       ON CONFLICT (id) DO NOTHING
     `,
     [listId, 'Weekly Groceries', ownerDeviceId]
-  )
-
-  await client.query(
-    `
-      INSERT INTO device_list_memberships(list_id, device_id, role, last_seen_at)
-      VALUES ($1, $2, 'owner', NOW())
-      ON CONFLICT (list_id, device_id) DO NOTHING
-    `,
-    [listId, ownerDeviceId]
   )
 
   await client.query(
@@ -45,11 +37,18 @@ async function seedList(client: PoolClient): Promise<void> {
 
   await client.query(
     `
-      INSERT INTO share_tokens(id, list_id, token_hash, created_by_device_id)
-      VALUES ($1, $2, $3, $4)
+      INSERT INTO share_tokens(
+        id,
+        list_id,
+        token_hash,
+        created_by_device_id,
+        redeemed_by_device_id,
+        redeemed_at
+      )
+      VALUES ($1, $2, $3, $4, $5, NOW())
       ON CONFLICT (id) DO NOTHING
     `,
-    [randomUUID(), listId, createTokenHash(token), ownerDeviceId]
+    [randomUUID(), listId, createTokenHash(token), ownerDeviceId, redeemedByDeviceId]
   )
 
   console.log(`Seeded list ${listId} with owner device ${ownerDeviceId}`)
