@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import type { Item } from "@golist/shared/domain/types";
 import AppHeader from "./components/AppHeader";
 import BottomBar from "./components/BottomBar";
 import AddItemDialog from "./components/AddItemDialog";
@@ -12,6 +13,7 @@ import { useLongPressItem } from "./hooks/useLongPressItem";
 const App = () => {
   const {
     lists,
+    items,
     activeListId,
     activeList,
     listItems,
@@ -44,12 +46,41 @@ const App = () => {
     handleDeleteList
   } = useAppState();
 
+  const undoTimeoutRef = useRef<number | null>(null);
   const [exitingItemIds, setExitingItemIds] = useState<Set<string>>(new Set());
+  const [pendingUndoItem, setPendingUndoItem] = useState<Item | null>(null);
+
+  const clearUndoTimeout = () => {
+    if (undoTimeoutRef.current !== null) {
+      window.clearTimeout(undoTimeoutRef.current);
+      undoTimeoutRef.current = null;
+    }
+  };
+
+  const showUndo = (item: Item) => {
+    clearUndoTimeout();
+    setPendingUndoItem(item);
+    undoTimeoutRef.current = window.setTimeout(() => {
+      setPendingUndoItem(null);
+      undoTimeoutRef.current = null;
+    }, 5000);
+  };
+
+  useEffect(
+    () => () => {
+      clearUndoTimeout();
+    },
+    []
+  );
 
   const handleToggleItem = async (itemId: string) => {
     if (exitingItemIds.has(itemId)) return;
+    const itemToDelete = items.find((item) => item.id === itemId);
+    if (!itemToDelete) return;
+
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
       await toggleItem(itemId);
+      showUndo(itemToDelete);
       return;
     }
     setExitingItemIds((current) => new Set(current).add(itemId));
@@ -57,12 +88,23 @@ const App = () => {
 
   const handleExitComplete = async (itemId: string) => {
     if (!exitingItemIds.has(itemId)) return;
+    const deletedItem = items.find((item) => item.id === itemId);
     await toggleItem(itemId);
+    if (deletedItem) {
+      showUndo(deletedItem);
+    }
     setExitingItemIds((current) => {
       const next = new Set(current);
       next.delete(itemId);
       return next;
     });
+  };
+
+  const handleUndoDelete = async () => {
+    if (!pendingUndoItem) return;
+    clearUndoTimeout();
+    setPendingUndoItem(null);
+    await toggleItem(pendingUndoItem.id);
   };
 
   const { handlePointerDown, handlePointerUp, handlePointerCancel, longPressTriggeredRef } =
@@ -92,6 +134,15 @@ const App = () => {
       />
 
       <BottomBar onOpenDrawer={() => setIsDrawerOpen(true)} onAddItem={openAddDialog} />
+
+      {pendingUndoItem && (
+        <div className="undo-toast" role="status" aria-live="polite">
+          <span>{`„${pendingUndoItem.name}“ gelöscht.`}</span>
+          <button type="button" className="undo-toast__action" onClick={() => void handleUndoDelete()}>
+            Rückgängig
+          </button>
+        </div>
+      )}
 
       <ListsDrawer
         isOpen={isDrawerOpen}
