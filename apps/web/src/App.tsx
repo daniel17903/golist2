@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import type { Item } from "@golist/shared/domain/types";
 import AppHeader from "./components/AppHeader";
 import BottomBar from "./components/BottomBar";
 import AddItemDialog from "./components/AddItemDialog";
@@ -9,9 +10,15 @@ import RenameListModal from "./components/RenameListModal";
 import { useAppState } from "./hooks/useAppState";
 import { useLongPressItem } from "./hooks/useLongPressItem";
 
+type UndoToast = {
+  id: string;
+  item: Item;
+};
+
 const App = () => {
   const {
     lists,
+    items,
     activeListId,
     activeList,
     listItems,
@@ -44,12 +51,48 @@ const App = () => {
     handleDeleteList
   } = useAppState();
 
+  const undoTimeoutsRef = useRef<Map<string, number>>(new Map());
   const [exitingItemIds, setExitingItemIds] = useState<Set<string>>(new Set());
+  const [undoToasts, setUndoToasts] = useState<UndoToast[]>([]);
+
+  const clearUndoTimeout = (toastId: string) => {
+    const timeout = undoTimeoutsRef.current.get(toastId);
+    if (timeout !== undefined) {
+      window.clearTimeout(timeout);
+      undoTimeoutsRef.current.delete(toastId);
+    }
+  };
+
+  const removeUndoToast = (toastId: string) => {
+    clearUndoTimeout(toastId);
+    setUndoToasts((current) => current.filter((toast) => toast.id !== toastId));
+  };
+
+  const showUndo = (item: Item) => {
+    const toastId = crypto.randomUUID();
+    setUndoToasts((current) => [...current, { id: toastId, item }]);
+    const timeout = window.setTimeout(() => {
+      removeUndoToast(toastId);
+    }, 5000);
+    undoTimeoutsRef.current.set(toastId, timeout);
+  };
+
+  useEffect(
+    () => () => {
+      undoTimeoutsRef.current.forEach((timeout) => window.clearTimeout(timeout));
+      undoTimeoutsRef.current.clear();
+    },
+    []
+  );
 
   const handleToggleItem = async (itemId: string) => {
     if (exitingItemIds.has(itemId)) return;
+    const itemToDelete = items.find((item) => item.id === itemId);
+    if (!itemToDelete) return;
+
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
       await toggleItem(itemId);
+      showUndo(itemToDelete);
       return;
     }
     setExitingItemIds((current) => new Set(current).add(itemId));
@@ -57,12 +100,21 @@ const App = () => {
 
   const handleExitComplete = async (itemId: string) => {
     if (!exitingItemIds.has(itemId)) return;
+    const deletedItem = items.find((item) => item.id === itemId);
     await toggleItem(itemId);
+    if (deletedItem) {
+      showUndo(deletedItem);
+    }
     setExitingItemIds((current) => {
       const next = new Set(current);
       next.delete(itemId);
       return next;
     });
+  };
+
+  const handleUndoDelete = async (toastId: string, itemId: string) => {
+    removeUndoToast(toastId);
+    await toggleItem(itemId);
   };
 
   const { handlePointerDown, handlePointerUp, handlePointerCancel, longPressTriggeredRef } =
@@ -92,6 +144,21 @@ const App = () => {
       />
 
       <BottomBar onOpenDrawer={() => setIsDrawerOpen(true)} onAddItem={openAddDialog} />
+
+      <div className="undo-toast-stack" aria-live="polite" aria-atomic="false">
+        {undoToasts.map((toast) => (
+          <div key={toast.id} className="undo-toast" role="status">
+            <span className="undo-toast__text">{`„${toast.item.name}“ gelöscht.`}</span>
+            <button
+              type="button"
+              className="undo-toast__action"
+              onClick={() => void handleUndoDelete(toast.id, toast.item.id)}
+            >
+              Rückgängig
+            </button>
+          </div>
+        ))}
+      </div>
 
       <ListsDrawer
         isOpen={isDrawerOpen}
