@@ -29,7 +29,7 @@ export async function runMigrations(): Promise<number> {
 
       const existing = await client.query<{ name: string }>(
         'SELECT name FROM migration_history WHERE name = $1 LIMIT 1',
-        [file]
+        [file],
       )
 
       if (existing.rowCount && existing.rowCount > 0) {

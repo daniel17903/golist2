@@ -16,7 +16,7 @@ export const categories: Category[] = [
   { id: "beverages", label: "Beverages", icon: "🧃", order: 8 },
   { id: "household", label: "Household", icon: "🧽", order: 9 },
   { id: "convenienceProductFrozen", label: "Convenience & Frozen", icon: "🍕", order: 10 },
-  { id: "other", label: "Other", icon: "🛒", order: 11 }
+  { id: "other", label: "Other", icon: "🛒", order: 11 },
 ];
 
 type CategoryEntry = {
@@ -29,12 +29,12 @@ const categoryEntries: CategoryEntry[] = [
   {
     assetFileName: "apple",
     matchingNames: ["fruit", "apples", "apple"],
-    category: "fruitsVegetables"
+    category: "fruitsVegetables",
   },
   {
     assetFileName: "banana",
     matchingNames: ["banana"],
-    category: "fruitsVegetables"
+    category: "fruitsVegetables",
   },
   {
     assetFileName: "bottle",
@@ -59,14 +59,14 @@ const categoryEntries: CategoryEntry[] = [
       "bottle",
       "sprites",
       "red bull",
-      "fanta"
+      "fanta",
     ],
-    category: "beverages"
+    category: "beverages",
   },
   {
     assetFileName: "bottle",
     matchingNames: ["mayonnaise", "oil", "mayo", "vinegar", "ketchup", "soy sauce", "remoulade"],
-    category: "convenienceProductFrozen"
+    category: "convenienceProductFrozen",
   },
   {
     assetFileName: "box",
@@ -87,14 +87,14 @@ const categoryEntries: CategoryEntry[] = [
       "müsli",
       "dishwasher taps",
       "muesli",
-      "box"
+      "box",
     ],
-    category: "household"
+    category: "household",
   },
   {
     assetFileName: "flour",
     matchingNames: ["flour"],
-    category: "cereals"
+    category: "cereals",
   },
   {
     assetFileName: "bread",
@@ -108,14 +108,14 @@ const categoryEntries: CategoryEntry[] = [
       "bread",
       "roll",
       "bun",
-      "baguette"
+      "baguette",
     ],
-    category: "bread"
+    category: "bread",
   },
   {
     assetFileName: "can",
     matchingNames: ["tomato can", "can", "beans", "canned tomatoes", "chickpeas"],
-    category: "spicesCanned"
+    category: "spicesCanned",
   },
   {
     assetFileName: "carrot",
@@ -127,14 +127,14 @@ const categoryEntries: CategoryEntry[] = [
       "turnip",
       "vegetables",
       "ruebe",
-      "parsnip"
+      "parsnip",
     ],
-    category: "fruitsVegetables"
+    category: "fruitsVegetables",
   },
   {
     assetFileName: "corn",
     matchingNames: ["lenses", "millet", "quinoa", "seed", "seeds", "peas", "bulgur", "oatmeal", "grains"],
-    category: "cereals"
+    category: "cereals",
   },
   {
     assetFileName: "cup",
@@ -147,9 +147,9 @@ const categoryEntries: CategoryEntry[] = [
       "sour cream",
       "cream",
       "yoghurt",
-      "cups"
+      "cups",
     ],
-    category: "milkCheese"
+    category: "milkCheese",
   },
   {
     assetFileName: "glas",
@@ -167,26 +167,26 @@ const categoryEntries: CategoryEntry[] = [
       "jam",
       "guacamole",
       "honey",
-      "glasses"
+      "glasses",
     ],
-    category: "spicesCanned"
+    category: "spicesCanned",
   },
   { assetFileName: "leek", matchingNames: ["leek"], category: "fruitsVegetables" },
   {
     assetFileName: "peanut",
     matchingNames: ["pistachios", "nut", "cashews", "nuts"],
-    category: "cereals"
+    category: "cereals",
   },
   { assetFileName: "almonds", matchingNames: ["almond"], category: "cereals" },
   {
     assetFileName: "round_fruit",
     matchingNames: ["tangerine", "nectarine", "peach", "tomato", "orange", "mango"],
-    category: "fruitsVegetables"
+    category: "fruitsVegetables",
   },
   {
     assetFileName: "dead_cow",
     matchingNames: ["flesh", "minced meat", "steak", "cattle", "meat", "bovine"],
-    category: "meatFish"
+    category: "meatFish",
   },
   {
     assetFileName: "dead_pig",
@@ -206,9 +206,9 @@ const categoryEntries: CategoryEntry[] = [
       "meatloaf",
       "sausage",
       "sausages",
-      "mead"
+      "mead",
     ],
-    category: "meatFish"
+    category: "meatFish",
   },
   { assetFileName: "dead_chicken", matchingNames: ["chicken", "turkey", "chickens"], category: "meatFish" },
   {
@@ -224,14 +224,14 @@ const categoryEntries: CategoryEntry[] = [
       "dorade",
       "trout",
       "fish",
-      "pike"
+      "pike",
     ],
-    category: "meatFish"
+    category: "meatFish",
   },
   {
     assetFileName: "cookie",
     matchingNames: ["cookie", "biscuit", "sweets", "cookies"],
-    category: "sweetsSnacks"
+    category: "sweetsSnacks",
   },
   { assetFileName: "pepper", matchingNames: ["paprika"], category: "fruitsVegetables" },
   { assetFileName: "onion", matchingNames: ["onion", "shell", "shallot"], category: "fruitsVegetables" },
@@ -239,25 +239,25 @@ const categoryEntries: CategoryEntry[] = [
   {
     assetFileName: "cabbage",
     matchingNames: ["savoy", "kohl", "cabbage", "savoy cabbage"],
-    category: "fruitsVegetables"
+    category: "fruitsVegetables",
   },
   { assetFileName: "broccoli", matchingNames: ["broccoli"], category: "fruitsVegetables" },
   { assetFileName: "eggplant", matchingNames: ["aubergine", "eggplant"], category: "fruitsVegetables" },
   {
     assetFileName: "salad",
     matchingNames: ["salad", "pak choy", "spinach", "pak choi", "mangold", "chard", "arugula"],
-    category: "fruitsVegetables"
+    category: "fruitsVegetables",
   },
   {
     assetFileName: "chocolate",
     matchingNames: ["chocolate shavings", "chocolate sprinkles", "chocolate rasps", "chocolate"],
-    category: "sweetsSnacks"
+    category: "sweetsSnacks",
   },
   { assetFileName: "ice", matchingNames: ["magnum", "ice"], category: "sweetsSnacks" },
   {
     assetFileName: "berries",
     matchingNames: ["berries", "grapes", "currants", "raspberries", "blueberries", "berry"],
-    category: "fruitsVegetables"
+    category: "fruitsVegetables",
   },
   { assetFileName: "strawberry", matchingNames: ["strawberry"], category: "fruitsVegetables" },
   { assetFileName: "block", matchingNames: ["margarine", "tofu", "ram", "butter", "rama"], category: "milkCheese" },
@@ -265,12 +265,12 @@ const categoryEntries: CategoryEntry[] = [
   {
     assetFileName: "herbs",
     matchingNames: ["parsley", "coriander", "herbs", "mint", "basil", "dill"],
-    category: "spicesCanned"
+    category: "spicesCanned",
   },
   {
     assetFileName: "pizza_cake",
     matchingNames: ["pizza", "tarte", "cake", "tarte flambée"],
-    category: "convenienceProductFrozen"
+    category: "convenienceProductFrozen",
   },
   { assetFileName: "yeast", matchingNames: ["yeast"], category: "milkCheese" },
   {
@@ -285,9 +285,9 @@ const categoryEntries: CategoryEntry[] = [
       "baking powder",
       "pudding powder",
       "jam sugar",
-      "vanilla sugar"
+      "vanilla sugar",
     ],
-    category: "spicesCanned"
+    category: "spicesCanned",
   },
   { assetFileName: "pasta", matchingNames: ["noodles", "pasta", "spaghetti"], category: "cereals" },
   { assetFileName: "lemon", matchingNames: ["lemon"], category: "fruitsVegetables" },
@@ -306,9 +306,9 @@ const categoryEntries: CategoryEntry[] = [
       "pepper",
       "spice",
       "curry",
-      "turmeric"
+      "turmeric",
     ],
-    category: "spicesCanned"
+    category: "spicesCanned",
   },
   { assetFileName: "rice", matchingNames: ["rice"], category: "cereals" },
   { assetFileName: "paper_towel", matchingNames: ["kitchen roll", "zewa"], category: "household" },
@@ -316,7 +316,7 @@ const categoryEntries: CategoryEntry[] = [
   {
     assetFileName: "baking_paper",
     matchingNames: ["baking paper", "cling film", "parchment paper", "back paper"],
-    category: "household"
+    category: "household",
   },
   { assetFileName: "mushroom", matchingNames: ["mushroom", "fungus"], category: "fruitsVegetables" },
   { assetFileName: "papaya", matchingNames: ["papaya"], category: "fruitsVegetables" },
@@ -331,9 +331,9 @@ const categoryEntries: CategoryEntry[] = [
       "soy drink",
       "icetea",
       "rice drink",
-      "milk"
+      "milk",
     ],
-    category: "milkCheese"
+    category: "milkCheese",
   },
   { assetFileName: "egg", matchingNames: ["eggs"], category: "milkCheese" },
   { assetFileName: "coffee_beans", matchingNames: ["coffee", "espresso"], category: "beverages" },
@@ -364,9 +364,9 @@ const categoryEntries: CategoryEntry[] = [
       "cheese",
       "ricotta",
       "mozarella",
-      "tilsit"
+      "tilsit",
     ],
-    category: "milkCheese"
+    category: "milkCheese",
   },
   { assetFileName: "asparagus", matchingNames: ["asparagus"], category: "fruitsVegetables" },
   { assetFileName: "gnocchi", matchingNames: ["gnocchi"], category: "cereals" },
@@ -374,7 +374,7 @@ const categoryEntries: CategoryEntry[] = [
   {
     assetFileName: "beetroot",
     matchingNames: ["yellow turnip", "yellow beets", "beet", "red beet", "beetroot", "yellow beet"],
-    category: "fruitsVegetables"
+    category: "fruitsVegetables",
   },
   { assetFileName: "radish", matchingNames: ["radishes", "radish"], category: "fruitsVegetables" },
   { assetFileName: "cucumber", matchingNames: ["cucumber"], category: "fruitsVegetables" },
@@ -385,7 +385,7 @@ const categoryEntries: CategoryEntry[] = [
   {
     assetFileName: "round_fruit_small",
     matchingNames: ["kiwi", "apricot", "mirabelle", "plum"],
-    category: "fruitsVegetables"
+    category: "fruitsVegetables",
   },
   { assetFileName: "seeds", matchingNames: ["flakes", "cores"], category: "cereals" },
   { assetFileName: "sponge", matchingNames: ["schwaemme", "sponge", "sponges"], category: "household" },
@@ -406,9 +406,9 @@ const categoryEntries: CategoryEntry[] = [
       "cantuccini",
       "snacks",
       "sweets",
-      "licorice"
+      "licorice",
     ],
-    category: "fruitsVegetables"
+    category: "fruitsVegetables",
   },
   { assetFileName: "cream", matchingNames: ["hair gel"], category: "household" },
   { assetFileName: "shower_gel", matchingNames: ["shampoo", "shower gel"], category: "household" },
@@ -422,19 +422,19 @@ const categoryEntries: CategoryEntry[] = [
       "bathroom cleaner",
       "neutral cleaner",
       "dishwashing",
-      "dishwashing detergent"
+      "dishwashing detergent",
     ],
-    category: "household"
+    category: "household",
   },
   {
     assetFileName: "apple",
     matchingNames: ["apfel", "äpfel", "aepfel", "obst"],
-    category: "fruitsVegetables"
+    category: "fruitsVegetables",
   },
   {
     assetFileName: "banana",
     matchingNames: ["banane"],
-    category: "fruitsVegetables"
+    category: "fruitsVegetables",
   },
   {
     assetFileName: "bottle",
@@ -454,9 +454,9 @@ const categoryEntries: CategoryEntry[] = [
       "pils",
       "hefeweizen",
       "red bull",
-      "trinken"
+      "trinken",
     ],
-    category: "beverages"
+    category: "beverages",
   },
   {
     assetFileName: "bottle",
@@ -471,9 +471,9 @@ const categoryEntries: CategoryEntry[] = [
       "mayonnaise",
       "mayo",
       "ketchup",
-      "remoulade"
+      "remoulade",
     ],
-    category: "convenienceProductFrozen"
+    category: "convenienceProductFrozen",
   },
   {
     assetFileName: "box",
@@ -493,39 +493,39 @@ const categoryEntries: CategoryEntry[] = [
       "kakao",
       "kakaopulver",
       "zwieback",
-      "caotina"
+      "caotina",
     ],
-    category: "household"
+    category: "household",
   },
   {
     assetFileName: "flour",
     matchingNames: ["mehl"],
-    category: "cereals"
+    category: "cereals",
   },
   {
     assetFileName: "bread",
     matchingNames: ["brot", "brötchen", "laugenstange", "brezel", "semmel", "baguette", "ekmek"],
-    category: "bread"
+    category: "bread",
   },
   {
     assetFileName: "can",
     matchingNames: ["bohnen", "dose", "kichererbsen", "dosentomaten", "tomatendose"],
-    category: "spicesCanned"
+    category: "spicesCanned",
   },
   {
     assetFileName: "carrot",
     matchingNames: ["karotte", "pastinake", "rübe", "ruebe", "rettich", "möhre", "gemüse", "gemuese"],
-    category: "fruitsVegetables"
+    category: "fruitsVegetables",
   },
   {
     assetFileName: "corn",
     matchingNames: ["samen", "körner", "linsen", "erbsen", "hirse", "haferflocken", "quinoa", "bulgur"],
-    category: "cereals"
+    category: "cereals",
   },
   {
     assetFileName: "cup",
     matchingNames: ["becher", "yoghurt", "joghurt", "quark", "saure sahne", "schlagsahne", "sahne", "pudding"],
-    category: "milkCheese"
+    category: "milkCheese",
   },
   {
     assetFileName: "glas",
@@ -543,34 +543,34 @@ const categoryEntries: CategoryEntry[] = [
       "senf",
       "pesto",
       "tahini",
-      "oliven"
+      "oliven",
     ],
-    category: "spicesCanned"
+    category: "spicesCanned",
   },
   {
     assetFileName: "leek",
     matchingNames: ["lauch", "porree"],
-    category: "fruitsVegetables"
+    category: "fruitsVegetables",
   },
   {
     assetFileName: "peanut",
     matchingNames: ["nuss", "nüsse", "cashews", "cashewkerne", "pistazien"],
-    category: "cereals"
+    category: "cereals",
   },
   {
     assetFileName: "almonds",
     matchingNames: ["mandel"],
-    category: "cereals"
+    category: "cereals",
   },
   {
     assetFileName: "round_fruit",
     matchingNames: ["tomate", "orange", "mandarine", "mango", "nektarine", "pfirsich"],
-    category: "fruitsVegetables"
+    category: "fruitsVegetables",
   },
   {
     assetFileName: "dead_cow",
     matchingNames: ["fleisch", "hackfleisch", "steak", "rinder"],
-    category: "meatFish"
+    category: "meatFish",
   },
   {
     assetFileName: "dead_pig",
@@ -588,14 +588,14 @@ const categoryEntries: CategoryEntry[] = [
       "wiener",
       "aufschnitt",
       "schweine",
-      "mett"
+      "mett",
     ],
-    category: "meatFish"
+    category: "meatFish",
   },
   {
     assetFileName: "dead_chicken",
     matchingNames: ["hühnchen", "pute", "chicken", "hühner"],
-    category: "meatFish"
+    category: "meatFish",
   },
   {
     assetFileName: "fish",
@@ -610,9 +610,9 @@ const categoryEntries: CategoryEntry[] = [
       "kabeljau",
       "dorsch",
       "karpfen",
-      "fischstäbchen"
+      "fischstäbchen",
     ],
-    category: "meatFish"
+    category: "meatFish",
   },
   { assetFileName: "cookie", matchingNames: ["keks", "kekse", "süssigkeiten"], category: "sweetsSnacks" },
   { assetFileName: "pepper", matchingNames: ["paprika"], category: "fruitsVegetables" },
@@ -624,18 +624,18 @@ const categoryEntries: CategoryEntry[] = [
   {
     assetFileName: "salad",
     matchingNames: ["salat", "rucola", "spinat", "mangold", "pak choi", "pak choy"],
-    category: "fruitsVegetables"
+    category: "fruitsVegetables",
   },
   {
     assetFileName: "chocolate",
     matchingNames: ["schokolade", "schokostreusel", "schokoraspel"],
-    category: "sweetsSnacks"
+    category: "sweetsSnacks",
   },
   { assetFileName: "ice", matchingNames: ["eis", "magnum"], category: "sweetsSnacks" },
   {
     assetFileName: "berries",
     matchingNames: ["beeren", "himbeeren", "johannisbeeren", "heidelbeeren", "blaubeeren", "trauben"],
-    category: "fruitsVegetables"
+    category: "fruitsVegetables",
   },
   { assetFileName: "strawberry", matchingNames: ["erdbeere"], category: "fruitsVegetables" },
   { assetFileName: "block", matchingNames: ["tofu", "butter", "margarine", "rama"], category: "milkCheese" },
@@ -643,18 +643,18 @@ const categoryEntries: CategoryEntry[] = [
   {
     assetFileName: "herbs",
     matchingNames: ["kräuter", "petersilie", "basilikum", "koriander", "dill", "minze"],
-    category: "spicesCanned"
+    category: "spicesCanned",
   },
   {
     assetFileName: "pizza_cake",
     matchingNames: ["pizza", "kuchen", "torte", "flammkuchen"],
-    category: "convenienceProductFrozen"
+    category: "convenienceProductFrozen",
   },
   { assetFileName: "yeast", matchingNames: ["hefe"], category: "milkCheese" },
   {
     assetFileName: "package",
     matchingNames: ["backpulver", "natron", "vanillezucker", "trockenhefe", "agar-agar", "agar agar", "puddingpulver", "gelierzucker"],
-    category: "spicesCanned"
+    category: "spicesCanned",
   },
   { assetFileName: "pasta", matchingNames: ["nudeln", "spaghetti", "pasta"], category: "cereals" },
   { assetFileName: "lemon", matchingNames: ["zitrone"], category: "fruitsVegetables" },
@@ -663,7 +663,7 @@ const categoryEntries: CategoryEntry[] = [
   {
     assetFileName: "spice",
     matchingNames: ["salz", "pfeffer", "gewürz", "gewuerz", "curry", "kurkuma", "zimt", "kümmel", "kuemmel"],
-    category: "spicesCanned"
+    category: "spicesCanned",
   },
   { assetFileName: "rice", matchingNames: ["reis"], category: "cereals" },
   { assetFileName: "paper_towel", matchingNames: ["küchenrolle", "kuechenrolle", "zewa"], category: "household" },
@@ -685,9 +685,9 @@ const categoryEntries: CategoryEntry[] = [
       "mandel drink",
       "reisdrink",
       "reis drink",
-      "eistee"
+      "eistee",
     ],
-    category: "milkCheese"
+    category: "milkCheese",
   },
   { assetFileName: "egg", matchingNames: ["eier"], category: "milkCheese" },
   { assetFileName: "coffee_beans", matchingNames: ["kaffee", "espresso"], category: "beverages" },
@@ -713,9 +713,9 @@ const categoryEntries: CategoryEntry[] = [
       "tilsiter",
       "ricotta",
       "caprice dieux",
-      "mozzarella"
+      "mozzarella",
     ],
-    category: "milkCheese"
+    category: "milkCheese",
   },
   { assetFileName: "asparagus", matchingNames: ["spargel"], category: "fruitsVegetables" },
   { assetFileName: "gnocchi", matchingNames: ["gnocchi"], category: "cereals" },
@@ -730,7 +730,7 @@ const categoryEntries: CategoryEntry[] = [
   {
     assetFileName: "round_fruit_small",
     matchingNames: ["pflaume", "aprikose", "zwetschge", "mirabelle", "marille", "kiwi"],
-    category: "fruitsVegetables"
+    category: "fruitsVegetables",
   },
   { assetFileName: "seeds", matchingNames: ["kerne", "flocken"], category: "cereals" },
   { assetFileName: "sponge", matchingNames: ["schwamm", "schwämme", "schwaemme"], category: "household" },
@@ -742,15 +742,15 @@ const categoryEntries: CategoryEntry[] = [
   {
     assetFileName: "sweets",
     matchingNames: ["chips", "gummibärchen", "süssigkeiten", "süßigkeiten", "lakritze", "cantuccini", "cracker", "snacks"],
-    category: "fruitsVegetables"
+    category: "fruitsVegetables",
   },
   { assetFileName: "cream", matchingNames: ["haargel", "creme"], category: "household" },
   { assetFileName: "shower_gel", matchingNames: ["duschgel", "shampoo"], category: "household" },
   {
     assetFileName: "dish_soap",
     matchingNames: ["badreiniger", "spüli", "spülmittel", "putzmittel", "neutralreiniger"],
-    category: "household"
-  }
+    category: "household",
+  },
 ];
 
 const itemCategoryMap = new Map<string, string>();
@@ -762,7 +762,7 @@ const buildIconPath = (iconName: string) => `${iconBasePath}/${iconName}.svg`;
 categoryEntries.forEach((entry) => {
   entry.matchingNames.forEach((name) => {
     const key = name.trim().toLowerCase();
-    if (!key) return;
+    if (!key) {return;}
     if (!itemCategoryMap.has(key)) {
       itemCategoryMap.set(key, entry.category);
     }

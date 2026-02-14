@@ -12,18 +12,28 @@ export default tseslint.config(
     languageOptions: {
       ecmaVersion: 2022,
       sourceType: "module",
-      globals: globals.browser
+      globals: globals.browser,
     },
     plugins: {
       "react-hooks": reactHooks,
-      "react-refresh": reactRefresh
+      "react-refresh": reactRefresh,
     },
     rules: {
       ...reactHooks.configs.recommended.rules,
+      "comma-dangle": ["error", "always-multiline"],
+      curly: ["error", "all"],
+      eqeqeq: ["error", "always"],
+      "no-nested-ternary": "warn",
+      "object-shorthand": ["error", "always"],
+      "prefer-template": "warn",
+      "@typescript-eslint/consistent-type-assertions": [
+        "error",
+        { assertionStyle: "never" },
+      ],
       "react-refresh/only-export-components": [
         "warn",
-        { allowConstantExport: true }
-      ]
-    }
-  }
+        { allowConstantExport: true },
+      ],
+    },
+  },
 );

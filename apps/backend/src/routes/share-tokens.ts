@@ -13,7 +13,7 @@ export function registerShareTokenRoutes(app: FastifyInstance) {
       `INSERT INTO share_token_redemptions(token_id, device_id, redeemed_at)
        VALUES ($1, $2, NOW())
        ON CONFLICT (token_id, device_id) DO NOTHING`,
-      [request.auth!.tokenId, deviceId]
+      [request.auth!.tokenId, deviceId],
     )
 
     reply.code(204)
@@ -27,7 +27,7 @@ export function registerShareTokenRoutes(app: FastifyInstance) {
       `INSERT INTO share_tokens(id, list_id, created_by_device_id, created_at)
        VALUES ($1, $2, $3, NOW())
        RETURNING created_at`,
-      [tokenId, request.auth!.listId, createdBy]
+      [tokenId, request.auth!.listId, createdBy],
     )
 
     reply.code(201)
@@ -35,7 +35,7 @@ export function registerShareTokenRoutes(app: FastifyInstance) {
       tokenId,
       listId: request.auth!.listId,
       createdAt: result.rows[0].created_at,
-      shareToken: tokenId
+      shareToken: tokenId,
     }
   })
 }

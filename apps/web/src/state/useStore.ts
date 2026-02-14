@@ -32,7 +32,7 @@ export const useStore = create<StoreState>((set, get) => ({
     const metadata: AppMetadata = {
       id: "app",
       appVersion,
-      lastOpenedAt: Date.now()
+      lastOpenedAt: Date.now(),
     };
     await db.metadata.put(metadata);
     set({
@@ -40,7 +40,7 @@ export const useStore = create<StoreState>((set, get) => ({
       items,
       activeListId: sortedLists[0]?.id,
       metadata,
-      isLoaded: true
+      isLoaded: true,
     });
   },
   addList: async (name: string) => {
@@ -49,12 +49,12 @@ export const useStore = create<StoreState>((set, get) => ({
       id: createId(),
       name,
       createdAt: now,
-      updatedAt: now
+      updatedAt: now,
     };
     await db.lists.add(list);
     set((state) => ({
       lists: [...state.lists, list],
-      activeListId: list.id
+      activeListId: list.id,
     }));
   },
   renameList: async (listId: string, name: string) => {
@@ -62,8 +62,8 @@ export const useStore = create<StoreState>((set, get) => ({
     await db.lists.update(listId, { name, updatedAt: now });
     set((state) => ({
       lists: state.lists.map((list) =>
-        list.id === listId ? { ...list, name, updatedAt: now } : list
-      )
+        list.id === listId ? { ...list, name, updatedAt: now } : list,
+      ),
     }));
   },
   deleteList: async (listId: string) => {
@@ -76,7 +76,7 @@ export const useStore = create<StoreState>((set, get) => ({
       return {
         lists: remainingLists,
         items: state.items.filter((item) => item.listId !== listId),
-        activeListId: nextActiveListId
+        activeListId: nextActiveListId,
       };
     });
   },
@@ -90,7 +90,7 @@ export const useStore = create<StoreState>((set, get) => ({
       quantityOrUnit,
       checked: false,
       createdAt: now,
-      updatedAt: now
+      updatedAt: now,
     };
     await db.items.add(item);
     set((state) => ({ items: [...state.items, item] }));
@@ -98,26 +98,26 @@ export const useStore = create<StoreState>((set, get) => ({
   toggleItem: async (itemId: string) => {
     const { items } = get();
     const item = items.find((entry) => entry.id === itemId);
-    if (!item) return;
+    if (!item) {return;}
     const updated = { ...item, checked: !item.checked, updatedAt: Date.now() };
     await db.items.put(updated);
     set((state) => ({
-      items: state.items.map((entry) => (entry.id === itemId ? updated : entry))
+      items: state.items.map((entry) => (entry.id === itemId ? updated : entry)),
     }));
   },
   updateItem: async (itemId: string, name: string, quantityOrUnit?: string) => {
     const { items } = get();
     const item = items.find((entry) => entry.id === itemId);
-    if (!item) return;
+    if (!item) {return;}
     const updated = {
       ...item,
       name,
       quantityOrUnit,
-      updatedAt: Date.now()
+      updatedAt: Date.now(),
     };
     await db.items.put(updated);
     set((state) => ({
-      items: state.items.map((entry) => (entry.id === itemId ? updated : entry))
+      items: state.items.map((entry) => (entry.id === itemId ? updated : entry)),
     }));
-  }
+  },
 }));

@@ -21,7 +21,7 @@ const ItemCard = ({
   onPointerUp,
   onPointerLeave,
   onPointerCancel,
-  onClick
+  onClick,
 }: ItemCardProps) => {
   return (
     <button
