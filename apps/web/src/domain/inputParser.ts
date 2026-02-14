@@ -18,6 +18,6 @@ export const parseItemInput = (input: string): ParsedItemInput => {
   const name = amount ? trimmedInput.replace(amount, "").trim() : trimmedInput;
   return {
     name,
-    quantityOrUnit: amount ?? undefined
+    quantityOrUnit: amount ?? undefined,
   };
 };

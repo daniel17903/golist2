@@ -29,8 +29,8 @@ const itemsWhere = vi.fn((field: keyof Item) => ({
       if (field === "listId") {
         itemsData = itemsData.filter((item) => item.listId !== value);
       }
-    })
-  })
+    }),
+  }),
 }));
 
 vi.mock("../storage/db", () => ({
@@ -39,18 +39,18 @@ vi.mock("../storage/db", () => ({
       toArray: vi.fn(async () => [...listsData]),
       add: listAdd,
       update: listUpdate,
-      delete: listDelete
+      delete: listDelete,
     },
     items: {
       toArray: vi.fn(async () => [...itemsData]),
       add: itemAdd,
       put: itemPut,
-      where: itemsWhere
+      where: itemsWhere,
     },
     metadata: {
-      put: metadataPut
-    }
-  }
+      put: metadataPut,
+    },
+  },
 }));
 
 const { useStore } = await import("./useStore");
@@ -61,7 +61,7 @@ const resetStore = () => {
     items: [],
     isLoaded: false,
     activeListId: undefined,
-    metadata: undefined
+    metadata: undefined,
   });
 };
 
@@ -88,7 +88,7 @@ describe("useStore", () => {
   it("loads lists and items, sorting lists by creation time", async () => {
     listsData = [
       { id: "b", name: "Later", createdAt: 2, updatedAt: 2 },
-      { id: "a", name: "Earlier", createdAt: 1, updatedAt: 1 }
+      { id: "a", name: "Earlier", createdAt: 1, updatedAt: 1 },
     ];
     itemsData = [
       {
@@ -97,8 +97,8 @@ describe("useStore", () => {
         name: "apple",
         checked: false,
         createdAt: 10,
-        updatedAt: 10
-      }
+        updatedAt: 10,
+      },
     ];
 
     await useStore.getState().load();
@@ -139,7 +139,7 @@ describe("useStore", () => {
     expect(state.lists[0]?.updatedAt).toBe(Date.now());
     expect(listUpdate).toHaveBeenCalledWith("list-1", {
       name: "New",
-      updatedAt: Date.now()
+      updatedAt: Date.now(),
     });
   });
 
@@ -166,7 +166,7 @@ describe("useStore", () => {
       quantityOrUnit: "2L",
       checked: false,
       createdAt: 1,
-      updatedAt: 1
+      updatedAt: 1,
     };
     itemsData = [baseItem];
     useStore.setState({ items: [baseItem] });
@@ -178,15 +178,15 @@ describe("useStore", () => {
     expect(itemPut).toHaveBeenCalledWith(
       expect.objectContaining({
         id: "item-1",
-        checked: true
-      })
+        checked: true,
+      }),
     );
   });
 
   it("deletes a list with its items and updates active list", async () => {
     listsData = [
       { id: "list-1", name: "One", createdAt: 1, updatedAt: 1 },
-      { id: "list-2", name: "Two", createdAt: 2, updatedAt: 2 }
+      { id: "list-2", name: "Two", createdAt: 2, updatedAt: 2 },
     ];
     itemsData = [
       {
@@ -195,7 +195,7 @@ describe("useStore", () => {
         name: "Milk",
         checked: false,
         createdAt: 1,
-        updatedAt: 1
+        updatedAt: 1,
       },
       {
         id: "item-2",
@@ -203,8 +203,8 @@ describe("useStore", () => {
         name: "Apples",
         checked: false,
         createdAt: 2,
-        updatedAt: 2
-      }
+        updatedAt: 2,
+      },
     ];
     useStore.setState({ lists: [...listsData], items: [...itemsData], activeListId: "list-1" });
 

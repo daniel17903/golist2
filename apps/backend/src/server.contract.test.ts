@@ -5,7 +5,7 @@ const withTransactionMock = vi.fn()
 
 vi.mock('./db/client.js', () => ({
   query: queryMock,
-  withTransaction: withTransactionMock
+  withTransaction: withTransactionMock,
 }))
 
 describe('sharing API contract basics', () => {
@@ -25,15 +25,15 @@ describe('sharing API contract basics', () => {
     const response = await app.inject({
       method: 'POST',
       url: '/v1/lists',
-      payload: { name: 'Groceries' }
+      payload: { name: 'Groceries' },
     })
 
     expect(response.statusCode).toBe(201)
     expect(response.json()).toEqual(
       expect.objectContaining({
         listId: expect.any(String),
-        shareToken: expect.any(String)
-      })
+        shareToken: expect.any(String),
+      }),
     )
 
     await app.close()
@@ -57,7 +57,7 @@ describe('sharing API contract basics', () => {
     const response = await app.inject({
       method: 'GET',
       url: '/v1/lists/11111111-1111-4111-8111-111111111111',
-      headers: { authorization: 'Bearer 11111111-1111-4111-8111-111111111111' }
+      headers: { authorization: 'Bearer 11111111-1111-4111-8111-111111111111' },
     })
 
     expect(response.statusCode).toBe(400)
@@ -72,14 +72,14 @@ describe('sharing API contract basics', () => {
     queryMock
       .mockResolvedValueOnce({
         rowCount: 1,
-        rows: [{ token_id: '11111111-1111-4111-8111-111111111111', list_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' }]
+        rows: [{ token_id: '11111111-1111-4111-8111-111111111111', list_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' }],
       })
       .mockResolvedValueOnce({ rowCount: 0, rows: [] })
 
     const response = await app.inject({
       method: 'GET',
       url: '/v1/lists/11111111-1111-4111-8111-111111111111?deviceId=22222222-2222-4222-8222-222222222222',
-      headers: { authorization: 'Bearer 11111111-1111-4111-8111-111111111111' }
+      headers: { authorization: 'Bearer 11111111-1111-4111-8111-111111111111' },
     })
 
     expect(response.statusCode).toBe(403)
@@ -94,14 +94,14 @@ describe('sharing API contract basics', () => {
     queryMock
       .mockResolvedValueOnce({
         rowCount: 1,
-        rows: [{ token_id: '11111111-1111-4111-8111-111111111111', list_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' }]
+        rows: [{ token_id: '11111111-1111-4111-8111-111111111111', list_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' }],
       })
       .mockResolvedValueOnce({ rowCount: 1, rows: [] })
 
     const response = await app.inject({
       method: 'POST',
       url: '/v1/share-tokens/11111111-1111-4111-8111-111111111111/redeem?deviceId=22222222-2222-4222-8222-222222222222',
-      headers: { authorization: 'Bearer 11111111-1111-4111-8111-111111111111' }
+      headers: { authorization: 'Bearer 11111111-1111-4111-8111-111111111111' },
     })
 
     expect(response.statusCode).toBe(204)

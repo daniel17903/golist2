@@ -13,38 +13,58 @@ vi.mock("dexie", () => {
       return {
         stores: (schema: Record<string, string>) => {
           this.versions.push({ number, stores: schema });
-        }
+        },
       };
     }
   }
 
   return {
     default: DexieMock,
-    Table: class {}
+    Table: class {},
   };
 });
 
 const { GoListDatabase } = await import("./db");
 
+type MockDbInstance = {
+  name: string;
+  versions: Array<{ number: number; stores: Record<string, string> | null }>;
+};
+
+const isMockDbInstance = (value: unknown): value is MockDbInstance => {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+
+  const name = Reflect.get(value, "name");
+  const versions = Reflect.get(value, "versions");
+
+  return typeof name === "string" && Array.isArray(versions);
+};
+
 describe("GoListDatabase", () => {
   it("initializes schema versions with expected tables", () => {
-    const db = new GoListDatabase() as unknown as {
-      name: string;
-      versions: Array<{ number: number; stores: Record<string, string> | null }>;
-    };
+    const dbCandidate: unknown = new GoListDatabase();
+
+    expect(isMockDbInstance(dbCandidate)).toBe(true);
+    if (!isMockDbInstance(dbCandidate)) {
+      throw new Error("Expected mocked db shape");
+    }
+
+    const db = dbCandidate;
 
     expect(db.name).toBe("golist");
     expect(db.versions).toHaveLength(2);
     expect(db.versions[0]?.number).toBe(1);
     expect(db.versions[0]?.stores).toEqual({
       lists: "id, name, updatedAt",
-      items: "id, listId, checked, updatedAt"
+      items: "id, listId, checked, updatedAt",
     });
     expect(db.versions[1]?.number).toBe(2);
     expect(db.versions[1]?.stores).toEqual({
       lists: "id, name, updatedAt",
       items: "id, listId, checked, updatedAt",
-      metadata: "id"
+      metadata: "id",
     });
   });
 });

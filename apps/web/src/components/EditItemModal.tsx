@@ -15,9 +15,9 @@ const EditItemModal = ({
   onNameChange,
   onQuantityChange,
   onCancel,
-  onSave
+  onSave,
 }: EditItemModalProps) => {
-  if (!isOpen) return null;
+  if (!isOpen) {return null;}
 
   return (
     <div className="modal-backdrop" role="dialog" aria-modal="true" onClick={onCancel}>

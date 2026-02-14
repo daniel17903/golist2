@@ -48,7 +48,7 @@ const App = () => {
     handleSaveItem,
     openAddDialog,
     handleCreateList,
-    handleDeleteList
+    handleDeleteList,
   } = useAppState();
 
   const undoTimeoutsRef = useRef<Map<string, number>>(new Map());
@@ -82,13 +82,13 @@ const App = () => {
       undoTimeoutsRef.current.forEach((timeout) => window.clearTimeout(timeout));
       undoTimeoutsRef.current.clear();
     },
-    []
+    [],
   );
 
   const handleToggleItem = async (itemId: string) => {
-    if (exitingItemIds.has(itemId)) return;
+    if (exitingItemIds.has(itemId)) {return;}
     const itemToDelete = items.find((item) => item.id === itemId);
-    if (!itemToDelete) return;
+    if (!itemToDelete) {return;}
 
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
       await toggleItem(itemId);
@@ -99,7 +99,7 @@ const App = () => {
   };
 
   const handleExitComplete = async (itemId: string) => {
-    if (!exitingItemIds.has(itemId)) return;
+    if (!exitingItemIds.has(itemId)) {return;}
     const deletedItem = items.find((item) => item.id === itemId);
     await toggleItem(itemId);
     if (deletedItem) {
@@ -120,7 +120,7 @@ const App = () => {
   const { handlePointerDown, handlePointerUp, handlePointerCancel, longPressTriggeredRef } =
     useLongPressItem({
       onLongPress: openEditItem,
-      onShortPress: handleToggleItem
+      onShortPress: handleToggleItem,
     });
 
   return (

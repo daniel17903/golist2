@@ -15,7 +15,7 @@ async function seedList(client: PoolClient): Promise<void> {
       VALUES ($1, $2, $3)
       ON CONFLICT (id) DO NOTHING
     `,
-    [listId, 'Weekly Groceries', ownerDeviceId]
+    [listId, 'Weekly Groceries', ownerDeviceId],
   )
 
   await client.query(
@@ -27,7 +27,7 @@ async function seedList(client: PoolClient): Promise<void> {
         ($5, $2, 'Bread', '1', 'bakery', $3)
       ON CONFLICT (id) DO NOTHING
     `,
-    [randomUUID(), listId, ownerDeviceId, randomUUID(), randomUUID()]
+    [randomUUID(), listId, ownerDeviceId, randomUUID(), randomUUID()],
   )
 
   await client.query(
@@ -40,7 +40,7 @@ async function seedList(client: PoolClient): Promise<void> {
       VALUES ($1, $2, $3)
       ON CONFLICT (id) DO NOTHING
     `,
-    [tokenId, listId, ownerDeviceId]
+    [tokenId, listId, ownerDeviceId],
   )
 
   console.log(`Seeded list ${listId} with share token ${tokenId}`)

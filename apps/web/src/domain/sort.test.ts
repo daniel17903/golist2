@@ -11,7 +11,7 @@ describe("sortItemsForList", () => {
         name: "unknown",
         checked: false,
         createdAt: 2,
-        updatedAt: 2
+        updatedAt: 2,
       },
       {
         id: "2",
@@ -19,7 +19,7 @@ describe("sortItemsForList", () => {
         name: "bread",
         checked: false,
         createdAt: 5,
-        updatedAt: 5
+        updatedAt: 5,
       },
       {
         id: "3",
@@ -27,7 +27,7 @@ describe("sortItemsForList", () => {
         name: "apple",
         checked: false,
         createdAt: 1,
-        updatedAt: 1
+        updatedAt: 1,
       },
       {
         id: "4",
@@ -35,8 +35,8 @@ describe("sortItemsForList", () => {
         name: "apple",
         checked: false,
         createdAt: 10,
-        updatedAt: 10
-      }
+        updatedAt: 10,
+      },
     ];
 
     const sorted = sortItemsForList(items);

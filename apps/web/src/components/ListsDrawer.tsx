@@ -24,7 +24,7 @@ const ListsDrawer = ({
   onOpen,
   onSelectList,
   onDeleteList,
-  onCreateList
+  onCreateList,
 }: ListsDrawerProps) => {
   const drawerRef = useRef<HTMLElement | null>(null);
   const dragStateRef = useRef<{ pointerId: number; startX: number; mode: DragMode } | null>(null);
@@ -32,7 +32,7 @@ const ListsDrawer = ({
 
   const getDrawerWidth = () => {
     const measured = drawerRef.current?.offsetWidth;
-    if (measured && measured > 0) return measured;
+    if (measured && measured > 0) {return measured;}
     return Math.min(320, Math.round(window.innerWidth * 0.8));
   };
 
@@ -43,7 +43,7 @@ const ListsDrawer = ({
 
   const handleDragMove = (event: PointerEvent<HTMLElement>) => {
     const dragState = dragStateRef.current;
-    if (!dragState || dragState.pointerId !== event.pointerId) return;
+    if (!dragState || dragState.pointerId !== event.pointerId) {return;}
 
     const drawerWidth = getDrawerWidth();
     const deltaX = event.clientX - dragState.startX;
@@ -60,7 +60,7 @@ const ListsDrawer = ({
 
   const handleDragEnd = (event: PointerEvent<HTMLElement>) => {
     const dragState = dragStateRef.current;
-    if (!dragState || dragState.pointerId !== event.pointerId) return;
+    if (!dragState || dragState.pointerId !== event.pointerId) {return;}
 
     const drawerWidth = getDrawerWidth();
     const deltaX = event.clientX - dragState.startX;
@@ -90,7 +90,7 @@ const ListsDrawer = ({
           className="drawer-edge-swipe-zone"
           aria-hidden="true"
           onPointerDown={(event) => {
-            if (event.clientX > EDGE_SWIPE_WIDTH) return;
+            if (event.clientX > EDGE_SWIPE_WIDTH) {return;}
             handleDragStart(event, "opening");
           }}
           onPointerMove={handleDragMove}

@@ -19,17 +19,17 @@ const AddItemDialog = ({
   onItemNameChange,
   onClose,
   onAddItem,
-  onAddSuggestion
+  onAddSuggestion,
 }: AddItemDialogProps) => {
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {return;}
     const timer = window.setTimeout(() => inputRef.current?.focus(), 0);
     return () => window.clearTimeout(timer);
   }, [isOpen]);
 
-  if (!isOpen) return null;
+  if (!isOpen) {return null;}
 
   return (
     <div className="modal-backdrop add-dialog" role="dialog" aria-modal="true" onClick={onClose}>
@@ -64,7 +64,7 @@ const AddItemDialog = ({
                 type="button"
                 className="item-card item-card--dialog"
                 onClick={() => {
-                  if (!parsed.name) return;
+                  if (!parsed.name) {return;}
                   void onAddSuggestion(parsed.name, parsed.quantityOrUnit);
                 }}
               >

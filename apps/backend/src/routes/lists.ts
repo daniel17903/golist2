@@ -11,29 +11,31 @@ const listNameUpdateSchema = z.object({ name: z.string().min(1) })
 const itemCreateSchema = z.object({
   name: z.string().min(1),
   category: z.string().min(1),
-  deleted: z.boolean()
+  deleted: z.boolean(),
 })
+const listCreateQuerySchema = z.object({ deviceId: z.uuid().optional() })
 const itemUpdateSchema = z.object({
   name: z.string().min(1),
   category: z.string().min(1),
   deleted: z.boolean(),
-  updatedAt: z.iso.datetime()
+  updatedAt: z.iso.datetime(),
 })
 export function registerListRoutes(app: FastifyInstance) {
   app.post('/v1/lists', async (request, reply) => {
     const body = listCreateSchema.parse(request.body)
     const listId = crypto.randomUUID()
     const tokenId = crypto.randomUUID()
-    const createdBy = normalizeDeviceId((request.query as { deviceId?: string } | undefined)?.deviceId)
+    const querystring = listCreateQuerySchema.parse(request.query)
+    const createdBy = normalizeDeviceId(querystring.deviceId)
 
     await withTransaction(async (client) => {
       await client.query(
         'INSERT INTO shared_lists(id, name, created_by_device_id, created_at, updated_at) VALUES ($1, $2, $3, NOW(), NOW())',
-        [listId, body.name, createdBy]
+        [listId, body.name, createdBy],
       )
       await client.query(
         'INSERT INTO share_tokens(id, list_id, created_by_device_id, created_at) VALUES ($1, $2, $3, NOW())',
-        [tokenId, listId, createdBy]
+        [tokenId, listId, createdBy],
       )
     })
 
@@ -67,7 +69,7 @@ export function registerListRoutes(app: FastifyInstance) {
          FROM list_items
         WHERE list_id = $1
         ORDER BY created_at ASC`,
-      [auth.listId]
+      [auth.listId],
     )
 
     const list = listResult.rows[0]
@@ -83,15 +85,15 @@ export function registerListRoutes(app: FastifyInstance) {
         category: item.category,
         deleted: item.deleted,
         createdAt: item.created_at,
-        updatedAt: item.updated_at
-      }))
+        updatedAt: item.updated_at,
+      })),
     }
   })
 
   app.delete('/v1/lists/:shareToken', { preHandler: requireToken }, async (request, reply) => {
     const result = await query(
       'DELETE FROM shared_lists WHERE id = $1 AND created_by_device_id = $2',
-      [request.auth!.listId, request.auth!.deviceId]
+      [request.auth!.listId, request.auth!.deviceId],
     )
 
     if (!result.rowCount) {
@@ -123,7 +125,7 @@ export function registerListRoutes(app: FastifyInstance) {
          FROM list_items
         WHERE list_id = $1 AND updated_at > $2
         ORDER BY updated_at ASC`,
-      [request.auth!.listId, querystring.updatedAfter]
+      [request.auth!.listId, querystring.updatedAfter],
     )
 
     return {
@@ -133,8 +135,8 @@ export function registerListRoutes(app: FastifyInstance) {
         category: item.category,
         deleted: item.deleted,
         createdAt: item.created_at,
-        updatedAt: item.updated_at
-      }))
+        updatedAt: item.updated_at,
+      })),
     }
   })
 
@@ -146,7 +148,7 @@ export function registerListRoutes(app: FastifyInstance) {
     await query(
       `INSERT INTO list_items(id, list_id, text, category, deleted, created_by_device_id, created_at, updated_at, deleted_at)
        VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW(), CASE WHEN $5 THEN NOW() ELSE NULL END)`,
-      [itemId, request.auth!.listId, body.name, body.category, body.deleted, createdBy]
+      [itemId, request.auth!.listId, body.name, body.category, body.deleted, createdBy],
     )
 
     reply.code(201)
@@ -167,7 +169,7 @@ export function registerListRoutes(app: FastifyInstance) {
          FROM list_items
         WHERE id = $1 AND list_id = $2
         LIMIT 1`,
-      [params.itemId, request.auth!.listId]
+      [params.itemId, request.auth!.listId],
     )
 
     if (!itemResult.rowCount) {
@@ -182,7 +184,7 @@ export function registerListRoutes(app: FastifyInstance) {
       category: item.category,
       deleted: item.deleted,
       createdAt: item.created_at,
-      updatedAt: item.updated_at
+      updatedAt: item.updated_at,
     }
   })
 
@@ -198,7 +200,7 @@ export function registerListRoutes(app: FastifyInstance) {
               updated_at = $4,
               deleted_at = CASE WHEN $3 THEN NOW() ELSE NULL END
         WHERE id = $5 AND list_id = $6`,
-      [body.name, body.category, body.deleted, body.updatedAt, params.itemId, request.auth!.listId]
+      [body.name, body.category, body.deleted, body.updatedAt, params.itemId, request.auth!.listId],
     )
 
     reply.code(204)
