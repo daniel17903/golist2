@@ -8,7 +8,7 @@ let readyPromise: Promise<void> | undefined
 
 async function ensureServerReady() {
   if (!readyPromise) {
-    readyPromise = app.ready().then(() => {
+    readyPromise = Promise.resolve(app.ready()).then(() => {
       app.log.info('vercel function initialized Fastify runtime')
     })
   }
