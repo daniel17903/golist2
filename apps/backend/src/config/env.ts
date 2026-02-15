@@ -1,5 +1,7 @@
 import { z } from 'zod'
 
+const sslModeSchema = z.enum(['disable', 'prefer', 'require', 'verify-ca', 'verify-full'])
+
 const envSchema = z.object({
   HOST: z.string().min(1).default('0.0.0.0'),
   PORT: z.coerce.number().int().positive().default(3000),
@@ -8,15 +10,22 @@ const envSchema = z.object({
   PGUSER: z.string().min(1).default('golist'),
   PGDATABASE: z.string().min(1).default('golist'),
   PGPASSWORD: z.string().min(1).default('golist'),
+  PGSSLMODE: sslModeSchema.default('disable'),
   NEON_PGHOST: z.string().min(1).optional(),
   NEON_PGUSER: z.string().min(1).optional(),
   NEON_PGDATABASE: z.string().min(1).optional(),
   NEON_PGPASSWORD: z.string().min(1).optional(),
+  NEON_PGSSLMODE: sslModeSchema.optional(),
 })
 
 type RawEnv = z.infer<typeof envSchema>
 
-type NeonKeys = 'NEON_PGHOST' | 'NEON_PGUSER' | 'NEON_PGDATABASE' | 'NEON_PGPASSWORD'
+type NeonKeys =
+  | 'NEON_PGHOST'
+  | 'NEON_PGUSER'
+  | 'NEON_PGDATABASE'
+  | 'NEON_PGPASSWORD'
+  | 'NEON_PGSSLMODE'
 
 export type Env = Omit<RawEnv, NeonKeys>
 
@@ -26,6 +35,7 @@ export function resolveEnv(source: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
     PGUSER: 'NEON_PGUSER',
     PGDATABASE: 'NEON_PGDATABASE',
     PGPASSWORD: 'NEON_PGPASSWORD',
+    PGSSLMODE: 'NEON_PGSSLMODE',
   } as const
 
   const resolved = { ...source }
@@ -34,6 +44,16 @@ export function resolveEnv(source: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
     if (!resolved[primaryKey] && resolved[fallbackKey]) {
       resolved[primaryKey] = resolved[fallbackKey]
     }
+  }
+
+  const hasNeonDbConfig =
+    Boolean(resolved.NEON_PGHOST) ||
+    Boolean(resolved.NEON_PGUSER) ||
+    Boolean(resolved.NEON_PGDATABASE) ||
+    Boolean(resolved.NEON_PGPASSWORD)
+
+  if (!resolved.PGSSLMODE && hasNeonDbConfig) {
+    resolved.PGSSLMODE = 'require'
   }
 
   return resolved
@@ -49,4 +69,5 @@ export const env: Env = {
   PGUSER: parsed.PGUSER,
   PGDATABASE: parsed.PGDATABASE,
   PGPASSWORD: parsed.PGPASSWORD,
+  PGSSLMODE: parsed.PGSSLMODE,
 }

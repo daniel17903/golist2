@@ -32,6 +32,7 @@ services:
       PGUSER: golist
       PGDATABASE: golist
       PGPASSWORD: golist
+      PGSSLMODE: disable
     ports:
       - '3000:3000'
 

@@ -2,10 +2,23 @@ import { Pool, type PoolClient, type QueryResult, type QueryResultRow } from 'pg
 
 import { env } from '../config/env.js'
 
+function resolveSsl(sslMode: string): false | { rejectUnauthorized: boolean } {
+  if (sslMode === 'disable') {
+    return false
+  }
+
+  return {
+    rejectUnauthorized: sslMode === 'verify-ca' || sslMode === 'verify-full',
+  }
+}
+
+const ssl = resolveSsl(env.PGSSLMODE)
+
 console.info('[db] Creating PostgreSQL pool', {
   host: env.PGHOST,
   user: env.PGUSER,
   database: env.PGDATABASE,
+  sslMode: env.PGSSLMODE,
 })
 
 export const pool = new Pool({
@@ -13,6 +26,7 @@ export const pool = new Pool({
   user: env.PGUSER,
   database: env.PGDATABASE,
   password: env.PGPASSWORD,
+  ssl,
 })
 
 pool.on('error', (error) => {
@@ -22,6 +36,7 @@ pool.on('error', (error) => {
     host: env.PGHOST,
     user: env.PGUSER,
     database: env.PGDATABASE,
+    sslMode: env.PGSSLMODE,
   })
 })
 
@@ -57,6 +72,7 @@ export async function withTransaction<T>(work: (client: PoolClient) => Promise<T
         host: env.PGHOST,
         user: env.PGUSER,
         database: env.PGDATABASE,
+        sslMode: env.PGSSLMODE,
       })
     }
 

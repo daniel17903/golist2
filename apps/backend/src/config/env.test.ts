@@ -17,21 +17,32 @@ describe('resolveEnv', () => {
     expect(resolved.PGPASSWORD).toBe('neon-pass')
   })
 
+  it('defaults PGSSLMODE to require when using NEON_ db config', () => {
+    const resolved = resolveEnv({
+      NEON_PGHOST: 'neon-host',
+    })
+
+    expect(resolved.PGSSLMODE).toBe('require')
+  })
+
   it('prefers non-prefixed PG env vars when both are set', () => {
     const resolved = resolveEnv({
       PGHOST: 'primary-host',
       PGUSER: 'primary-user',
       PGDATABASE: 'primary-db',
       PGPASSWORD: 'primary-pass',
+      PGSSLMODE: 'disable',
       NEON_PGHOST: 'neon-host',
       NEON_PGUSER: 'neon-user',
       NEON_PGDATABASE: 'neon-db',
       NEON_PGPASSWORD: 'neon-pass',
+      NEON_PGSSLMODE: 'require',
     })
 
     expect(resolved.PGHOST).toBe('primary-host')
     expect(resolved.PGUSER).toBe('primary-user')
     expect(resolved.PGDATABASE).toBe('primary-db')
     expect(resolved.PGPASSWORD).toBe('primary-pass')
+    expect(resolved.PGSSLMODE).toBe('disable')
   })
 })
