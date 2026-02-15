@@ -9,7 +9,18 @@ const hasIssues = (value: unknown): boolean => {
 }
 
 export function registerErrorHandler(app: FastifyInstance) {
-  app.setErrorHandler((error, _request, reply) => {
+  app.setErrorHandler((error, request, reply) => {
+    request.log.error(
+      {
+        requestId: request.id,
+        method: request.method,
+        url: request.url,
+        errorMessage: error.message,
+        errorStack: error.stack,
+      },
+      'error handler captured an exception',
+    )
+
     if (hasIssues(error)) {
       reply.status(400).send({ message: 'Invalid request' })
       return
