@@ -25,7 +25,11 @@ jobs:
           --health-timeout 5s
           --health-retries 10
     env:
-      DATABASE_URL: postgres://golist:golist@localhost:5432/golist
+      PGHOST: localhost
+      PGUSER: golist
+      PGDATABASE: golist
+      PGPASSWORD: golist
+      PGSSLMODE: disable
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
@@ -36,4 +40,5 @@ jobs:
       - run: npm run lint -w apps/backend
       - run: npm run typecheck -w apps/backend
       - run: npm run db:migrate -w apps/backend
+      - run: npm run test -w apps/backend -- src/server.integration.test.ts
       - run: npm run test -w apps/backend
