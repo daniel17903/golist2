@@ -28,7 +28,10 @@ services:
       HOST: 0.0.0.0
       PORT: 3000
       NODE_ENV: development
-      DATABASE_URL: postgres://golist:golist@postgres:5432/golist
+      PGHOST: postgres
+      PGUSER: golist
+      PGDATABASE: golist
+      PGPASSWORD: golist
     ports:
       - '3000:3000'
 

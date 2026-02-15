@@ -129,7 +129,7 @@ The API contract is maintained in `apps/api-spec/openapi.yaml` (and related file
 - `backend` service
   - build from `apps/backend/Dockerfile`
   - depends_on postgres health
-  - explicit environment variables including `DATABASE_URL`
+  - explicit environment variables including `PGHOST`, `PGUSER`, `PGDATABASE`, and `PGPASSWORD` (with optional `NEON_`-prefixed fallbacks)
   - exposed API port `3000`
 
 ### Local workflow

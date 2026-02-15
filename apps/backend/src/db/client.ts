@@ -2,35 +2,26 @@ import { Pool, type PoolClient, type QueryResult, type QueryResultRow } from 'pg
 
 import { env } from '../config/env.js'
 
-function redactConnectionString(connectionString: string): string {
-  try {
-    const parsed = new URL(connectionString)
-
-    if (parsed.password) {
-      parsed.password = '***'
-    }
-
-    return parsed.toString()
-  } catch {
-    return '<invalid DATABASE_URL>'
-  }
-}
-
-const redactedConnectionString = redactConnectionString(env.DATABASE_URL)
-
 console.info('[db] Creating PostgreSQL pool', {
-  connectionString: redactedConnectionString,
+  host: env.PGHOST,
+  user: env.PGUSER,
+  database: env.PGDATABASE,
 })
 
 export const pool = new Pool({
-  connectionString: env.DATABASE_URL,
+  host: env.PGHOST,
+  user: env.PGUSER,
+  database: env.PGDATABASE,
+  password: env.PGPASSWORD,
 })
 
 pool.on('error', (error) => {
   console.error('[db] Unexpected PostgreSQL pool error', {
     message: error.message,
     stack: error.stack,
-    connectionString: redactedConnectionString,
+    host: env.PGHOST,
+    user: env.PGUSER,
+    database: env.PGDATABASE,
   })
 })
 
@@ -63,7 +54,9 @@ export async function withTransaction<T>(work: (client: PoolClient) => Promise<T
       console.error('[db] Failed to obtain PostgreSQL client from pool', {
         message: error.message,
         stack: error.stack,
-        connectionString: redactedConnectionString,
+        host: env.PGHOST,
+        user: env.PGUSER,
+        database: env.PGDATABASE,
       })
     }
 
