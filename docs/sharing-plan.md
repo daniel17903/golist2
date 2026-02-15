@@ -142,6 +142,7 @@ The API contract is maintained in `apps/api-spec/openapi.yaml` (and related file
 - Inject production secrets via environment variables or secret manager.
 - Run Postgres as managed service when possible; keep Compose profile for self-hosted VPS.
 - For Vercel deployments of `apps/backend`, route all paths through `apps/backend/api/index.ts` (rewrite `/(.*)` -> `/api/index`) so Fastify handles requests instead of static/redirect responses.
+- In Vercel backend project settings, keep the root at `apps/backend` and output directory aligned to `dist` (not `apps/backend/dist`) so the Node entrypoint can be discovered after TypeScript build.
 
 ---
 
