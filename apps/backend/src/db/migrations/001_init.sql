@@ -9,8 +9,8 @@ CREATE TABLE IF NOT EXISTS shared_lists (
 CREATE TABLE IF NOT EXISTS list_items (
   id UUID PRIMARY KEY,
   list_id UUID NOT NULL REFERENCES shared_lists(id) ON DELETE CASCADE,
-  text TEXT NOT NULL,
-  quantity TEXT,
+  name TEXT NOT NULL,
+  quantity_or_unit TEXT,
   category TEXT NOT NULL DEFAULT 'other',
   deleted BOOLEAN NOT NULL DEFAULT FALSE,
   created_by_device_id UUID NOT NULL,

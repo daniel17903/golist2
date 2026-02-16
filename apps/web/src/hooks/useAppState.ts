@@ -42,7 +42,7 @@ export const useAppState = () => {
 
   const activeList = lists.find((list) => list.id === activeListId) ?? null;
   const listItems = useMemo(() => {
-    const filtered = items.filter((item) => item.listId === activeListId && !item.checked);
+    const filtered = items.filter((item) => item.listId === activeListId && !item.deleted);
     return sortItemsForList(filtered);
   }, [items, activeListId]);
 

@@ -48,6 +48,8 @@ components:
           format: uuid
         name:
           type: string
+        quantityOrUnit:
+          type: string
         category:
           type: string
         deleted:
@@ -101,6 +103,8 @@ components:
       required: [name, category, deleted, updatedAt]
       properties:
         name:
+          type: string
+        quantityOrUnit:
           type: string
         category:
           type: string

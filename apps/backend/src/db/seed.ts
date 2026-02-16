@@ -20,7 +20,7 @@ async function seedList(client: PoolClient): Promise<void> {
 
   await client.query(
     `
-      INSERT INTO list_items(id, list_id, text, quantity, category, created_by_device_id)
+      INSERT INTO list_items(id, list_id, name, quantity_or_unit, category, created_by_device_id)
       VALUES
         ($1, $2, 'Milk', '1', 'dairy', $3),
         ($4, $2, 'Eggs', '12', 'dairy', $3),

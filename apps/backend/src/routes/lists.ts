@@ -14,6 +14,7 @@ const listNameUpdateSchema = z.object({ name: z.string().min(1) })
 const listCreateHeadersSchema = z.object({ 'x-device-id': z.uuid() })
 const itemUpsertSchema = z.object({
   name: z.string().min(1),
+  quantityOrUnit: z.string().min(1).optional(),
   category: z.string().min(1),
   deleted: z.boolean(),
   updatedAt: z.iso.datetime(),
@@ -21,8 +22,13 @@ const itemUpsertSchema = z.object({
 
 const itemUpdateTieBreakDelimiter = '\u0001'
 
-function computeItemTieBreakValue(item: { name: string; category: string; deleted: boolean }): string {
-  return `${item.name}${itemUpdateTieBreakDelimiter}${item.category}${itemUpdateTieBreakDelimiter}${item.deleted}`
+function computeItemTieBreakValue(item: {
+  name: string
+  quantityOrUnit?: string
+  category: string
+  deleted: boolean
+}): string {
+  return `${item.name}${itemUpdateTieBreakDelimiter}${item.quantityOrUnit ?? ''}${itemUpdateTieBreakDelimiter}${item.category}${itemUpdateTieBreakDelimiter}${item.deleted}`
 }
 
 export function registerListRoutes(app: FastifyInstance) {
@@ -125,12 +131,13 @@ export function registerListRoutes(app: FastifyInstance) {
     const itemsResult = await query<{
       id: string
       name: string
+      quantity_or_unit: string | null
       category: string
       deleted: boolean
       created_at: string
       updated_at: string
     }>(
-      `SELECT id, text AS name, category, deleted, created_at, updated_at
+      `SELECT id, name, quantity_or_unit, category, deleted, created_at, updated_at
          FROM list_items
         WHERE list_id = $1
         ORDER BY created_at ASC, id ASC`,
@@ -147,6 +154,7 @@ export function registerListRoutes(app: FastifyInstance) {
       items: itemsResult.rows.map((item) => ({
         id: item.id,
         name: item.name,
+        quantityOrUnit: item.quantity_or_unit ?? undefined,
         category: item.category,
         deleted: item.deleted,
         createdAt: item.created_at,
@@ -190,12 +198,13 @@ export function registerListRoutes(app: FastifyInstance) {
     const itemsResult = await query<{
       id: string
       name: string
+      quantity_or_unit: string | null
       category: string
       deleted: boolean
       created_at: string
       updated_at: string
     }>(
-      `SELECT id, text AS name, category, deleted, created_at, updated_at
+      `SELECT id, name, quantity_or_unit, category, deleted, created_at, updated_at
          FROM list_items
         WHERE list_id = $1 AND updated_at > $2
         ORDER BY updated_at ASC, id ASC`,
@@ -206,6 +215,7 @@ export function registerListRoutes(app: FastifyInstance) {
       items: itemsResult.rows.map((item) => ({
         id: item.id,
         name: item.name,
+        quantityOrUnit: item.quantity_or_unit ?? undefined,
         category: item.category,
         deleted: item.deleted,
         createdAt: item.created_at,
@@ -219,12 +229,13 @@ export function registerListRoutes(app: FastifyInstance) {
     const itemResult = await query<{
       id: string
       name: string
+      quantity_or_unit: string | null
       category: string
       deleted: boolean
       created_at: string
       updated_at: string
     }>(
-      `SELECT id, text AS name, category, deleted, created_at, updated_at
+      `SELECT id, name, quantity_or_unit, category, deleted, created_at, updated_at
          FROM list_items
         WHERE id = $1 AND list_id = $2
         LIMIT 1`,
@@ -240,6 +251,7 @@ export function registerListRoutes(app: FastifyInstance) {
     return {
       id: item.id,
       name: item.name,
+      quantityOrUnit: item.quantity_or_unit ?? undefined,
       category: item.category,
       deleted: item.deleted,
       createdAt: item.created_at,
@@ -262,9 +274,18 @@ export function registerListRoutes(app: FastifyInstance) {
 
       if (!existingItemResult.rowCount) {
         await client.query(
-          `INSERT INTO list_items(id, list_id, text, category, deleted, created_by_device_id, created_at, updated_at, deleted_at)
-           VALUES ($1, $2, $3, $4, $5, $6, NOW(), $7, CASE WHEN $5 THEN NOW() ELSE NULL END)`,
-          [params.itemId, request.auth!.listId, body.name, body.category, body.deleted, request.auth!.deviceId, body.updatedAt],
+          `INSERT INTO list_items(id, list_id, name, quantity_or_unit, category, deleted, created_by_device_id, created_at, updated_at, deleted_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), $8, CASE WHEN $6 THEN NOW() ELSE NULL END)`,
+          [
+            params.itemId,
+            request.auth!.listId,
+            body.name,
+            body.quantityOrUnit ?? null,
+            body.category,
+            body.deleted,
+            request.auth!.deviceId,
+            body.updatedAt,
+          ],
         )
 
         await client.query('UPDATE shared_lists SET updated_at = GREATEST(updated_at, $2::timestamptz) WHERE id = $1', [
@@ -281,22 +302,24 @@ export function registerListRoutes(app: FastifyInstance) {
 
       const updateResult = await client.query(
         `UPDATE list_items
-            SET text = $1,
-                category = $2,
-                deleted = $3,
-                updated_at = $4,
-                deleted_at = CASE WHEN $3 THEN NOW() ELSE NULL END
-          WHERE id = $5
-            AND list_id = $6
+            SET name = $1,
+                quantity_or_unit = $2,
+                category = $3,
+                deleted = $4,
+                updated_at = $5,
+                deleted_at = CASE WHEN $4 THEN NOW() ELSE NULL END
+          WHERE id = $6
+            AND list_id = $7
             AND (
-              updated_at < $4
+              updated_at < $5
               OR (
-                updated_at = $4
-                AND CONCAT_WS($8, text, category, deleted::text) < $7
+                updated_at = $5
+                AND CONCAT_WS($9, name, COALESCE(quantity_or_unit, ''), category, deleted::text) < $8
               )
             )`,
         [
           body.name,
+          body.quantityOrUnit ?? null,
           body.category,
           body.deleted,
           body.updatedAt,

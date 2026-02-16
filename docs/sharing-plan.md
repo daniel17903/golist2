@@ -28,6 +28,7 @@ The API contract is maintained in `apps/api-spec/openapi.yaml` (and related file
 
 ### Data model direction
 - Store each shared list as a canonical document with metadata and items.
+- Field naming is aligned across API/backend/frontend: `listId`, `quantityOrUnit`, `category`, `deleted`, `createdAt`, and `updatedAt` are the canonical item/list field names; Postgres uses snake_case column equivalents (`list_id`, `quantity_or_unit`, `created_at`, `updated_at`).
 - Use item tombstones (`deleted: true`) instead of hard deletes.
 - Keep canonical timestamps with backend-assigned `createdAt`; persist client-provided `updatedAt` for item updates to support deterministic sync ordering.
 - **Do not include a `shareTokens` field in the list document.** Token management is handled by backend tables/relations.

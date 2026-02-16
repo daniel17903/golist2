@@ -20,7 +20,7 @@
 
 ## Data model (initial)
 - **List**: `id`, `name`, `createdAt`, `updatedAt`.
-- **Item**: `id`, `listId`, `name`, `quantityOrUnit?` (free-form text), `checked`, `createdAt`, `updatedAt`.
+- **Item**: `id`, `listId`, `name`, `quantityOrUnit?` (free-form text), `deleted`, `createdAt`, `updatedAt`.
 - **Metadata**: app version, last opened time.
 
 ## PWA behavior
