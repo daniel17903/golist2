@@ -26,9 +26,7 @@ const ItemCard = ({
   return (
     <button
       type="button"
-      className={`item-card ${item.checked ? "item-card--checked" : ""} ${
-        isExiting ? "item-card--exit" : ""
-      }`}
+      className={`item-card ${isExiting ? "item-card--exit" : ""}`}
       onPointerDown={() => onPointerDown(item.id, item.name, item.quantityOrUnit)}
       onPointerUp={() => onPointerUp(item.id)}
       onPointerLeave={onPointerLeave}

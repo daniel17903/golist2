@@ -58,12 +58,12 @@ describe("GoListDatabase", () => {
     expect(db.versions[0]?.number).toBe(1);
     expect(db.versions[0]?.stores).toEqual({
       lists: "id, name, updatedAt",
-      items: "id, listId, checked, updatedAt",
+      items: "id, listId, deleted, updatedAt",
     });
     expect(db.versions[1]?.number).toBe(2);
     expect(db.versions[1]?.stores).toEqual({
       lists: "id, name, updatedAt",
-      items: "id, listId, checked, updatedAt",
+      items: "id, listId, deleted, updatedAt",
       metadata: "id",
     });
   });

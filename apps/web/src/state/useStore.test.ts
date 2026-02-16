@@ -117,7 +117,6 @@ describe("useStore", () => {
         name: "apple",
         category: "fruitsVegetables",
         deleted: false,
-        checked: false,
         createdAt: 10,
         updatedAt: 10,
       },
@@ -189,7 +188,7 @@ describe("useStore", () => {
     uuidSpy.mockRestore();
   });
 
-  it("toggles an item checked state", async () => {
+  it("toggles an item deleted state", async () => {
     const baseItem: Item = {
       id: "item-1",
       listId: "list-1",
@@ -197,7 +196,6 @@ describe("useStore", () => {
       quantityOrUnit: "2L",
       category: "other",
       deleted: false,
-      checked: false,
       createdAt: 1,
       updatedAt: 1,
     };
@@ -207,12 +205,10 @@ describe("useStore", () => {
     await useStore.getState().toggleItem("item-1");
 
     const state = useStore.getState();
-    expect(state.items[0]?.checked).toBe(true);
     expect(state.items[0]?.deleted).toBe(true);
     expect(itemPut).toHaveBeenCalledWith(
       expect.objectContaining({
         id: "item-1",
-        checked: true,
         deleted: true,
       }),
     );
@@ -230,7 +226,6 @@ describe("useStore", () => {
         name: "Milk",
         category: "other",
         deleted: false,
-        checked: false,
         createdAt: 1,
         updatedAt: 1,
       },
@@ -240,7 +235,6 @@ describe("useStore", () => {
         name: "Apples",
         category: "fruitsVegetables",
         deleted: false,
-        checked: false,
         createdAt: 2,
         updatedAt: 2,
       },

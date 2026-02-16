@@ -130,10 +130,6 @@ body {
   pointer-events: none;
 }
 
-.item-card--checked {
-  opacity: 0.6;
-  text-decoration: line-through;
-}
 
 .item-icon {
   width: 44px;

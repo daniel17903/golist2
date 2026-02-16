@@ -104,7 +104,6 @@ export const useStore = create<StoreState>((set, get) => ({
       quantityOrUnit,
       category: getCategoryForItem(name)?.id ?? "other",
       deleted: false,
-      checked: false,
       createdAt: now,
       updatedAt: now,
     };
@@ -117,8 +116,7 @@ export const useStore = create<StoreState>((set, get) => ({
     if (!item) {return;}
     const updated = {
       ...item,
-      checked: !item.checked,
-      deleted: !item.checked,
+      deleted: !item.deleted,
       updatedAt: Date.now(),
     };
     await db.items.put(updated);

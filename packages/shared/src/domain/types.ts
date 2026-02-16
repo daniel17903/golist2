@@ -17,10 +17,7 @@ export type SharedItem = {
 };
 
 export type List = SharedList;
-
-export type Item = SharedItem & {
-  checked: boolean;
-};
+export type Item = SharedItem;
 
 export type AppMetadata = {
   id: string;

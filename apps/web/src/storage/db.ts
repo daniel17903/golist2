@@ -10,11 +10,11 @@ export class GoListDatabase extends Dexie {
     super("golist");
     this.version(1).stores({
       lists: "id, name, updatedAt",
-      items: "id, listId, checked, updatedAt",
+      items: "id, listId, deleted, updatedAt",
     });
     this.version(2).stores({
       lists: "id, name, updatedAt",
-      items: "id, listId, checked, updatedAt",
+      items: "id, listId, deleted, updatedAt",
       metadata: "id",
     });
   }
