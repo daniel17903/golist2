@@ -19,7 +19,7 @@ declare module 'fastify' {
 }
 
 const uuidSchema = z.uuid()
-const authQuerySchema = z.object({ deviceId: z.uuid() })
+const deviceIdHeaderSchema = z.object({ 'x-device-id': z.uuid() })
 const shareTokenParamsSchema = z.object({ shareToken: z.string().min(1) })
 
 function getBearerToken(request: FastifyRequest): string | null {
@@ -42,6 +42,15 @@ export function normalizeDeviceId(value: unknown): string {
     : crypto.randomUUID()
 }
 
+function getDeviceIdFromHeaders(request: FastifyRequest): string | null {
+  const parsedHeaders = deviceIdHeaderSchema.safeParse(request.headers)
+  if (!parsedHeaders.success) {
+    return null
+  }
+
+  return parsedHeaders.data['x-device-id']
+}
+
 async function requireTokenInternal(
   request: FastifyRequest,
   reply: FastifyReply,
@@ -56,9 +65,9 @@ async function requireTokenInternal(
     return
   }
 
-  const querystring = authQuerySchema.safeParse(request.query)
+  const deviceId = getDeviceIdFromHeaders(request)
 
-  if (!querystring.success) {
+  if (!deviceId) {
     reply.code(400).send({ message: 'Invalid request' })
     return
   }
@@ -84,7 +93,7 @@ async function requireTokenInternal(
          FROM share_token_redemptions
         WHERE token_id = $1 AND device_id = $2
         LIMIT 1`,
-      [tokenResult.rows[0].token_id, querystring.data.deviceId],
+      [tokenResult.rows[0].token_id, deviceId],
     )
 
     if (!redeemedResult.rowCount) {
@@ -97,7 +106,7 @@ async function requireTokenInternal(
     listId: tokenResult.rows[0].list_id,
     tokenId: tokenResult.rows[0].token_id,
     shareToken,
-    deviceId: querystring.data.deviceId,
+    deviceId,
   }
 }
 

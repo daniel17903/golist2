@@ -38,9 +38,9 @@ describe('backend runtime integration (real postgres)', () => {
     expect(await healthResponse.json()).toEqual({ status: 'ok' })
 
     const listId = crypto.randomUUID()
-    const createResponse = await fetch(`${baseUrl}/v1/lists?deviceId=${testDeviceId}`, {
+    const createResponse = await fetch(`${baseUrl}/v1/lists`, {
       method: 'PUT',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', 'x-device-id': testDeviceId },
       body: JSON.stringify({ listId, name: 'Integration Test List' }),
     })
 
@@ -52,10 +52,10 @@ describe('backend runtime integration (real postgres)', () => {
 
     expect(createPayload.listId).toBe(listId)
 
-    const authHeaders = { authorization: `Bearer ${createPayload.shareToken}` }
+    const authHeaders = { authorization: `Bearer ${createPayload.shareToken}`, 'x-device-id': testDeviceId }
 
     const redeemResponse = await fetch(
-      `${baseUrl}/v1/share-tokens/${createPayload.shareToken}/redeem?deviceId=${testDeviceId}`,
+      `${baseUrl}/v1/share-tokens/${createPayload.shareToken}/redeem`,
       {
         method: 'POST',
         headers: authHeaders,
@@ -64,7 +64,7 @@ describe('backend runtime integration (real postgres)', () => {
 
     expect(redeemResponse.status).toBe(204)
 
-    const listResponse = await fetch(`${baseUrl}/v1/lists/${createPayload.shareToken}?deviceId=${testDeviceId}`, {
+    const listResponse = await fetch(`${baseUrl}/v1/lists/${createPayload.shareToken}`, {
       headers: authHeaders,
     })
 
@@ -80,9 +80,9 @@ describe('backend runtime integration (real postgres)', () => {
 
   it('creates items via PUT and enforces deterministic LWW tie-break conflicts', async () => {
     const listId = crypto.randomUUID()
-    const createResponse = await fetch(`${baseUrl}/v1/lists?deviceId=${testDeviceId}`, {
+    const createResponse = await fetch(`${baseUrl}/v1/lists`, {
       method: 'PUT',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', 'x-device-id': testDeviceId },
       body: JSON.stringify({ listId, name: 'Conflict List' }),
     })
 
@@ -92,10 +92,10 @@ describe('backend runtime integration (real postgres)', () => {
       .object({ listId: z.string().uuid(), shareToken: z.string().uuid() })
       .parse(await createResponse.json())
 
-    const authHeaders = { authorization: `Bearer ${createPayload.shareToken}` }
+    const authHeaders = { authorization: `Bearer ${createPayload.shareToken}`, 'x-device-id': testDeviceId }
 
     const redeemResponse = await fetch(
-      `${baseUrl}/v1/share-tokens/${createPayload.shareToken}/redeem?deviceId=${testDeviceId}`,
+      `${baseUrl}/v1/share-tokens/${createPayload.shareToken}/redeem`,
       {
         method: 'POST',
         headers: authHeaders,
@@ -108,7 +108,7 @@ describe('backend runtime integration (real postgres)', () => {
     const createItemTimestamp = new Date().toISOString()
 
     const createItemResponse = await fetch(
-      `${baseUrl}/v1/lists/${createPayload.shareToken}/items/${itemId}?deviceId=${testDeviceId}`,
+      `${baseUrl}/v1/lists/${createPayload.shareToken}/items/${itemId}`,
       {
         method: 'PUT',
         headers: {
@@ -127,7 +127,7 @@ describe('backend runtime integration (real postgres)', () => {
     expect(createItemResponse.status).toBe(201)
 
     const baselineItemResponse = await fetch(
-      `${baseUrl}/v1/lists/${createPayload.shareToken}/items/${itemId}?deviceId=${testDeviceId}`,
+      `${baseUrl}/v1/lists/${createPayload.shareToken}/items/${itemId}`,
       {
         headers: authHeaders,
       },
@@ -145,7 +145,7 @@ describe('backend runtime integration (real postgres)', () => {
     const sameTimestamp = new Date(Date.parse(baselineItem.updatedAt) + 60_000).toISOString()
 
     const [largerTieBreakUpdateResponse, smallerTieBreakUpdateResponse] = await Promise.all([
-      fetch(`${baseUrl}/v1/lists/${createPayload.shareToken}/items/${itemId}?deviceId=${testDeviceId}`, {
+      fetch(`${baseUrl}/v1/lists/${createPayload.shareToken}/items/${itemId}`, {
         method: 'PUT',
         headers: {
           ...authHeaders,
@@ -153,7 +153,7 @@ describe('backend runtime integration (real postgres)', () => {
         },
         body: JSON.stringify({ name: 'Yogurt', category: 'dairy', deleted: false, updatedAt: sameTimestamp }),
       }),
-      fetch(`${baseUrl}/v1/lists/${createPayload.shareToken}/items/${itemId}?deviceId=${testDeviceId}`, {
+      fetch(`${baseUrl}/v1/lists/${createPayload.shareToken}/items/${itemId}`, {
         method: 'PUT',
         headers: {
           ...authHeaders,
@@ -166,7 +166,7 @@ describe('backend runtime integration (real postgres)', () => {
     expect(largerTieBreakUpdateResponse.status).toBe(204)
     expect(smallerTieBreakUpdateResponse.status).toBe(204)
 
-    const itemResponse = await fetch(`${baseUrl}/v1/lists/${createPayload.shareToken}/items/${itemId}?deviceId=${testDeviceId}`, {
+    const itemResponse = await fetch(`${baseUrl}/v1/lists/${createPayload.shareToken}/items/${itemId}`, {
       headers: authHeaders,
     })
 
@@ -185,19 +185,20 @@ describe('backend runtime integration (real postgres)', () => {
   it('forbids putting an existing list without a valid access token', async () => {
     const listId = crypto.randomUUID()
 
-    const createResponse = await fetch(`${baseUrl}/v1/lists?deviceId=${testDeviceId}`, {
+    const createResponse = await fetch(`${baseUrl}/v1/lists`, {
       method: 'PUT',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', 'x-device-id': testDeviceId },
       body: JSON.stringify({ listId, name: 'Owned List' }),
     })
 
     expect(createResponse.status).toBe(201)
 
     const intruderDeviceId = '22222222-2222-4222-8222-222222222222'
-    const forbiddenUpdateResponse = await fetch(`${baseUrl}/v1/lists?deviceId=${intruderDeviceId}`, {
+    const forbiddenUpdateResponse = await fetch(`${baseUrl}/v1/lists`, {
       method: 'PUT',
       headers: {
         'content-type': 'application/json',
+        'x-device-id': intruderDeviceId,
       },
       body: JSON.stringify({ listId, name: 'Should Fail' }),
     })

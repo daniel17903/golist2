@@ -29,9 +29,9 @@ components:
       schema:
         type: string
         format: date-time
-    DeviceId:
-      name: deviceId
-      in: query
+    DeviceIdHeader:
+      name: X-Device-Id
+      in: header
       required: true
       schema:
         type: string
@@ -143,6 +143,8 @@ paths:
     put:
       summary: Create list (idempotent) or update existing list when caller has access
       security: []
+      parameters:
+        - $ref: "#/components/parameters/DeviceIdHeader"
       requestBody:
         required: true
         content:
@@ -167,7 +169,7 @@ paths:
   /v1/lists/{shareToken}:
     parameters:
       - $ref: "#/components/parameters/ShareToken"
-      - $ref: "#/components/parameters/DeviceId"
+      - $ref: "#/components/parameters/DeviceIdHeader"
     get:
       summary: Fetch list by share token
       responses:
@@ -187,7 +189,7 @@ paths:
   /v1/lists/{shareToken}/name:
     parameters:
       - $ref: "#/components/parameters/ShareToken"
-      - $ref: "#/components/parameters/DeviceId"
+      - $ref: "#/components/parameters/DeviceIdHeader"
     patch:
       summary: Update list name
       requestBody:
@@ -202,7 +204,7 @@ paths:
   /v1/lists/{shareToken}/items:
     parameters:
       - $ref: "#/components/parameters/ShareToken"
-      - $ref: "#/components/parameters/DeviceId"
+      - $ref: "#/components/parameters/DeviceIdHeader"
     get:
       summary: Fetch items updated after timestamp
       parameters:
@@ -217,7 +219,7 @@ paths:
   /v1/lists/{shareToken}/items/{itemId}:
     parameters:
       - $ref: "#/components/parameters/ShareToken"
-      - $ref: "#/components/parameters/DeviceId"
+      - $ref: "#/components/parameters/DeviceIdHeader"
       - $ref: "#/components/parameters/ItemId"
     get:
       summary: Fetch item by id
@@ -246,7 +248,7 @@ paths:
   /v1/share-tokens/{shareToken}/redeem:
     parameters:
       - $ref: "#/components/parameters/ShareToken"
-      - $ref: "#/components/parameters/DeviceId"
+      - $ref: "#/components/parameters/DeviceIdHeader"
     post:
       summary: Redeem a share token for the requesting device
       responses:
@@ -255,7 +257,7 @@ paths:
   /v1/lists/{shareToken}/share-tokens:
     parameters:
       - $ref: "#/components/parameters/ShareToken"
-      - $ref: "#/components/parameters/DeviceId"
+      - $ref: "#/components/parameters/DeviceIdHeader"
     post:
       summary: Create additional share token for a list
       responses:

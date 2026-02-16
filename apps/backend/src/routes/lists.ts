@@ -11,7 +11,7 @@ const listPutSchema = z.object({
   name: z.string().min(1),
 })
 const listNameUpdateSchema = z.object({ name: z.string().min(1) })
-const listCreateQuerySchema = z.object({ deviceId: z.uuid().optional() })
+const listCreateHeadersSchema = z.object({ 'x-device-id': z.uuid().optional() })
 const itemUpsertSchema = z.object({
   name: z.string().min(1),
   category: z.string().min(1),
@@ -28,8 +28,8 @@ function computeItemTieBreakValue(item: { name: string; category: string; delete
 export function registerListRoutes(app: FastifyInstance) {
   app.put('/v1/lists', async (request, reply) => {
     const body = listPutSchema.parse(request.body)
-    const querystring = listCreateQuerySchema.parse(request.query)
-    const createdBy = normalizeDeviceId(querystring.deviceId)
+    const headers = listCreateHeadersSchema.parse(request.headers)
+    const createdBy = normalizeDeviceId(headers['x-device-id'])
 
     const authHeader = request.headers.authorization
     const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null
@@ -61,7 +61,7 @@ export function registerListRoutes(app: FastifyInstance) {
         return { statusCode: 201, shareToken: tokenId }
       }
 
-      if (!querystring.deviceId || !bearerToken) {
+      if (!headers['x-device-id'] || !bearerToken) {
         return { statusCode: 403 as const }
       }
 
@@ -86,10 +86,10 @@ export function registerListRoutes(app: FastifyInstance) {
           WHERE token_id = $1
             AND device_id = $2
           LIMIT 1`,
-        [bearerToken, querystring.deviceId],
+        [bearerToken, headers['x-device-id']],
       )
 
-      const isCreator = existingListResult.rows[0].created_by_device_id === querystring.deviceId
+      const isCreator = existingListResult.rows[0].created_by_device_id === headers['x-device-id']
 
       if (!accessResult.rowCount && !isCreator) {
         return { statusCode: 403 as const }
