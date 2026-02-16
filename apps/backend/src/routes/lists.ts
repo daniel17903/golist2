@@ -3,7 +3,7 @@ import crypto from 'node:crypto'
 import { type FastifyInstance } from 'fastify'
 import { z } from 'zod'
 
-import { normalizeDeviceId, requireToken } from '../auth.js'
+import { normalizeDeviceId, requireToken, requireTokenForListUpdates } from '../auth.js'
 import { query, withTransaction } from '../db/client.js'
 
 const listPutSchema = z.object({
@@ -173,7 +173,7 @@ export function registerListRoutes(app: FastifyInstance) {
     reply.code(204)
   })
 
-  app.patch('/v1/lists/:shareToken/name', { preHandler: requireToken }, async (request, reply) => {
+  app.patch('/v1/lists/:shareToken/name', { preHandler: requireTokenForListUpdates }, async (request, reply) => {
     const body = listNameUpdateSchema.parse(request.body)
 
     await withTransaction(async (client) => {
@@ -247,7 +247,7 @@ export function registerListRoutes(app: FastifyInstance) {
     }
   })
 
-  app.put('/v1/lists/:shareToken/items/:itemId', { preHandler: requireToken }, async (request, reply) => {
+  app.put('/v1/lists/:shareToken/items/:itemId', { preHandler: requireTokenForListUpdates }, async (request, reply) => {
     const params = z.object({ itemId: z.uuid() }).parse(request.params)
     const body = itemUpsertSchema.parse(request.body)
     const tieBreakValue = computeItemTieBreakValue(body)

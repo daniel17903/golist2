@@ -82,7 +82,8 @@ The API contract is maintained in `apps/api-spec/openapi.yaml` (and related file
 2. Write paths are guarded with transactional row locking (`SELECT ... FOR UPDATE`) before mutating list/item state.
 3. Incremental sync support is implemented via `GET /v1/lists/{shareToken}/items?updatedAfter=...` with deterministic ordering by `updated_at` then `id`.
 4. Creation is idempotent with client-generated IDs: lists use `PUT /v1/lists` with a client `listId`, and items use `PUT /v1/lists/{shareToken}/items/{itemId}`.
-5. Existing-list `PUT /v1/lists` updates are access-controlled: only devices with list access (valid token + device access) may update an existing list.
+5. Existing-list `PUT /v1/lists` updates are access-controlled: only devices with list access (list creator or devices that redeemed the share token) may update an existing list.
+6. Authenticated list/item update routes enforce the same rule: updates are allowed only for the list creator or for devices that redeemed the active share token for that list.
 
 ### Phase 4 — Web app integration
 1. Add API client in `apps/web` for sharing and sync endpoints.
