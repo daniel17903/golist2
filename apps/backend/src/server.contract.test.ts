@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { z } from 'zod'
 
 const queryMock = vi.fn()
 const withTransactionMock = vi.fn()
@@ -182,4 +183,107 @@ describe('sharing API contract basics', () => {
 
     await app.close()
   })
+  it('creates a secondary share token only for redeemed devices', async () => {
+    const { buildServer } = await import('./server.js')
+    const app = buildServer()
+
+    queryMock
+      .mockResolvedValueOnce({
+        rowCount: 1,
+        rows: [{ token_id: '11111111-1111-4111-8111-111111111111', list_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' }],
+      })
+      .mockResolvedValueOnce({ rowCount: 1, rows: [] })
+      .mockResolvedValueOnce({ rowCount: 1, rows: [{ created_at: '2026-01-01T00:00:00.000Z' }] })
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/lists/11111111-1111-4111-8111-111111111111/share-tokens',
+      headers: {
+        authorization: 'Bearer 11111111-1111-4111-8111-111111111111',
+        'x-device-id': '22222222-2222-4222-8222-222222222222',
+      },
+    })
+
+    expect(response.statusCode).toBe(201)
+    expect(response.json()).toEqual(
+      expect.objectContaining({
+        listId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        tokenId: expect.any(String),
+        shareToken: expect.any(String),
+      }),
+    )
+
+    const tokenPayload = z
+      .object({ tokenId: z.string().uuid(), shareToken: z.string().uuid() })
+      .parse(response.json())
+    expect(tokenPayload.shareToken).toBe(tokenPayload.tokenId)
+
+    await app.close()
+  })
+
+  it('forbids creating a secondary share token for non-redeemed devices', async () => {
+    const { buildServer } = await import('./server.js')
+    const app = buildServer()
+
+    queryMock
+      .mockResolvedValueOnce({
+        rowCount: 1,
+        rows: [{ token_id: '11111111-1111-4111-8111-111111111111', list_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' }],
+      })
+      .mockResolvedValueOnce({ rowCount: 0, rows: [] })
+      .mockResolvedValueOnce({ rowCount: 0, rows: [] })
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/lists/11111111-1111-4111-8111-111111111111/share-tokens',
+      headers: {
+        authorization: 'Bearer 11111111-1111-4111-8111-111111111111',
+        'x-device-id': '22222222-2222-4222-8222-222222222222',
+      },
+    })
+
+    expect(response.statusCode).toBe(403)
+
+    await app.close()
+  })
+
+  it('accepts repeated redemption calls for the same device and token', async () => {
+    const { buildServer } = await import('./server.js')
+    const app = buildServer()
+
+    queryMock
+      .mockResolvedValueOnce({
+        rowCount: 1,
+        rows: [{ token_id: '11111111-1111-4111-8111-111111111111', list_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' }],
+      })
+      .mockResolvedValueOnce({ rowCount: 1, rows: [] })
+      .mockResolvedValueOnce({
+        rowCount: 1,
+        rows: [{ token_id: '11111111-1111-4111-8111-111111111111', list_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' }],
+      })
+      .mockResolvedValueOnce({ rowCount: 1, rows: [] })
+
+    const headers = {
+      authorization: 'Bearer 11111111-1111-4111-8111-111111111111',
+      'x-device-id': '22222222-2222-4222-8222-222222222222',
+    }
+
+    const firstResponse = await app.inject({
+      method: 'POST',
+      url: '/v1/share-tokens/11111111-1111-4111-8111-111111111111/redeem',
+      headers,
+    })
+
+    const secondResponse = await app.inject({
+      method: 'POST',
+      url: '/v1/share-tokens/11111111-1111-4111-8111-111111111111/redeem',
+      headers,
+    })
+
+    expect(firstResponse.statusCode).toBe(204)
+    expect(secondResponse.statusCode).toBe(204)
+
+    await app.close()
+  })
+
 })
