@@ -19,6 +19,10 @@ export const useAppState = () => {
     toggleItem,
     updateItem,
     deleteList,
+    ensureShareToken,
+    joinSharedList,
+    listShareTokens,
+    syncAllLists,
   } = useStore();
 
   const [newListName, setNewListName] = useState("");
@@ -39,6 +43,31 @@ export const useAppState = () => {
       void addList(defaultListName);
     }
   }, [isLoaded, lists.length, addList]);
+
+  useEffect(() => {
+    if (!isLoaded) {
+      return;
+    }
+
+    const interval = window.setInterval(() => {
+      void syncAllLists();
+    }, 60_000);
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        void syncAllLists();
+      }
+    };
+
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    window.addEventListener("online", onVisibilityChange);
+
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      window.removeEventListener("online", onVisibilityChange);
+    };
+  }, [isLoaded, syncAllLists]);
 
   const activeList = lists.find((list) => list.id === activeListId) ?? null;
   const listItems = useMemo(() => {
@@ -153,6 +182,14 @@ export const useAppState = () => {
     setIsDrawerOpen(false);
   };
 
+  const handleShareActiveList = async () => {
+    if (!activeListId) {
+      throw new Error("Keine aktive Liste ausgewählt");
+    }
+    const token = await ensureShareToken(activeListId);
+    return `${window.location.origin}/?shareToken=${token}`;
+  };
+
   return {
     lists,
     items,
@@ -168,6 +205,7 @@ export const useAppState = () => {
     editItemQuantity,
     isDrawerOpen,
     isAddDialogOpen,
+    activeListShareToken: activeListId ? listShareTokens[activeListId] : undefined,
     setNewListName,
     setEditingTitle,
     setItemName,
@@ -186,5 +224,7 @@ export const useAppState = () => {
     openAddDialog,
     handleCreateList,
     handleDeleteList,
+    handleShareActiveList,
+    joinSharedList,
   };
 };

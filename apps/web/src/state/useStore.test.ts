@@ -22,8 +22,20 @@ const createMemoryStorage = () => {
 
 vi.stubGlobal("localStorage", createMemoryStorage());
 
+
+vi.mock("../sharing/apiClient", () => ({
+  extractShareToken: (value: string) => value,
+  sharingApiClient: {
+    upsertList: vi.fn(),
+    fetchList: vi.fn(),
+    redeemShareToken: vi.fn(),
+    upsertItem: vi.fn(),
+  },
+}));
+
 let listsData: List[] = [];
 let itemsData: Item[] = [];
+let listSharesData: Array<{ listId: string; shareToken: string; lastSyncedAt: number }> = [];
 const metadataPut = vi.fn();
 const listAdd = vi.fn(async (list: List) => {
   listsData.push(list);
@@ -40,7 +52,22 @@ const itemAdd = vi.fn(async (item: Item) => {
   return item.id;
 });
 const itemPut = vi.fn(async (item: Item) => {
-  itemsData = itemsData.map((entry) => (entry.id === item.id ? item : entry));
+  const index = itemsData.findIndex((entry) => entry.id === item.id);
+  if (index >= 0) {
+    itemsData[index] = item;
+    return;
+  }
+  itemsData.push(item);
+});
+const itemBulkPut = vi.fn(async (items: Item[]) => {
+  for (const item of items) {
+    const index = itemsData.findIndex((entry) => entry.id === item.id);
+    if (index >= 0) {
+      itemsData[index] = item;
+    } else {
+      itemsData.push(item);
+    }
+  }
 });
 const itemsWhere = vi.fn((field: keyof Item) => ({
   equals: (value: Item[keyof Item]) => ({
@@ -64,10 +91,25 @@ vi.mock("../storage/db", () => ({
       toArray: vi.fn(async () => [...itemsData]),
       add: itemAdd,
       put: itemPut,
+      bulkPut: itemBulkPut,
       where: itemsWhere,
     },
     metadata: {
       put: metadataPut,
+    },
+    listShares: {
+      toArray: vi.fn(async () => [...listSharesData]),
+      put: vi.fn(async (entry: { listId: string; shareToken: string; lastSyncedAt: number }) => {
+        const index = listSharesData.findIndex((item) => item.listId === entry.listId);
+        if (index >= 0) {
+          listSharesData[index] = entry;
+        } else {
+          listSharesData.push(entry);
+        }
+      }),
+      delete: vi.fn(async (listId: string) => {
+        listSharesData = listSharesData.filter((entry) => entry.listId !== listId);
+      }),
     },
   },
 }));
@@ -81,6 +123,7 @@ const resetStore = () => {
     isLoaded: false,
     activeListId: undefined,
     metadata: undefined,
+    listShareTokens: {},
   });
 };
 
@@ -88,12 +131,14 @@ describe("useStore", () => {
   beforeEach(() => {
     listsData = [];
     itemsData = [];
+    listSharesData = [];
     metadataPut.mockClear();
     listAdd.mockClear();
     listUpdate.mockClear();
     listDelete.mockClear();
     itemAdd.mockClear();
     itemPut.mockClear();
+    itemBulkPut.mockClear();
     itemsWhere.mockClear();
     globalThis.localStorage.clear();
     resetStore();

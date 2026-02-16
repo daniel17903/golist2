@@ -2,9 +2,13 @@ import { create } from "zustand";
 import type { AppMetadata, Item, List } from "@golist/shared/domain/types";
 import { getCategoryForItem } from "../domain/categories";
 import { db } from "../storage/db";
+import { extractShareToken, sharingApiClient } from "../sharing/apiClient";
 
 const createId = () => crypto.randomUUID();
 const appVersion = __APP_VERSION__;
+
+const toIsoTimestamp = (value: number) => new Date(value).toISOString();
+const toMillis = (value: string) => new Date(value).getTime();
 
 const getOrCreateDeviceId = (): string => {
   const storageKey = "golist.deviceId";
@@ -23,6 +27,7 @@ type StoreState = {
   items: Item[];
   metadata?: AppMetadata;
   activeListId?: string;
+  listShareTokens: Record<string, string>;
   isLoaded: boolean;
   load: () => Promise<void>;
   addList: (name: string) => Promise<void>;
@@ -32,6 +37,29 @@ type StoreState = {
   addItem: (listId: string, name: string, quantityOrUnit?: string) => Promise<void>;
   toggleItem: (itemId: string) => Promise<void>;
   updateItem: (itemId: string, name: string, quantityOrUnit?: string) => Promise<void>;
+  ensureShareToken: (listId: string) => Promise<string>;
+  joinSharedList: (rawShareValue: string) => Promise<string>;
+  syncList: (listId: string) => Promise<void>;
+  syncAllLists: () => Promise<void>;
+};
+
+const loadShareTokenMap = async () => {
+  const entries = await db.listShares.toArray();
+  return entries.reduce<Record<string, string>>((accumulator, entry) => {
+    accumulator[entry.listId] = entry.shareToken;
+    return accumulator;
+  }, {});
+};
+
+const setShareToken = async (listId: string, shareToken: string) => {
+  await db.listShares.put({ listId, shareToken, lastSyncedAt: Date.now() });
+};
+
+const triggerSyncInBackground = (listId: string) => {
+  void useStore
+    .getState()
+    .syncList(listId)
+    .catch(() => undefined);
 };
 
 export const useStore = create<StoreState>((set, get) => ({
@@ -39,8 +67,13 @@ export const useStore = create<StoreState>((set, get) => ({
   items: [],
   isLoaded: false,
   activeListId: undefined,
+  listShareTokens: {},
   load: async () => {
-    const [lists, items] = await Promise.all([db.lists.toArray(), db.items.toArray()]);
+    const [lists, items, listShareTokens] = await Promise.all([
+      db.lists.toArray(),
+      db.items.toArray(),
+      loadShareTokenMap(),
+    ]);
     const sortedLists = lists.sort((a, b) => a.createdAt - b.createdAt);
     const metadata: AppMetadata = {
       id: "app",
@@ -54,8 +87,11 @@ export const useStore = create<StoreState>((set, get) => ({
       items,
       activeListId: sortedLists[0]?.id,
       metadata,
+      listShareTokens,
       isLoaded: true,
     });
+
+    await get().syncAllLists();
   },
   addList: async (name: string) => {
     const now = Date.now();
@@ -79,18 +115,23 @@ export const useStore = create<StoreState>((set, get) => ({
         list.id === listId ? { ...list, name, updatedAt: now } : list,
       ),
     }));
+    triggerSyncInBackground(listId);
   },
   deleteList: async (listId: string) => {
     await db.items.where("listId").equals(listId).delete();
     await db.lists.delete(listId);
+    await db.listShares.delete(listId);
     set((state) => {
       const remainingLists = state.lists.filter((list) => list.id !== listId);
       const nextActiveListId =
         state.activeListId === listId ? remainingLists[0]?.id : state.activeListId;
+      const remainingTokens = { ...state.listShareTokens };
+      delete remainingTokens[listId];
       return {
         lists: remainingLists,
         items: state.items.filter((item) => item.listId !== listId),
         activeListId: nextActiveListId,
+        listShareTokens: remainingTokens,
       };
     });
   },
@@ -109,6 +150,7 @@ export const useStore = create<StoreState>((set, get) => ({
     };
     await db.items.add(item);
     set((state) => ({ items: [...state.items, item] }));
+    triggerSyncInBackground(listId);
   },
   toggleItem: async (itemId: string) => {
     const { items } = get();
@@ -123,6 +165,7 @@ export const useStore = create<StoreState>((set, get) => ({
     set((state) => ({
       items: state.items.map((entry) => (entry.id === itemId ? updated : entry)),
     }));
+    triggerSyncInBackground(updated.listId);
   },
   updateItem: async (itemId: string, name: string, quantityOrUnit?: string) => {
     const { items } = get();
@@ -139,5 +182,203 @@ export const useStore = create<StoreState>((set, get) => ({
     set((state) => ({
       items: state.items.map((entry) => (entry.id === itemId ? updated : entry)),
     }));
+    triggerSyncInBackground(updated.listId);
+  },
+  ensureShareToken: async (listId: string) => {
+    const state = get();
+    const existing = state.listShareTokens[listId];
+    if (existing) {
+      return existing;
+    }
+
+    const list = state.lists.find((entry) => entry.id === listId);
+    if (!list || !state.metadata?.deviceId) {
+      throw new Error("List or device metadata missing");
+    }
+
+    const response = await sharingApiClient.upsertList({
+      deviceId: state.metadata.deviceId,
+      body: { listId: list.id, name: list.name },
+    });
+
+    await setShareToken(listId, response.shareToken);
+    set((current) => ({
+      listShareTokens: {
+        ...current.listShareTokens,
+        [listId]: response.shareToken,
+      },
+    }));
+
+    return response.shareToken;
+  },
+  joinSharedList: async (rawShareValue: string) => {
+    const state = get();
+    if (!state.metadata?.deviceId) {
+      throw new Error("Device metadata missing");
+    }
+
+    const shareToken = extractShareToken(rawShareValue);
+    if (!shareToken) {
+      throw new Error("Invalid share token");
+    }
+
+    await sharingApiClient.redeemShareToken({
+      deviceId: state.metadata.deviceId,
+      shareToken,
+    });
+
+    const remoteList = await sharingApiClient.fetchList({
+      deviceId: state.metadata.deviceId,
+      shareToken,
+    });
+
+    const localList: List = {
+      id: remoteList.listId,
+      name: remoteList.name,
+      createdAt: toMillis(remoteList.createdAt),
+      updatedAt: toMillis(remoteList.updatedAt),
+    };
+
+    const localItems: Item[] = remoteList.items.map((item) => ({
+      id: item.id,
+      listId: remoteList.listId,
+      name: item.name,
+      quantityOrUnit: item.quantityOrUnit,
+      category: item.category,
+      deleted: item.deleted,
+      createdAt: toMillis(item.createdAt),
+      updatedAt: toMillis(item.updatedAt),
+    }));
+
+    await db.lists.put(localList);
+    await db.items.bulkPut(localItems);
+    await setShareToken(localList.id, shareToken);
+
+    set((current) => {
+      const withoutListItems = current.items.filter((item) => item.listId !== localList.id);
+      const withoutList = current.lists.filter((list) => list.id !== localList.id);
+      return {
+        lists: [...withoutList, localList].sort((a, b) => a.createdAt - b.createdAt),
+        items: [...withoutListItems, ...localItems],
+        activeListId: localList.id,
+        listShareTokens: {
+          ...current.listShareTokens,
+          [localList.id]: shareToken,
+        },
+      };
+    });
+
+    return localList.id;
+  },
+  syncList: async (listId: string) => {
+    const state = get();
+    const shareToken = state.listShareTokens[listId];
+    if (!shareToken || !state.metadata?.deviceId) {
+      return;
+    }
+
+    const localList = state.lists.find((entry) => entry.id === listId);
+    if (!localList) {
+      return;
+    }
+
+    const deviceId = state.metadata.deviceId;
+    const remoteList = await sharingApiClient.fetchList({ deviceId, shareToken });
+
+    const remoteListUpdatedAt = toMillis(remoteList.updatedAt);
+    const nextList =
+      remoteListUpdatedAt > localList.updatedAt
+        ? { ...localList, name: remoteList.name, updatedAt: remoteListUpdatedAt }
+        : localList;
+
+    if (localList.updatedAt > remoteListUpdatedAt || localList.name !== remoteList.name) {
+      await sharingApiClient.upsertList({
+        deviceId,
+        shareToken,
+        body: { listId, name: localList.name },
+      });
+    }
+
+    const localItemsForList = state.items.filter((item) => item.listId === listId);
+    const localItemMap = new Map(localItemsForList.map((item) => [item.id, item]));
+    const merged = [...localItemsForList];
+    const localPushQueue: Item[] = [];
+
+    for (const remoteItem of remoteList.items) {
+      const mappedRemote: Item = {
+        id: remoteItem.id,
+        listId,
+        name: remoteItem.name,
+        quantityOrUnit: remoteItem.quantityOrUnit,
+        category: remoteItem.category,
+        deleted: remoteItem.deleted,
+        createdAt: toMillis(remoteItem.createdAt),
+        updatedAt: toMillis(remoteItem.updatedAt),
+      };
+
+      const local = localItemMap.get(mappedRemote.id);
+      if (!local) {
+        merged.push(mappedRemote);
+        continue;
+      }
+
+      if (mappedRemote.updatedAt > local.updatedAt) {
+        const index = merged.findIndex((item) => item.id === local.id);
+        if (index >= 0) {
+          merged[index] = mappedRemote;
+        }
+      } else if (local.updatedAt > mappedRemote.updatedAt) {
+        localPushQueue.push(local);
+      }
+    }
+
+    const remoteIds = new Set(remoteList.items.map((item) => item.id));
+    for (const local of localItemsForList) {
+      if (!remoteIds.has(local.id)) {
+        localPushQueue.push(local);
+      }
+    }
+
+    await db.lists.put(nextList);
+    await db.items.bulkPut(merged);
+
+    for (const item of localPushQueue) {
+      await sharingApiClient.upsertItem({
+        deviceId,
+        shareToken,
+        itemId: item.id,
+        body: {
+          name: item.name,
+          quantityOrUnit: item.quantityOrUnit,
+          category: item.category,
+          deleted: item.deleted,
+          updatedAt: toIsoTimestamp(item.updatedAt),
+        },
+      });
+    }
+
+    const now = Date.now();
+    await db.listShares.put({ listId, shareToken, lastSyncedAt: now });
+
+    set((current) => {
+      const remainingLists = current.lists.filter((entry) => entry.id !== listId);
+      const remainingItems = current.items.filter((entry) => entry.listId !== listId);
+      return {
+        lists: [...remainingLists, nextList].sort((a, b) => a.createdAt - b.createdAt),
+        items: [...remainingItems, ...merged],
+      };
+    });
+  },
+  syncAllLists: async () => {
+    const state = get();
+    await Promise.all(
+      Object.keys(state.listShareTokens).map(async (listId) => {
+        try {
+          await get().syncList(listId);
+        } catch {
+          // offline or unreachable backend should not break local-first behavior
+        }
+      }),
+    );
   },
 }));

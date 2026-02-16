@@ -37,11 +37,12 @@
 - `npm run typecheck`
 - `npm run build`
 - `npm run test`
+- `npm run test:integration -w apps/web`
 - `npm run db:migrate -w apps/backend`
 - `npm run db:seed -w apps/backend`
 
 ## CI/CD
-- GitHub Actions `ci.yml` workflow validates `lint`, `typecheck`, `test` and `build` for the web workspace on PRs.
+- GitHub Actions `ci.yml` workflow validates `lint`, `typecheck`, `test` and `build` for the web workspace on PRs, and runs a `web-sharing-integration` job that executes web integration tests against backend + Postgres services.
 - GitHub Actions `backend-bootstrap.yml` runs backend `lint` + `typecheck` + `db:migrate` + `test` (against ephemeral Postgres) on PRs that touch `apps/backend/**`.
 - Deploy workflow builds on `main`.
 
