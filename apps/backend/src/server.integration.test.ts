@@ -218,4 +218,91 @@ describe('backend runtime integration (real postgres)', () => {
 
     expect(forbiddenUpdateResponse.status).toBe(403)
   })
+
+  it('completes share-token creation and redemption across multiple devices', async () => {
+    const ownerDeviceId = '33333333-3333-4333-8333-333333333333'
+    const guestDeviceId = '44444444-4444-4444-8444-444444444444'
+    const secondGuestDeviceId = '55555555-5555-4555-8555-555555555555'
+    const listId = crypto.randomUUID()
+
+    const createResponse = await fetch(`${baseUrl}/v1/lists`, {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json', 'x-device-id': ownerDeviceId },
+      body: JSON.stringify({ listId, name: 'Token Flow List' }),
+    })
+
+    expect(createResponse.status).toBe(201)
+
+    const createdList = z
+      .object({ listId: z.string().uuid(), shareToken: z.string().uuid() })
+      .parse(await createResponse.json())
+
+    const unredeemedGuestHeaders = {
+      authorization: `Bearer ${createdList.shareToken}`,
+      'x-device-id': guestDeviceId,
+    }
+
+    const unredeemedGuestListResponse = await fetch(`${baseUrl}/v1/lists/${createdList.shareToken}`, {
+      headers: unredeemedGuestHeaders,
+    })
+
+    expect(unredeemedGuestListResponse.status).toBe(403)
+
+    const redeemPrimaryTokenResponse = await fetch(
+      `${baseUrl}/v1/share-tokens/${createdList.shareToken}/redeem`,
+      {
+        method: 'POST',
+        headers: unredeemedGuestHeaders,
+      },
+    )
+
+    expect(redeemPrimaryTokenResponse.status).toBe(204)
+
+    const redeemedGuestListResponse = await fetch(`${baseUrl}/v1/lists/${createdList.shareToken}`, {
+      headers: unredeemedGuestHeaders,
+    })
+
+    expect(redeemedGuestListResponse.status).toBe(200)
+
+    const createSecondaryTokenResponse = await fetch(`${baseUrl}/v1/lists/${createdList.shareToken}/share-tokens`, {
+      method: 'POST',
+      headers: unredeemedGuestHeaders,
+    })
+
+    expect(createSecondaryTokenResponse.status).toBe(201)
+
+    const secondaryToken = z
+      .object({ tokenId: z.string().uuid(), listId: z.string().uuid(), shareToken: z.string().uuid() })
+      .parse(await createSecondaryTokenResponse.json())
+
+    expect(secondaryToken.listId).toBe(listId)
+    expect(secondaryToken.shareToken).toBe(secondaryToken.tokenId)
+
+    const secondGuestHeaders = {
+      authorization: `Bearer ${secondaryToken.shareToken}`,
+      'x-device-id': secondGuestDeviceId,
+    }
+
+    const secondUnredeemedListResponse = await fetch(`${baseUrl}/v1/lists/${secondaryToken.shareToken}`, {
+      headers: secondGuestHeaders,
+    })
+
+    expect(secondUnredeemedListResponse.status).toBe(403)
+
+    const redeemSecondaryTokenResponse = await fetch(
+      `${baseUrl}/v1/share-tokens/${secondaryToken.shareToken}/redeem`,
+      {
+        method: 'POST',
+        headers: secondGuestHeaders,
+      },
+    )
+
+    expect(redeemSecondaryTokenResponse.status).toBe(204)
+
+    const secondRedeemedListResponse = await fetch(`${baseUrl}/v1/lists/${secondaryToken.shareToken}`, {
+      headers: secondGuestHeaders,
+    })
+
+    expect(secondRedeemedListResponse.status).toBe(200)
+  })
 })
