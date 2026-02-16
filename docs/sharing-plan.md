@@ -75,12 +75,14 @@ The API contract is maintained in `apps/api-spec/openapi.yaml` (and related file
    - track redemptions/devices
 5. **GitHub Actions update**: backend bootstrap workflow now runs backend tests (including API contract baseline tests in `apps/backend/src/server.contract.test.ts`).
 
-### Phase 3 — Sync semantics and conflict safety
-1. Define merge rules (last-write-wins by `updatedAt` with deterministic tie-break).
-2. Guard writes with row/document locking and transactional updates.
-3. Add incremental sync support (`updatedAfter`) per API spec.
-4. Add idempotency behavior for retried writes from unstable mobile/PWA sessions.
-5. **GitHub Actions update**: add concurrency and sync regression tests to CI (parallel write scenarios + retry/idempotency tests).
+### Phase 3 — Sync semantics and conflict safety ✅ Implemented
+1. Merge rules are implemented as deterministic last-write-wins in `apps/backend/src/routes/lists.ts`:
+   - writes with newer `updatedAt` win
+   - equal `updatedAt` conflicts are resolved by a stable tie-break value derived from item content
+2. Write paths are guarded with transactional row locking (`SELECT ... FOR UPDATE`) before mutating list/item state.
+3. Incremental sync support is implemented via `GET /v1/lists/{shareToken}/items?updatedAfter=...` with deterministic ordering by `updated_at` then `id`.
+4. Idempotency support is implemented for retried item creates via optional `Idempotency-Key` semantics backed by `idempotency_keys` (migration `002_idempotency_keys.sql`).
+5. **GitHub Actions update**: backend CI now exercises sync/conflict and retry/idempotency regression coverage via backend test suite additions in `apps/backend/src/server.integration.test.ts`.
 
 ### Phase 4 — Web app integration
 1. Add API client in `apps/web` for sharing and sync endpoints.
