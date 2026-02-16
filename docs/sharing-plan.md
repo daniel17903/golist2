@@ -24,7 +24,7 @@ The API contract is maintained in `apps/api-spec/openapi.yaml` (and related file
 - Each client keeps a generated `deviceId` UUID for auditing and server-side token redemption tracking.
 - Share links use random UUID share tokens (token IDs).
 - Protected API calls use `Authorization: Bearer <shareToken>`.
-- **Do not require an `X-Device-Id` header.** If device identity is needed for an endpoint, carry it in the API payload/query per the canonical spec.
+- If device identity is needed for an endpoint, require `X-Device-Id` header and do not accept `deviceId` in query parameters.
 
 ### Data model direction
 - Store each shared list as a canonical document with metadata and items.
