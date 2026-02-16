@@ -25,7 +25,11 @@ jobs:
           --health-timeout 5s
           --health-retries 10
     env:
-      DATABASE_URL: postgres://golist:golist@localhost:5432/golist
+      PGHOST: localhost
+      PGUSER: golist
+      PGDATABASE: golist
+      PGPASSWORD: golist
+      PGSSLMODE: disable
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6

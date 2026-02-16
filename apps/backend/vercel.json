@@ -1,6 +1,12 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "installCommand": "npm install",
-  "buildCommand": "export DATABASE_URL=\"$NEON_DATABASE_URL\" && npm run db:migrate && npm run build",
-  "outputDirectory": "dist"
+  "buildCommand": "npm run db:migrate && npm run build",
+  "outputDirectory": "dist",
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/api/index"
+    }
+  ]
 }

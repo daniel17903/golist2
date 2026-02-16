@@ -2,19 +2,82 @@ import { Pool, type PoolClient, type QueryResult, type QueryResultRow } from 'pg
 
 import { env } from '../config/env.js'
 
+function resolveSsl(sslMode: string): false | { rejectUnauthorized: boolean } {
+  if (sslMode === 'disable') {
+    return false
+  }
+
+  return {
+    rejectUnauthorized: sslMode === 'verify-ca' || sslMode === 'verify-full',
+  }
+}
+
+const ssl = resolveSsl(env.PGSSLMODE)
+
+console.info('[db] Creating PostgreSQL pool', {
+  host: env.PGHOST,
+  user: env.PGUSER,
+  database: env.PGDATABASE,
+  sslMode: env.PGSSLMODE,
+})
+
 export const pool = new Pool({
-  connectionString: env.DATABASE_URL,
+  host: env.PGHOST,
+  user: env.PGUSER,
+  database: env.PGDATABASE,
+  password: env.PGPASSWORD,
+  ssl,
+})
+
+pool.on('error', (error) => {
+  console.error('[db] Unexpected PostgreSQL pool error', {
+    message: error.message,
+    stack: error.stack,
+    host: env.PGHOST,
+    user: env.PGUSER,
+    database: env.PGDATABASE,
+    sslMode: env.PGSSLMODE,
+  })
 })
 
 export async function query<T extends QueryResultRow>(
   text: string,
   values?: unknown[],
 ): Promise<QueryResult<T>> {
-  return pool.query<T>(text, values)
+  try {
+    return await pool.query<T>(text, values)
+  } catch (error) {
+    if (error instanceof Error) {
+      console.error('[db] Query failed', {
+        queryText: text,
+        message: error.message,
+        stack: error.stack,
+      })
+    }
+
+    throw error
+  }
 }
 
 export async function withTransaction<T>(work: (client: PoolClient) => Promise<T>): Promise<T> {
-  const client = await pool.connect()
+  let client: PoolClient
+
+  try {
+    client = await pool.connect()
+  } catch (error) {
+    if (error instanceof Error) {
+      console.error('[db] Failed to obtain PostgreSQL client from pool', {
+        message: error.message,
+        stack: error.stack,
+        host: env.PGHOST,
+        user: env.PGUSER,
+        database: env.PGDATABASE,
+        sslMode: env.PGSSLMODE,
+      })
+    }
+
+    throw error
+  }
 
   try {
     await client.query('BEGIN')

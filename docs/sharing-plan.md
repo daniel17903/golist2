@@ -129,7 +129,7 @@ The API contract is maintained in `apps/api-spec/openapi.yaml` (and related file
 - `backend` service
   - build from `apps/backend/Dockerfile`
   - depends_on postgres health
-  - explicit environment variables including `DATABASE_URL`
+  - explicit environment variables including `PGHOST`, `PGUSER`, `PGDATABASE`, `PGPASSWORD`, and optional `PGSSLMODE` (with optional `NEON_`-prefixed fallbacks)
   - exposed API port `3000`
 
 ### Local workflow
@@ -141,6 +141,8 @@ The API contract is maintained in `apps/api-spec/openapi.yaml` (and related file
 - Build immutable backend image tagged by commit SHA.
 - Inject production secrets via environment variables or secret manager.
 - Run Postgres as managed service when possible; keep Compose profile for self-hosted VPS.
+- For Vercel deployments of `apps/backend`, route all paths through `apps/backend/api/index.ts` (rewrite `/(.*)` -> `/api/index`) so Fastify handles requests instead of static/redirect responses.
+- In Vercel backend project settings, keep the root at `apps/backend` and output directory aligned to `dist` (not `apps/backend/dist`) so the Node entrypoint can be discovered after TypeScript build.
 
 ---
 
