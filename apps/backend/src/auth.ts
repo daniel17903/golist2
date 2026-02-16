@@ -21,6 +21,7 @@ declare module 'fastify' {
 const uuidSchema = z.uuid()
 const deviceIdHeaderSchema = z.object({ 'x-device-id': z.uuid() })
 const shareTokenParamsSchema = z.object({ shareToken: z.uuid() })
+const deviceIdQuerySchema = z.object({ deviceId: z.uuid() })
 
 function getBearerToken(request: FastifyRequest): string | null {
   const authHeader = request.headers.authorization
@@ -42,13 +43,18 @@ export function normalizeDeviceId(value: unknown): string {
     : crypto.randomUUID()
 }
 
-function getDeviceIdFromHeaders(request: FastifyRequest): string | null {
+function getDeviceId(request: FastifyRequest): string | null {
   const parsedHeaders = deviceIdHeaderSchema.safeParse(request.headers)
-  if (!parsedHeaders.success) {
-    return null
+  if (parsedHeaders.success) {
+    return parsedHeaders.data['x-device-id']
   }
 
-  return parsedHeaders.data['x-device-id']
+  const parsedQuery = deviceIdQuerySchema.safeParse(request.query)
+  if (parsedQuery.success) {
+    return parsedQuery.data.deviceId
+  }
+
+  return null
 }
 
 async function requireTokenInternal(
@@ -65,7 +71,7 @@ async function requireTokenInternal(
     return
   }
 
-  const deviceId = getDeviceIdFromHeaders(request)
+  const deviceId = getDeviceId(request)
 
   if (!deviceId) {
     reply.code(400).send({ message: 'Invalid request' })

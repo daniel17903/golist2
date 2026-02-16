@@ -22,6 +22,37 @@ const itemUpsertSchema = z.object({
 
 const itemUpdateTieBreakDelimiter = '\u0001'
 
+
+type ListItemRow = {
+  id: string
+  name: string
+  quantity_or_unit: string | null
+  category: string
+  deleted: boolean
+  created_at: string
+  updated_at: string
+}
+
+function serializeListItem(item: ListItemRow) {
+  return {
+    id: item.id,
+    name: item.name,
+    quantityOrUnit: item.quantity_or_unit ?? undefined,
+    category: item.category,
+    deleted: item.deleted,
+    createdAt: item.created_at,
+    updatedAt: item.updated_at,
+  }
+}
+
+async function touchListUpdatedAt(
+  client: { query: (text: string, values?: unknown[]) => Promise<unknown> },
+  listId: string,
+  updatedAt: string,
+) {
+  await client.query('UPDATE shared_lists SET updated_at = GREATEST(updated_at, $2::timestamptz) WHERE id = $1', [listId, updatedAt])
+}
+
 function computeItemTieBreakValue(item: {
   name: string
   quantityOrUnit?: string
@@ -128,15 +159,7 @@ export function registerListRoutes(app: FastifyInstance) {
       return {}
     }
 
-    const itemsResult = await query<{
-      id: string
-      name: string
-      quantity_or_unit: string | null
-      category: string
-      deleted: boolean
-      created_at: string
-      updated_at: string
-    }>(
+    const itemsResult = await query<ListItemRow>(
       `SELECT id, name, quantity_or_unit, category, deleted, created_at, updated_at
          FROM list_items
         WHERE list_id = $1
@@ -151,15 +174,7 @@ export function registerListRoutes(app: FastifyInstance) {
       name: list.name,
       createdAt: list.created_at,
       updatedAt: list.updated_at,
-      items: itemsResult.rows.map((item) => ({
-        id: item.id,
-        name: item.name,
-        quantityOrUnit: item.quantity_or_unit ?? undefined,
-        category: item.category,
-        deleted: item.deleted,
-        createdAt: item.created_at,
-        updatedAt: item.updated_at,
-      })),
+      items: itemsResult.rows.map(serializeListItem),
     }
   })
 
@@ -195,15 +210,7 @@ export function registerListRoutes(app: FastifyInstance) {
   app.get('/v1/lists/:shareToken/items', { preHandler: requireToken }, async (request) => {
     const querystring = z.object({ updatedAfter: z.iso.datetime() }).parse(request.query)
 
-    const itemsResult = await query<{
-      id: string
-      name: string
-      quantity_or_unit: string | null
-      category: string
-      deleted: boolean
-      created_at: string
-      updated_at: string
-    }>(
+    const itemsResult = await query<ListItemRow>(
       `SELECT id, name, quantity_or_unit, category, deleted, created_at, updated_at
          FROM list_items
         WHERE list_id = $1 AND updated_at > $2
@@ -212,29 +219,13 @@ export function registerListRoutes(app: FastifyInstance) {
     )
 
     return {
-      items: itemsResult.rows.map((item) => ({
-        id: item.id,
-        name: item.name,
-        quantityOrUnit: item.quantity_or_unit ?? undefined,
-        category: item.category,
-        deleted: item.deleted,
-        createdAt: item.created_at,
-        updatedAt: item.updated_at,
-      })),
+      items: itemsResult.rows.map(serializeListItem),
     }
   })
 
   app.get('/v1/lists/:shareToken/items/:itemId', { preHandler: requireToken }, async (request, reply) => {
     const params = z.object({ itemId: z.uuid() }).parse(request.params)
-    const itemResult = await query<{
-      id: string
-      name: string
-      quantity_or_unit: string | null
-      category: string
-      deleted: boolean
-      created_at: string
-      updated_at: string
-    }>(
+    const itemResult = await query<ListItemRow>(
       `SELECT id, name, quantity_or_unit, category, deleted, created_at, updated_at
          FROM list_items
         WHERE id = $1 AND list_id = $2
@@ -247,16 +238,7 @@ export function registerListRoutes(app: FastifyInstance) {
       return { message: 'Item not found' }
     }
 
-    const item = itemResult.rows[0]
-    return {
-      id: item.id,
-      name: item.name,
-      quantityOrUnit: item.quantity_or_unit ?? undefined,
-      category: item.category,
-      deleted: item.deleted,
-      createdAt: item.created_at,
-      updatedAt: item.updated_at,
-    }
+    return serializeListItem(itemResult.rows[0])
   })
 
   app.put('/v1/lists/:shareToken/items/:itemId', { preHandler: requireToken }, async (request, reply) => {
@@ -288,10 +270,7 @@ export function registerListRoutes(app: FastifyInstance) {
           ],
         )
 
-        await client.query('UPDATE shared_lists SET updated_at = GREATEST(updated_at, $2::timestamptz) WHERE id = $1', [
-          request.auth!.listId,
-          body.updatedAt,
-        ])
+        await touchListUpdatedAt(client, request.auth!.listId, body.updatedAt)
 
         return { statusCode: 201 }
       }
@@ -331,10 +310,7 @@ export function registerListRoutes(app: FastifyInstance) {
       )
 
       if (updateResult.rowCount) {
-        await client.query('UPDATE shared_lists SET updated_at = GREATEST(updated_at, $2::timestamptz) WHERE id = $1', [
-          request.auth!.listId,
-          body.updatedAt,
-        ])
+        await touchListUpdatedAt(client, request.auth!.listId, body.updatedAt)
       }
 
       return { statusCode: 204 }

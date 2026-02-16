@@ -22,10 +22,16 @@ export const useLongPressItem = ({
   const longPressTimerRef = useRef<number | null>(null);
   const longPressTriggeredRef = useRef(false);
 
-  const handlePointerDown = (itemId: string, name: string, quantityOrUnit?: string) => {
-    if (longPressTimerRef.current) {
-      window.clearTimeout(longPressTimerRef.current);
+  const clearLongPressTimer = () => {
+    if (longPressTimerRef.current === null) {
+      return;
     }
+    window.clearTimeout(longPressTimerRef.current);
+    longPressTimerRef.current = null;
+  };
+
+  const handlePointerDown = (itemId: string, name: string, quantityOrUnit?: string) => {
+    clearLongPressTimer();
     longPressTriggeredRef.current = false;
     longPressTimerRef.current = window.setTimeout(() => {
       longPressTriggeredRef.current = true;
@@ -34,9 +40,7 @@ export const useLongPressItem = ({
   };
 
   const handlePointerUp = (itemId: string) => {
-    if (longPressTimerRef.current) {
-      window.clearTimeout(longPressTimerRef.current);
-    }
+    clearLongPressTimer();
     if (!longPressTriggeredRef.current) {
       void onShortPress(itemId);
     }
@@ -44,9 +48,7 @@ export const useLongPressItem = ({
   };
 
   const handlePointerCancel = () => {
-    if (longPressTimerRef.current) {
-      window.clearTimeout(longPressTimerRef.current);
-    }
+    clearLongPressTimer();
     longPressTriggeredRef.current = false;
   };
 
