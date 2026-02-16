@@ -140,8 +140,8 @@ security:
   - BearerAuth: []
 paths:
   /v1/lists:
-    post:
-      summary: Create list and initial share token
+    put:
+      summary: Create list (idempotent) or update existing list when caller has access
       security: []
       requestBody:
         required: true
@@ -156,6 +156,14 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ListCreateResponse"
+        "200":
+          description: Existing list updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListCreateResponse"
+        "403":
+          description: Existing list update requires caller access to that list
   /v1/lists/{shareToken}:
     parameters:
       - $ref: "#/components/parameters/ShareToken"

@@ -1,3 +1,0 @@
--- Intentionally left blank.
--- Item creation is now handled via PUT /v1/lists/{shareToken}/items/{itemId}
--- with client-generated item IDs, so dedicated idempotency key storage is no longer required.

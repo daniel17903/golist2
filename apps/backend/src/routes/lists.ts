@@ -6,7 +6,7 @@ import { z } from 'zod'
 import { normalizeDeviceId, requireToken } from '../auth.js'
 import { query, withTransaction } from '../db/client.js'
 
-const listCreateSchema = z.object({
+const listPutSchema = z.object({
   listId: z.uuid(),
   name: z.string().min(1),
 })
@@ -26,25 +26,86 @@ function computeItemTieBreakValue(item: { name: string; category: string; delete
 }
 
 export function registerListRoutes(app: FastifyInstance) {
-  app.post('/v1/lists', async (request, reply) => {
-    const body = listCreateSchema.parse(request.body)
-    const tokenId = crypto.randomUUID()
+  app.put('/v1/lists', async (request, reply) => {
+    const body = listPutSchema.parse(request.body)
     const querystring = listCreateQuerySchema.parse(request.query)
     const createdBy = normalizeDeviceId(querystring.deviceId)
 
-    await withTransaction(async (client) => {
-      await client.query(
-        'INSERT INTO shared_lists(id, name, created_by_device_id, created_at, updated_at) VALUES ($1, $2, $3, NOW(), NOW())',
-        [body.listId, body.name, createdBy],
+    const authHeader = request.headers.authorization
+    const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null
+
+    const result = await withTransaction(async (client) => {
+      const existingListResult = await client.query<{
+        id: string
+        created_by_device_id: string
+      }>('SELECT id, created_by_device_id FROM shared_lists WHERE id = $1 FOR UPDATE', [body.listId])
+
+      if (!existingListResult.rowCount) {
+        const tokenId = crypto.randomUUID()
+
+        await client.query(
+          'INSERT INTO shared_lists(id, name, created_by_device_id, created_at, updated_at) VALUES ($1, $2, $3, NOW(), NOW())',
+          [body.listId, body.name, createdBy],
+        )
+        await client.query(
+          'INSERT INTO share_tokens(id, list_id, created_by_device_id, created_at) VALUES ($1, $2, $3, NOW())',
+          [tokenId, body.listId, createdBy],
+        )
+        await client.query(
+          `INSERT INTO share_token_redemptions(token_id, device_id, redeemed_at)
+           VALUES ($1, $2, NOW())
+           ON CONFLICT (token_id, device_id) DO NOTHING`,
+          [tokenId, createdBy],
+        )
+
+        return { statusCode: 201, shareToken: tokenId }
+      }
+
+      if (!querystring.deviceId || !bearerToken) {
+        return { statusCode: 403 as const }
+      }
+
+      const tokenResult = await client.query<{ id: string; list_id: string }>(
+        `SELECT id, list_id
+           FROM share_tokens
+          WHERE id = $1
+            AND list_id = $2
+            AND revoked_at IS NULL
+            AND (expires_at IS NULL OR expires_at > NOW())
+          LIMIT 1`,
+        [bearerToken, body.listId],
       )
-      await client.query(
-        'INSERT INTO share_tokens(id, list_id, created_by_device_id, created_at) VALUES ($1, $2, $3, NOW())',
-        [tokenId, body.listId, createdBy],
+
+      if (!tokenResult.rowCount) {
+        return { statusCode: 403 as const }
+      }
+
+      const accessResult = await client.query(
+        `SELECT 1
+           FROM share_token_redemptions
+          WHERE token_id = $1
+            AND device_id = $2
+          LIMIT 1`,
+        [bearerToken, querystring.deviceId],
       )
+
+      const isCreator = existingListResult.rows[0].created_by_device_id === querystring.deviceId
+
+      if (!accessResult.rowCount && !isCreator) {
+        return { statusCode: 403 as const }
+      }
+
+      await client.query('UPDATE shared_lists SET name = $1, updated_at = NOW() WHERE id = $2', [body.name, body.listId])
+
+      return { statusCode: 200 as const, shareToken: bearerToken }
     })
 
-    reply.code(201)
-    return { listId: body.listId, shareToken: tokenId }
+    reply.code(result.statusCode)
+    if (result.statusCode === 403) {
+      return { message: 'Forbidden' }
+    }
+
+    return { listId: body.listId, shareToken: result.shareToken }
   })
 
   app.get('/v1/lists/:shareToken', { preHandler: requireToken }, async (request) => {

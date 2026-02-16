@@ -39,7 +39,7 @@ describe('backend runtime integration (real postgres)', () => {
 
     const listId = crypto.randomUUID()
     const createResponse = await fetch(`${baseUrl}/v1/lists?deviceId=${testDeviceId}`, {
-      method: 'POST',
+      method: 'PUT',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ listId, name: 'Integration Test List' }),
     })
@@ -81,7 +81,7 @@ describe('backend runtime integration (real postgres)', () => {
   it('creates items via PUT and enforces deterministic LWW tie-break conflicts', async () => {
     const listId = crypto.randomUUID()
     const createResponse = await fetch(`${baseUrl}/v1/lists?deviceId=${testDeviceId}`, {
-      method: 'POST',
+      method: 'PUT',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ listId, name: 'Conflict List' }),
     })
@@ -180,5 +180,28 @@ describe('backend runtime integration (real postgres)', () => {
         updatedAt: sameTimestamp,
       }),
     )
+  })
+
+  it('forbids putting an existing list without a valid access token', async () => {
+    const listId = crypto.randomUUID()
+
+    const createResponse = await fetch(`${baseUrl}/v1/lists?deviceId=${testDeviceId}`, {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ listId, name: 'Owned List' }),
+    })
+
+    expect(createResponse.status).toBe(201)
+
+    const intruderDeviceId = '22222222-2222-4222-8222-222222222222'
+    const forbiddenUpdateResponse = await fetch(`${baseUrl}/v1/lists?deviceId=${intruderDeviceId}`, {
+      method: 'PUT',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ listId, name: 'Should Fail' }),
+    })
+
+    expect(forbiddenUpdateResponse.status).toBe(403)
   })
 })
