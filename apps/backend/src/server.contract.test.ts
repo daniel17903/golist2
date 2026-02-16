@@ -139,9 +139,10 @@ describe('sharing API contract basics', () => {
 
     const response = await app.inject({
       method: 'PUT',
-      url: '/v1/lists/11111111-1111-4111-8111-111111111111/items/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb?deviceId=11111111-1111-4111-8111-111111111111',
+      url: '/v1/lists/11111111-1111-4111-8111-111111111111/items/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
       headers: {
         authorization: 'Bearer 11111111-1111-4111-8111-111111111111',
+        'x-device-id': '11111111-1111-4111-8111-111111111111',
       },
       payload: {
         name: 'Milk',
