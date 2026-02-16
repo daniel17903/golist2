@@ -46,7 +46,8 @@
 - Deploy workflow builds on `main`.
 
 ## Testing expectations
-- Run `npm run lint` and `npm run typecheck` before commit when possible (`-w apps/web` or `-w apps/backend` as appropriate).
+- Always run `npm run typecheck` before commit (`-w apps/web` or `-w apps/backend` as appropriate).
+- Run `npm run lint` before commit when possible (`-w apps/web` or `-w apps/backend` as appropriate).
 - Run `npm run test` for changes to `apps/web/src/domain/`, `apps/web/src/state/`, or `apps/web/src/storage/`.
 - Run `npm run test -w apps/backend` for backend endpoint/config changes.
 - Run `npm run db:migrate -w apps/backend` for backend schema/migration changes.
