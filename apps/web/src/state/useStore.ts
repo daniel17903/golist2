@@ -1,9 +1,22 @@
 import { create } from "zustand";
 import type { AppMetadata, Item, List } from "@golist/shared/domain/types";
+import { getCategoryForItem } from "../domain/categories";
 import { db } from "../storage/db";
 
 const createId = () => crypto.randomUUID();
 const appVersion = __APP_VERSION__;
+
+const getOrCreateDeviceId = (): string => {
+  const storageKey = "golist.deviceId";
+  const existing = localStorage.getItem(storageKey);
+  if (existing) {
+    return existing;
+  }
+
+  const created = crypto.randomUUID();
+  localStorage.setItem(storageKey, created);
+  return created;
+};
 
 type StoreState = {
   lists: List[];
@@ -31,6 +44,7 @@ export const useStore = create<StoreState>((set, get) => ({
     const sortedLists = lists.sort((a, b) => a.createdAt - b.createdAt);
     const metadata: AppMetadata = {
       id: "app",
+      deviceId: getOrCreateDeviceId(),
       appVersion,
       lastOpenedAt: Date.now(),
     };
@@ -88,6 +102,8 @@ export const useStore = create<StoreState>((set, get) => ({
       listId,
       name,
       quantityOrUnit,
+      category: getCategoryForItem(name)?.id ?? "other",
+      deleted: false,
       checked: false,
       createdAt: now,
       updatedAt: now,
@@ -99,7 +115,12 @@ export const useStore = create<StoreState>((set, get) => ({
     const { items } = get();
     const item = items.find((entry) => entry.id === itemId);
     if (!item) {return;}
-    const updated = { ...item, checked: !item.checked, updatedAt: Date.now() };
+    const updated = {
+      ...item,
+      checked: !item.checked,
+      deleted: !item.checked,
+      updatedAt: Date.now(),
+    };
     await db.items.put(updated);
     set((state) => ({
       items: state.items.map((entry) => (entry.id === itemId ? updated : entry)),
@@ -113,6 +134,7 @@ export const useStore = create<StoreState>((set, get) => ({
       ...item,
       name,
       quantityOrUnit,
+      category: getCategoryForItem(name)?.id ?? "other",
       updatedAt: Date.now(),
     };
     await db.items.put(updated);

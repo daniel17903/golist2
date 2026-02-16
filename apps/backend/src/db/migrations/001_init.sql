@@ -9,8 +9,8 @@ CREATE TABLE IF NOT EXISTS shared_lists (
 CREATE TABLE IF NOT EXISTS list_items (
   id UUID PRIMARY KEY,
   list_id UUID NOT NULL REFERENCES shared_lists(id) ON DELETE CASCADE,
-  text TEXT NOT NULL,
-  quantity TEXT,
+  name TEXT NOT NULL,
+  quantity_or_unit TEXT,
   category TEXT NOT NULL DEFAULT 'other',
   deleted BOOLEAN NOT NULL DEFAULT FALSE,
   created_by_device_id UUID NOT NULL,
@@ -47,3 +47,32 @@ CREATE TABLE IF NOT EXISTS migration_history (
   name TEXT NOT NULL UNIQUE,
   applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+
+ALTER TABLE list_items
+  ADD COLUMN IF NOT EXISTS name TEXT;
+
+ALTER TABLE list_items
+  ADD COLUMN IF NOT EXISTS quantity_or_unit TEXT;
+
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_name = 'list_items' AND column_name = 'text'
+  ) THEN
+    EXECUTE 'UPDATE list_items SET name = COALESCE(name, text) WHERE name IS NULL';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_name = 'list_items' AND column_name = 'quantity'
+  ) THEN
+    EXECUTE 'UPDATE list_items SET quantity_or_unit = COALESCE(quantity_or_unit, quantity) WHERE quantity_or_unit IS NULL';
+  END IF;
+END $$;
+
+ALTER TABLE list_items
+  ALTER COLUMN name SET NOT NULL;

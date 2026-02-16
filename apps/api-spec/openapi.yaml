@@ -22,6 +22,7 @@ components:
       required: true
       schema:
         type: string
+        format: uuid
     UpdatedAfter:
       name: updatedAfter
       in: query
@@ -39,11 +40,17 @@ components:
   schemas:
     ListItem:
       type: object
-      required: [id, name, category, deleted, createdAt, updatedAt]
+      required: [id, listId, name, category, deleted, createdAt, updatedAt]
       properties:
         id:
           type: string
+          format: uuid
+        listId:
+          type: string
+          format: uuid
         name:
+          type: string
+        quantityOrUnit:
           type: string
         category:
           type: string
@@ -61,6 +68,7 @@ components:
       properties:
         listId:
           type: string
+          format: uuid
         name:
           type: string
         items:
@@ -88,6 +96,7 @@ components:
       properties:
         listId:
           type: string
+          format: uuid
         shareToken:
           type: string
     ItemUpsertRequest:
@@ -95,6 +104,8 @@ components:
       required: [name, category, deleted, updatedAt]
       properties:
         name:
+          type: string
+        quantityOrUnit:
           type: string
         category:
           type: string
@@ -125,6 +136,7 @@ components:
           type: string
         listId:
           type: string
+          format: uuid
         createdAt:
           type: string
           format: date-time

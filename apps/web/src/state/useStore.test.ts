@@ -3,6 +3,25 @@ import type { Item, List } from "@golist/shared/domain/types";
 
 vi.stubGlobal("__APP_VERSION__", "test-version");
 
+
+const createMemoryStorage = () => {
+  const data = new Map<string, string>();
+  return {
+    getItem: (key: string) => data.get(key) ?? null,
+    setItem: (key: string, value: string) => {
+      data.set(key, value);
+    },
+    removeItem: (key: string) => {
+      data.delete(key);
+    },
+    clear: () => {
+      data.clear();
+    },
+  };
+};
+
+vi.stubGlobal("localStorage", createMemoryStorage());
+
 let listsData: List[] = [];
 let itemsData: Item[] = [];
 const metadataPut = vi.fn();
@@ -76,6 +95,7 @@ describe("useStore", () => {
     itemAdd.mockClear();
     itemPut.mockClear();
     itemsWhere.mockClear();
+    globalThis.localStorage.clear();
     resetStore();
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2024-01-01T00:00:00Z"));
@@ -95,6 +115,8 @@ describe("useStore", () => {
         id: "item-1",
         listId: "a",
         name: "apple",
+        category: "fruitsVegetables",
+        deleted: false,
         checked: false,
         createdAt: 10,
         updatedAt: 10,
@@ -108,6 +130,7 @@ describe("useStore", () => {
     expect(state.items).toHaveLength(1);
     expect(state.activeListId).toBe("a");
     expect(state.metadata?.appVersion).toBe("test-version");
+    expect(state.metadata?.deviceId).toBeTypeOf("string");
     expect(state.isLoaded).toBe(true);
     expect(metadataPut).toHaveBeenCalledTimes(1);
   });
@@ -157,6 +180,8 @@ describe("useStore", () => {
     expect(state.items).toHaveLength(1);
     expect(state.items[0]?.id).toBe("00000000-0000-0000-0000-000000000002");
     expect(state.items[0]?.name).toBe("Milk");
+    expect(state.items[0]?.category).toBe("milkCheese");
+    expect(state.items[0]?.deleted).toBe(false);
     expect(typeof state.items[0]?.createdAt).toBe("number");
     expect(typeof state.items[0]?.updatedAt).toBe("number");
     expect(itemAdd).toHaveBeenCalledTimes(1);
@@ -170,6 +195,8 @@ describe("useStore", () => {
       listId: "list-1",
       name: "Milk",
       quantityOrUnit: "2L",
+      category: "other",
+      deleted: false,
       checked: false,
       createdAt: 1,
       updatedAt: 1,
@@ -181,10 +208,12 @@ describe("useStore", () => {
 
     const state = useStore.getState();
     expect(state.items[0]?.checked).toBe(true);
+    expect(state.items[0]?.deleted).toBe(true);
     expect(itemPut).toHaveBeenCalledWith(
       expect.objectContaining({
         id: "item-1",
         checked: true,
+        deleted: true,
       }),
     );
   });
@@ -199,6 +228,8 @@ describe("useStore", () => {
         id: "item-1",
         listId: "list-1",
         name: "Milk",
+        category: "other",
+        deleted: false,
         checked: false,
         createdAt: 1,
         updatedAt: 1,
@@ -207,6 +238,8 @@ describe("useStore", () => {
         id: "item-2",
         listId: "list-2",
         name: "Apples",
+        category: "fruitsVegetables",
+        deleted: false,
         checked: false,
         createdAt: 2,
         updatedAt: 2,

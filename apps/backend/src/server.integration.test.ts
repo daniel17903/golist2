@@ -117,6 +117,7 @@ describe('backend runtime integration (real postgres)', () => {
         },
         body: JSON.stringify({
           name: 'Milk',
+          quantityOrUnit: '1L',
           category: 'dairy',
           deleted: false,
           updatedAt: createItemTimestamp,
@@ -151,7 +152,13 @@ describe('backend runtime integration (real postgres)', () => {
           ...authHeaders,
           'content-type': 'application/json',
         },
-        body: JSON.stringify({ name: 'Yogurt', category: 'dairy', deleted: false, updatedAt: sameTimestamp }),
+        body: JSON.stringify({
+          name: 'Yogurt',
+          quantityOrUnit: '2',
+          category: 'dairy',
+          deleted: false,
+          updatedAt: sameTimestamp,
+        }),
       }),
       fetch(`${baseUrl}/v1/lists/${createPayload.shareToken}/items/${itemId}`, {
         method: 'PUT',
@@ -159,7 +166,13 @@ describe('backend runtime integration (real postgres)', () => {
           ...authHeaders,
           'content-type': 'application/json',
         },
-        body: JSON.stringify({ name: 'Apple', category: 'produce', deleted: false, updatedAt: sameTimestamp }),
+        body: JSON.stringify({
+          name: 'Apple',
+          quantityOrUnit: '5',
+          category: 'produce',
+          deleted: false,
+          updatedAt: sameTimestamp,
+        }),
       }),
     ])
 
@@ -174,7 +187,9 @@ describe('backend runtime integration (real postgres)', () => {
     expect(await itemResponse.json()).toEqual(
       expect.objectContaining({
         id: itemId,
+        listId,
         name: 'Yogurt',
+        quantityOrUnit: '2',
         category: 'dairy',
         deleted: false,
         updatedAt: sameTimestamp,
