@@ -102,6 +102,7 @@ describe('sharing API contract basics', () => {
         rows: [{ token_id: '11111111-1111-4111-8111-111111111111', list_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' }],
       })
       .mockResolvedValueOnce({ rowCount: 0, rows: [] })
+      .mockResolvedValueOnce({ rowCount: 0, rows: [] })
 
     const response = await app.inject({
       method: 'GET',
@@ -116,6 +117,45 @@ describe('sharing API contract basics', () => {
 
     await app.close()
   })
+
+  it('allows list item updates for the list creator without a redemption record', async () => {
+    const { buildServer } = await import('./server.js')
+    const app = buildServer()
+
+    queryMock
+      .mockResolvedValueOnce({
+        rowCount: 1,
+        rows: [{ token_id: '11111111-1111-4111-8111-111111111111', list_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' }],
+      })
+      .mockResolvedValueOnce({ rowCount: 0, rows: [] })
+      .mockResolvedValueOnce({
+        rowCount: 1,
+        rows: [{ created_by_device_id: '11111111-1111-4111-8111-111111111111' }],
+      })
+      .mockResolvedValueOnce({ rowCount: 1, rows: [{ id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' }] })
+      .mockResolvedValueOnce({ rowCount: 0, rows: [] })
+      .mockResolvedValueOnce({ rowCount: 1, rows: [] })
+      .mockResolvedValueOnce({ rowCount: 1, rows: [] })
+
+    const response = await app.inject({
+      method: 'PUT',
+      url: '/v1/lists/11111111-1111-4111-8111-111111111111/items/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb?deviceId=11111111-1111-4111-8111-111111111111',
+      headers: {
+        authorization: 'Bearer 11111111-1111-4111-8111-111111111111',
+      },
+      payload: {
+        name: 'Milk',
+        category: 'dairy',
+        deleted: false,
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      },
+    })
+
+    expect(response.statusCode).toBe(201)
+
+    await app.close()
+  })
+
 
   it('allows redeem route before token redemption and records redemption', async () => {
     const { buildServer } = await import('./server.js')

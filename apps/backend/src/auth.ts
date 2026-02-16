@@ -97,8 +97,18 @@ async function requireTokenInternal(
     )
 
     if (!redeemedResult.rowCount) {
-      reply.code(403).send({ message: 'Forbidden' })
-      return
+      const creatorResult = await query<{ created_by_device_id: string }>(
+        `SELECT created_by_device_id
+           FROM shared_lists
+          WHERE id = $1
+          LIMIT 1`,
+        [tokenResult.rows[0].list_id],
+      )
+
+      if (!creatorResult.rowCount || creatorResult.rows[0].created_by_device_id !== querystring.data.deviceId) {
+        reply.code(403).send({ message: 'Forbidden' })
+        return
+      }
     }
   }
 
