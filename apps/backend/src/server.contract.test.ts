@@ -12,8 +12,8 @@ describe('sharing API contract basics', () => {
   beforeEach(() => {
     queryMock.mockReset()
     withTransactionMock.mockReset()
-    withTransactionMock.mockImplementation(async (work: (client: { query: typeof queryMock }) => Promise<void>) => {
-      await work({ query: queryMock })
+    withTransactionMock.mockImplementation(async (work: (client: { query: typeof queryMock }) => Promise<unknown>) => {
+      return await work({ query: queryMock })
     })
     queryMock.mockResolvedValue({ rowCount: 1, rows: [] })
   })
@@ -22,19 +22,45 @@ describe('sharing API contract basics', () => {
     const { buildServer } = await import('./server.js')
     const app = buildServer()
 
+    queryMock.mockResolvedValueOnce({ rowCount: 0, rows: [] })
+
     const response = await app.inject({
-      method: 'POST',
+      method: 'PUT',
       url: '/v1/lists',
-      payload: { name: 'Groceries' },
+      payload: { listId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'Groceries' },
     })
 
     expect(response.statusCode).toBe(201)
     expect(response.json()).toEqual(
       expect.objectContaining({
-        listId: expect.any(String),
+        listId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
         shareToken: expect.any(String),
       }),
     )
+
+    await app.close()
+  })
+
+
+
+  it('forbids putting an existing list without access credentials', async () => {
+    const { buildServer } = await import('./server.js')
+    const app = buildServer()
+
+    queryMock.mockResolvedValueOnce({
+      rowCount: 1,
+      rows: [{ id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', created_by_device_id: '11111111-1111-4111-8111-111111111111' }],
+    })
+
+    queryMock.mockResolvedValueOnce({ rowCount: 0, rows: [] })
+
+    const response = await app.inject({
+      method: 'PUT',
+      url: '/v1/lists',
+      payload: { listId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'Groceries' },
+    })
+
+    expect(response.statusCode).toBe(403)
 
     await app.close()
   })

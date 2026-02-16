@@ -121,7 +121,10 @@ describe("useStore", () => {
 
     const state = useStore.getState();
     expect(state.lists).toHaveLength(1);
+    expect(state.lists[0]?.id).toBe("00000000-0000-0000-0000-000000000001");
     expect(state.lists[0]?.name).toBe("Groceries");
+    expect(typeof state.lists[0]?.createdAt).toBe("number");
+    expect(typeof state.lists[0]?.updatedAt).toBe("number");
     expect(state.activeListId).toBe("00000000-0000-0000-0000-000000000001");
     expect(listAdd).toHaveBeenCalledTimes(1);
 
@@ -152,7 +155,10 @@ describe("useStore", () => {
 
     const state = useStore.getState();
     expect(state.items).toHaveLength(1);
+    expect(state.items[0]?.id).toBe("00000000-0000-0000-0000-000000000002");
     expect(state.items[0]?.name).toBe("Milk");
+    expect(typeof state.items[0]?.createdAt).toBe("number");
+    expect(typeof state.items[0]?.updatedAt).toBe("number");
     expect(itemAdd).toHaveBeenCalledTimes(1);
 
     uuidSpy.mockRestore();

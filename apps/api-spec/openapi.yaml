@@ -75,8 +75,11 @@ components:
           format: date-time
     ListCreateRequest:
       type: object
-      required: [name]
+      required: [listId, name]
       properties:
+        listId:
+          type: string
+          format: uuid
         name:
           type: string
     ListCreateResponse:
@@ -87,23 +90,7 @@ components:
           type: string
         shareToken:
           type: string
-    ItemCreateRequest:
-      type: object
-      required: [name, category, deleted]
-      properties:
-        name:
-          type: string
-        category:
-          type: string
-        deleted:
-          type: boolean
-    ItemCreateResponse:
-      type: object
-      required: [itemId]
-      properties:
-        itemId:
-          type: string
-    ItemUpdateRequest:
+    ItemUpsertRequest:
       type: object
       required: [name, category, deleted, updatedAt]
       properties:
@@ -153,8 +140,8 @@ security:
   - BearerAuth: []
 paths:
   /v1/lists:
-    post:
-      summary: Create list and initial share token
+    put:
+      summary: Create list (idempotent) or update existing list when caller has access
       security: []
       requestBody:
         required: true
@@ -169,6 +156,14 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ListCreateResponse"
+        "200":
+          description: Existing list updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListCreateResponse"
+        "403":
+          description: Existing list update requires caller access to that list
   /v1/lists/{shareToken}:
     parameters:
       - $ref: "#/components/parameters/ShareToken"
@@ -219,21 +214,6 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UpdatedItemsResponse"
-    post:
-      summary: Add item to list
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/ItemCreateRequest"
-      responses:
-        "201":
-          description: Item created
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ItemCreateResponse"
   /v1/lists/{shareToken}/items/{itemId}:
     parameters:
       - $ref: "#/components/parameters/ShareToken"
@@ -249,16 +229,20 @@ paths:
               schema:
                 $ref: "#/components/schemas/ListItem"
     put:
-      summary: Update item in list
+      summary: Upsert item in list (create or update by client-provided itemId)
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/ItemUpdateRequest"
+              $ref: "#/components/schemas/ItemUpsertRequest"
       responses:
+        "201":
+          description: Item created
         "204":
           description: Item updated
+        "409":
+          description: Item id belongs to another list
   /v1/share-tokens/{shareToken}/redeem:
     parameters:
       - $ref: "#/components/parameters/ShareToken"
