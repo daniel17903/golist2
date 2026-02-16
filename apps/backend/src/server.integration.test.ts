@@ -118,7 +118,23 @@ describe('backend runtime integration (real postgres)', () => {
 
     const { itemId } = z.object({ itemId: z.string().uuid() }).parse(await createItemResponse.json())
 
-    const sameTimestamp = new Date('2026-01-01T00:00:00.000Z').toISOString()
+    const baselineItemResponse = await fetch(
+      `${baseUrl}/v1/lists/${createPayload.shareToken}/items/${itemId}?deviceId=${testDeviceId}`,
+      {
+        headers: authHeaders,
+      },
+    )
+
+    expect(baselineItemResponse.status).toBe(200)
+
+    const baselineItem = z
+      .object({
+        id: z.string().uuid(),
+        updatedAt: z.string().datetime(),
+      })
+      .parse(await baselineItemResponse.json())
+
+    const sameTimestamp = new Date(Date.parse(baselineItem.updatedAt) + 60_000).toISOString()
 
     const [largerTieBreakUpdateResponse, smallerTieBreakUpdateResponse] = await Promise.all([
       fetch(`${baseUrl}/v1/lists/${createPayload.shareToken}/items/${itemId}?deviceId=${testDeviceId}`, {
