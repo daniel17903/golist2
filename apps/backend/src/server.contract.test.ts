@@ -35,7 +35,7 @@ describe('sharing API contract basics', () => {
     expect(response.json()).toEqual(
       expect.objectContaining({
         listId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
-        shareToken: expect.any(String),
+        shareToken: expect.stringMatching(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i),
       }),
     )
 
@@ -44,7 +44,7 @@ describe('sharing API contract basics', () => {
 
 
 
-  it('forbids putting an existing list without access credentials', async () => {
+  it('rejects putting an existing list without required X-Device-Id header', async () => {
     const { buildServer } = await import('./server.js')
     const app = buildServer()
 
@@ -61,7 +61,7 @@ describe('sharing API contract basics', () => {
       payload: { listId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'Groceries' },
     })
 
-    expect(response.statusCode).toBe(403)
+    expect(response.statusCode).toBe(400)
 
     await app.close()
   })
