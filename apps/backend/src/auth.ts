@@ -105,7 +105,7 @@ async function requireTokenInternal(
         [tokenResult.rows[0].list_id],
       )
 
-      if (!creatorResult.rowCount || creatorResult.rows[0].created_by_device_id !== querystring.data.deviceId) {
+      if (!creatorResult.rowCount || creatorResult.rows[0].created_by_device_id !== deviceId) {
         reply.code(403).send({ message: 'Forbidden' })
         return
       }
