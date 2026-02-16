@@ -3,7 +3,7 @@ import crypto from 'node:crypto'
 import { type FastifyInstance } from 'fastify'
 import { z } from 'zod'
 
-import { normalizeDeviceId, requireToken } from '../auth.js'
+import { requireToken } from '../auth.js'
 import { query, withTransaction } from '../db/client.js'
 
 const listPutSchema = z.object({
@@ -11,7 +11,7 @@ const listPutSchema = z.object({
   name: z.string().min(1),
 })
 const listNameUpdateSchema = z.object({ name: z.string().min(1) })
-const listCreateHeadersSchema = z.object({ 'x-device-id': z.uuid().optional() })
+const listCreateHeadersSchema = z.object({ 'x-device-id': z.uuid() })
 const itemUpsertSchema = z.object({
   name: z.string().min(1),
   category: z.string().min(1),
@@ -29,7 +29,7 @@ export function registerListRoutes(app: FastifyInstance) {
   app.put('/v1/lists', async (request, reply) => {
     const body = listPutSchema.parse(request.body)
     const headers = listCreateHeadersSchema.parse(request.headers)
-    const createdBy = normalizeDeviceId(headers['x-device-id'])
+    const createdBy = headers['x-device-id']
 
     const authHeader = request.headers.authorization
     const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null
@@ -61,7 +61,7 @@ export function registerListRoutes(app: FastifyInstance) {
         return { statusCode: 201, shareToken: tokenId }
       }
 
-      if (!headers['x-device-id'] || !bearerToken) {
+      if (!bearerToken) {
         return { statusCode: 403 as const }
       }
 
@@ -215,7 +215,7 @@ export function registerListRoutes(app: FastifyInstance) {
   })
 
   app.get('/v1/lists/:shareToken/items/:itemId', { preHandler: requireToken }, async (request, reply) => {
-    const params = z.object({ itemId: z.string().min(1) }).parse(request.params)
+    const params = z.object({ itemId: z.uuid() }).parse(request.params)
     const itemResult = await query<{
       id: string
       name: string

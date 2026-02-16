@@ -20,7 +20,7 @@ declare module 'fastify' {
 
 const uuidSchema = z.uuid()
 const deviceIdHeaderSchema = z.object({ 'x-device-id': z.uuid() })
-const shareTokenParamsSchema = z.object({ shareToken: z.string().min(1) })
+const shareTokenParamsSchema = z.object({ shareToken: z.uuid() })
 
 function getBearerToken(request: FastifyRequest): string | null {
   const authHeader = request.headers.authorization
@@ -33,7 +33,7 @@ function getBearerToken(request: FastifyRequest): string | null {
     return null
   }
 
-  return token
+  return uuidSchema.safeParse(token).success ? token : null
 }
 
 export function normalizeDeviceId(value: unknown): string {

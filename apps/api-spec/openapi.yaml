@@ -16,12 +16,14 @@ components:
       required: true
       schema:
         type: string
+        format: uuid
     ItemId:
       name: itemId
       in: path
       required: true
       schema:
         type: string
+        format: uuid
     UpdatedAfter:
       name: updatedAfter
       in: query
@@ -43,6 +45,7 @@ components:
       properties:
         id:
           type: string
+          format: uuid
         name:
           type: string
         category:
@@ -61,6 +64,7 @@ components:
       properties:
         listId:
           type: string
+          format: uuid
         name:
           type: string
         items:
@@ -88,8 +92,10 @@ components:
       properties:
         listId:
           type: string
+          format: uuid
         shareToken:
           type: string
+          format: uuid
     ItemUpsertRequest:
       type: object
       required: [name, category, deleted, updatedAt]
@@ -123,8 +129,10 @@ components:
       properties:
         tokenId:
           type: string
+          format: uuid
         listId:
           type: string
+          format: uuid
         createdAt:
           type: string
           format: date-time
@@ -136,6 +144,7 @@ components:
           properties:
             shareToken:
               type: string
+              format: uuid
 security:
   - BearerAuth: []
 paths:
