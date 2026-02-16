@@ -34,7 +34,6 @@ export type ShareTokenRecord = {
 
 export type ApiListItem = {
   id: string;
-  listId: string;
   name: string;
   quantityOrUnit?: string;
   category: string;

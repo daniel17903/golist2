@@ -130,7 +130,6 @@ export function registerListRoutes(app: FastifyInstance) {
 
     const itemsResult = await query<{
       id: string
-      list_id: string
       name: string
       quantity_or_unit: string | null
       category: string
@@ -138,7 +137,7 @@ export function registerListRoutes(app: FastifyInstance) {
       created_at: string
       updated_at: string
     }>(
-      `SELECT id, list_id, name, quantity_or_unit, category, deleted, created_at, updated_at
+      `SELECT id, name, quantity_or_unit, category, deleted, created_at, updated_at
          FROM list_items
         WHERE list_id = $1
         ORDER BY created_at ASC, id ASC`,
@@ -154,7 +153,6 @@ export function registerListRoutes(app: FastifyInstance) {
       updatedAt: list.updated_at,
       items: itemsResult.rows.map((item) => ({
         id: item.id,
-        listId: item.list_id,
         name: item.name,
         quantityOrUnit: item.quantity_or_unit ?? undefined,
         category: item.category,
@@ -199,7 +197,6 @@ export function registerListRoutes(app: FastifyInstance) {
 
     const itemsResult = await query<{
       id: string
-      list_id: string
       name: string
       quantity_or_unit: string | null
       category: string
@@ -207,7 +204,7 @@ export function registerListRoutes(app: FastifyInstance) {
       created_at: string
       updated_at: string
     }>(
-      `SELECT id, list_id, name, quantity_or_unit, category, deleted, created_at, updated_at
+      `SELECT id, name, quantity_or_unit, category, deleted, created_at, updated_at
          FROM list_items
         WHERE list_id = $1 AND updated_at > $2
         ORDER BY updated_at ASC, id ASC`,
@@ -217,7 +214,6 @@ export function registerListRoutes(app: FastifyInstance) {
     return {
       items: itemsResult.rows.map((item) => ({
         id: item.id,
-        listId: item.list_id,
         name: item.name,
         quantityOrUnit: item.quantity_or_unit ?? undefined,
         category: item.category,
@@ -232,7 +228,6 @@ export function registerListRoutes(app: FastifyInstance) {
     const params = z.object({ itemId: z.uuid() }).parse(request.params)
     const itemResult = await query<{
       id: string
-      list_id: string
       name: string
       quantity_or_unit: string | null
       category: string
@@ -240,7 +235,7 @@ export function registerListRoutes(app: FastifyInstance) {
       created_at: string
       updated_at: string
     }>(
-      `SELECT id, list_id, name, quantity_or_unit, category, deleted, created_at, updated_at
+      `SELECT id, name, quantity_or_unit, category, deleted, created_at, updated_at
          FROM list_items
         WHERE id = $1 AND list_id = $2
         LIMIT 1`,
@@ -255,7 +250,6 @@ export function registerListRoutes(app: FastifyInstance) {
     const item = itemResult.rows[0]
     return {
       id: item.id,
-      listId: item.list_id,
       name: item.name,
       quantityOrUnit: item.quantity_or_unit ?? undefined,
       category: item.category,

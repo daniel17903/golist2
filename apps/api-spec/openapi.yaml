@@ -40,12 +40,9 @@ components:
   schemas:
     ListItem:
       type: object
-      required: [id, listId, name, category, deleted, createdAt, updatedAt]
+      required: [id, name, category, deleted, createdAt, updatedAt]
       properties:
         id:
-          type: string
-          format: uuid
-        listId:
           type: string
           format: uuid
         name:

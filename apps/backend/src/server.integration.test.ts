@@ -71,7 +71,6 @@ describe('backend runtime integration (real postgres)', () => {
     expect(listResponse.status).toBe(200)
     expect(await listResponse.json()).toEqual(
       expect.objectContaining({
-        listId,
         name: 'Integration Test List',
         items: [],
       }),
@@ -187,7 +186,6 @@ describe('backend runtime integration (real postgres)', () => {
     expect(await itemResponse.json()).toEqual(
       expect.objectContaining({
         id: itemId,
-        listId,
         name: 'Yogurt',
         quantityOrUnit: '2',
         category: 'dairy',
