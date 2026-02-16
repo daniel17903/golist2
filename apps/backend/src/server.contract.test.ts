@@ -25,13 +25,13 @@ describe('sharing API contract basics', () => {
     const response = await app.inject({
       method: 'POST',
       url: '/v1/lists',
-      payload: { name: 'Groceries' },
+      payload: { listId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'Groceries' },
     })
 
     expect(response.statusCode).toBe(201)
     expect(response.json()).toEqual(
       expect.objectContaining({
-        listId: expect.any(String),
+        listId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
         shareToken: expect.any(String),
       }),
     )

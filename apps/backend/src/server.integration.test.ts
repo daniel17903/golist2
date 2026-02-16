@@ -1,3 +1,5 @@
+import crypto from 'node:crypto'
+
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { z } from 'zod'
 
@@ -35,10 +37,11 @@ describe('backend runtime integration (real postgres)', () => {
     expect(healthResponse.status).toBe(200)
     expect(await healthResponse.json()).toEqual({ status: 'ok' })
 
+    const listId = crypto.randomUUID()
     const createResponse = await fetch(`${baseUrl}/v1/lists?deviceId=${testDeviceId}`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ name: 'Integration Test List' }),
+      body: JSON.stringify({ listId, name: 'Integration Test List' }),
     })
 
     expect(createResponse.status).toBe(201)
@@ -47,12 +50,7 @@ describe('backend runtime integration (real postgres)', () => {
       .object({ listId: z.string().uuid(), shareToken: z.string().uuid() })
       .parse(await createResponse.json())
 
-    expect(createPayload.listId).toMatch(
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
-    )
-    expect(createPayload.shareToken).toMatch(
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
-    )
+    expect(createPayload.listId).toBe(listId)
 
     const authHeaders = { authorization: `Bearer ${createPayload.shareToken}` }
 
@@ -73,18 +71,19 @@ describe('backend runtime integration (real postgres)', () => {
     expect(listResponse.status).toBe(200)
     expect(await listResponse.json()).toEqual(
       expect.objectContaining({
-        listId: createPayload.listId,
+        listId,
         name: 'Integration Test List',
         items: [],
       }),
     )
   })
 
-  it('enforces deterministic LWW item updates with tie-break protection for conflicts', async () => {
+  it('creates items via PUT and enforces deterministic LWW tie-break conflicts', async () => {
+    const listId = crypto.randomUUID()
     const createResponse = await fetch(`${baseUrl}/v1/lists?deviceId=${testDeviceId}`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ name: 'Conflict List' }),
+      body: JSON.stringify({ listId, name: 'Conflict List' }),
     })
 
     expect(createResponse.status).toBe(201)
@@ -105,18 +104,27 @@ describe('backend runtime integration (real postgres)', () => {
 
     expect(redeemResponse.status).toBe(204)
 
-    const createItemResponse = await fetch(`${baseUrl}/v1/lists/${createPayload.shareToken}/items?deviceId=${testDeviceId}`, {
-      method: 'POST',
-      headers: {
-        ...authHeaders,
-        'content-type': 'application/json',
+    const itemId = crypto.randomUUID()
+    const createItemTimestamp = new Date().toISOString()
+
+    const createItemResponse = await fetch(
+      `${baseUrl}/v1/lists/${createPayload.shareToken}/items/${itemId}?deviceId=${testDeviceId}`,
+      {
+        method: 'PUT',
+        headers: {
+          ...authHeaders,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: 'Milk',
+          category: 'dairy',
+          deleted: false,
+          updatedAt: createItemTimestamp,
+        }),
       },
-      body: JSON.stringify({ name: 'Milk', category: 'dairy', deleted: false }),
-    })
+    )
 
     expect(createItemResponse.status).toBe(201)
-
-    const { itemId } = z.object({ itemId: z.string().uuid() }).parse(await createItemResponse.json())
 
     const baselineItemResponse = await fetch(
       `${baseUrl}/v1/lists/${createPayload.shareToken}/items/${itemId}?deviceId=${testDeviceId}`,
@@ -172,78 +180,5 @@ describe('backend runtime integration (real postgres)', () => {
         updatedAt: sameTimestamp,
       }),
     )
-  })
-
-  it('supports idempotency keys for retried item creation writes', async () => {
-    const createResponse = await fetch(`${baseUrl}/v1/lists?deviceId=${testDeviceId}`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ name: 'Idempotency List' }),
-    })
-
-    expect(createResponse.status).toBe(201)
-
-    const createPayload = z
-      .object({ listId: z.string().uuid(), shareToken: z.string().uuid() })
-      .parse(await createResponse.json())
-
-    const authHeaders = { authorization: `Bearer ${createPayload.shareToken}` }
-
-    const redeemResponse = await fetch(
-      `${baseUrl}/v1/share-tokens/${createPayload.shareToken}/redeem?deviceId=${testDeviceId}`,
-      {
-        method: 'POST',
-        headers: authHeaders,
-      },
-    )
-
-    expect(redeemResponse.status).toBe(204)
-
-    const itemPayload = { name: 'Bread', category: 'bakery', deleted: false }
-
-    const firstCreateResponse = await fetch(`${baseUrl}/v1/lists/${createPayload.shareToken}/items?deviceId=${testDeviceId}`, {
-      method: 'POST',
-      headers: {
-        ...authHeaders,
-        'content-type': 'application/json',
-        'idempotency-key': 'retry-key-1',
-      },
-      body: JSON.stringify(itemPayload),
-    })
-
-    expect(firstCreateResponse.status).toBe(201)
-
-    const firstCreateBody = z.object({ itemId: z.string().uuid() }).parse(await firstCreateResponse.json())
-
-    const retriedCreateResponse = await fetch(`${baseUrl}/v1/lists/${createPayload.shareToken}/items?deviceId=${testDeviceId}`, {
-      method: 'POST',
-      headers: {
-        ...authHeaders,
-        'content-type': 'application/json',
-        'idempotency-key': 'retry-key-1',
-      },
-      body: JSON.stringify(itemPayload),
-    })
-
-    expect(retriedCreateResponse.status).toBe(201)
-
-    const retriedCreateBody = z.object({ itemId: z.string().uuid() }).parse(await retriedCreateResponse.json())
-
-    expect(retriedCreateBody.itemId).toBe(firstCreateBody.itemId)
-
-    const conflictingRetryResponse = await fetch(
-      `${baseUrl}/v1/lists/${createPayload.shareToken}/items?deviceId=${testDeviceId}`,
-      {
-        method: 'POST',
-        headers: {
-          ...authHeaders,
-          'content-type': 'application/json',
-          'idempotency-key': 'retry-key-1',
-        },
-        body: JSON.stringify({ name: 'Bagel', category: 'bakery', deleted: false }),
-      },
-    )
-
-    expect(conflictingRetryResponse.status).toBe(409)
   })
 })

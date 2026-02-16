@@ -6,30 +6,20 @@ import { z } from 'zod'
 import { normalizeDeviceId, requireToken } from '../auth.js'
 import { query, withTransaction } from '../db/client.js'
 
-const listCreateSchema = z.object({ name: z.string().min(1) })
-const listNameUpdateSchema = z.object({ name: z.string().min(1) })
-const itemCreateSchema = z.object({
+const listCreateSchema = z.object({
+  listId: z.uuid(),
   name: z.string().min(1),
-  category: z.string().min(1),
-  deleted: z.boolean(),
 })
+const listNameUpdateSchema = z.object({ name: z.string().min(1) })
 const listCreateQuerySchema = z.object({ deviceId: z.uuid().optional() })
-const itemUpdateSchema = z.object({
+const itemUpsertSchema = z.object({
   name: z.string().min(1),
   category: z.string().min(1),
   deleted: z.boolean(),
   updatedAt: z.iso.datetime(),
 })
 
-const idempotencyHeadersSchema = z.object({
-  'idempotency-key': z.string().trim().min(1).max(200).optional(),
-})
-
 const itemUpdateTieBreakDelimiter = '\u0001'
-
-function computeRequestHash(payload: unknown): string {
-  return crypto.createHash('sha256').update(JSON.stringify(payload)).digest('hex')
-}
 
 function computeItemTieBreakValue(item: { name: string; category: string; deleted: boolean }): string {
   return `${item.name}${itemUpdateTieBreakDelimiter}${item.category}${itemUpdateTieBreakDelimiter}${item.deleted}`
@@ -38,7 +28,6 @@ function computeItemTieBreakValue(item: { name: string; category: string; delete
 export function registerListRoutes(app: FastifyInstance) {
   app.post('/v1/lists', async (request, reply) => {
     const body = listCreateSchema.parse(request.body)
-    const listId = crypto.randomUUID()
     const tokenId = crypto.randomUUID()
     const querystring = listCreateQuerySchema.parse(request.query)
     const createdBy = normalizeDeviceId(querystring.deviceId)
@@ -46,16 +35,16 @@ export function registerListRoutes(app: FastifyInstance) {
     await withTransaction(async (client) => {
       await client.query(
         'INSERT INTO shared_lists(id, name, created_by_device_id, created_at, updated_at) VALUES ($1, $2, $3, NOW(), NOW())',
-        [listId, body.name, createdBy],
+        [body.listId, body.name, createdBy],
       )
       await client.query(
         'INSERT INTO share_tokens(id, list_id, created_by_device_id, created_at) VALUES ($1, $2, $3, NOW())',
-        [tokenId, listId, createdBy],
+        [tokenId, body.listId, createdBy],
       )
     })
 
     reply.code(201)
-    return { listId, shareToken: tokenId }
+    return { listId: body.listId, shareToken: tokenId }
   })
 
   app.get('/v1/lists/:shareToken', { preHandler: requireToken }, async (request) => {
@@ -164,97 +153,6 @@ export function registerListRoutes(app: FastifyInstance) {
     }
   })
 
-  app.post('/v1/lists/:shareToken/items', { preHandler: requireToken }, async (request, reply) => {
-    const body = itemCreateSchema.parse(request.body)
-    const createdBy = request.auth!.deviceId
-    const idempotencyHeaders = idempotencyHeadersSchema.parse(request.headers)
-    const idempotencyKey = idempotencyHeaders['idempotency-key']
-
-    if (!idempotencyKey) {
-      const itemId = crypto.randomUUID()
-
-      await withTransaction(async (client) => {
-        await client.query('SELECT id FROM shared_lists WHERE id = $1 FOR UPDATE', [request.auth!.listId])
-        await client.query(
-          `INSERT INTO list_items(id, list_id, text, category, deleted, created_by_device_id, created_at, updated_at, deleted_at)
-           VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW(), CASE WHEN $5 THEN NOW() ELSE NULL END)`,
-          [itemId, request.auth!.listId, body.name, body.category, body.deleted, createdBy],
-        )
-        await client.query('UPDATE shared_lists SET updated_at = NOW() WHERE id = $1', [request.auth!.listId])
-      })
-
-      reply.code(201)
-      return { itemId }
-    }
-
-    const requestHash = computeRequestHash(body)
-
-    const result = await withTransaction(async (client) => {
-      await client.query('SELECT id FROM shared_lists WHERE id = $1 FOR UPDATE', [request.auth!.listId])
-
-      const existingIdempotencyRecord = await client.query<{ response_code: number; response_body: { itemId: string }; request_hash: string }>(
-        `SELECT response_code, response_body, request_hash
-           FROM idempotency_keys
-          WHERE token_id = $1
-            AND device_id = $2
-            AND route = $3
-            AND idempotency_key = $4
-          FOR UPDATE`,
-        [request.auth!.tokenId, request.auth!.deviceId, '/v1/lists/:shareToken/items', idempotencyKey],
-      )
-
-      if (existingIdempotencyRecord.rowCount) {
-        const [record] = existingIdempotencyRecord.rows
-
-        if (record.request_hash !== requestHash) {
-          return {
-            statusCode: 409,
-            payload: { message: 'Idempotency key reuse with different payload is not allowed' },
-          }
-        }
-
-        return {
-          statusCode: record.response_code,
-          payload: record.response_body,
-        }
-      }
-
-      const itemId = crypto.randomUUID()
-
-      await client.query(
-        `INSERT INTO list_items(id, list_id, text, category, deleted, created_by_device_id, created_at, updated_at, deleted_at)
-         VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW(), CASE WHEN $5 THEN NOW() ELSE NULL END)`,
-        [itemId, request.auth!.listId, body.name, body.category, body.deleted, createdBy],
-      )
-
-      await client.query('UPDATE shared_lists SET updated_at = NOW() WHERE id = $1', [request.auth!.listId])
-
-      const payload = { itemId }
-
-      await client.query(
-        `INSERT INTO idempotency_keys(token_id, device_id, route, idempotency_key, request_hash, response_code, response_body, created_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, NOW())`,
-        [
-          request.auth!.tokenId,
-          request.auth!.deviceId,
-          '/v1/lists/:shareToken/items',
-          idempotencyKey,
-          requestHash,
-          201,
-          JSON.stringify(payload),
-        ],
-      )
-
-      return {
-        statusCode: 201,
-        payload,
-      }
-    })
-
-    reply.code(result.statusCode)
-    return result.payload
-  })
-
   app.get('/v1/lists/:shareToken/items/:itemId', { preHandler: requireToken }, async (request, reply) => {
     const params = z.object({ itemId: z.string().min(1) }).parse(request.params)
     const itemResult = await query<{
@@ -289,12 +187,36 @@ export function registerListRoutes(app: FastifyInstance) {
   })
 
   app.put('/v1/lists/:shareToken/items/:itemId', { preHandler: requireToken }, async (request, reply) => {
-    const params = z.object({ itemId: z.string().min(1) }).parse(request.params)
-    const body = itemUpdateSchema.parse(request.body)
+    const params = z.object({ itemId: z.uuid() }).parse(request.params)
+    const body = itemUpsertSchema.parse(request.body)
     const tieBreakValue = computeItemTieBreakValue(body)
 
-    await withTransaction(async (client) => {
+    const result = await withTransaction(async (client) => {
       await client.query('SELECT id FROM shared_lists WHERE id = $1 FOR UPDATE', [request.auth!.listId])
+
+      const existingItemResult = await client.query<{
+        id: string
+        list_id: string
+      }>('SELECT id, list_id FROM list_items WHERE id = $1 FOR UPDATE', [params.itemId])
+
+      if (!existingItemResult.rowCount) {
+        await client.query(
+          `INSERT INTO list_items(id, list_id, text, category, deleted, created_by_device_id, created_at, updated_at, deleted_at)
+           VALUES ($1, $2, $3, $4, $5, $6, NOW(), $7, CASE WHEN $5 THEN NOW() ELSE NULL END)`,
+          [params.itemId, request.auth!.listId, body.name, body.category, body.deleted, request.auth!.deviceId, body.updatedAt],
+        )
+
+        await client.query('UPDATE shared_lists SET updated_at = GREATEST(updated_at, $2::timestamptz) WHERE id = $1', [
+          request.auth!.listId,
+          body.updatedAt,
+        ])
+
+        return { statusCode: 201 }
+      }
+
+      if (existingItemResult.rows[0].list_id !== request.auth!.listId) {
+        return { statusCode: 409 }
+      }
 
       const updateResult = await client.query(
         `UPDATE list_items
@@ -312,7 +234,16 @@ export function registerListRoutes(app: FastifyInstance) {
                 AND CONCAT_WS($8, text, category, deleted::text) < $7
               )
             )`,
-        [body.name, body.category, body.deleted, body.updatedAt, params.itemId, request.auth!.listId, tieBreakValue, itemUpdateTieBreakDelimiter],
+        [
+          body.name,
+          body.category,
+          body.deleted,
+          body.updatedAt,
+          params.itemId,
+          request.auth!.listId,
+          tieBreakValue,
+          itemUpdateTieBreakDelimiter,
+        ],
       )
 
       if (updateResult.rowCount) {
@@ -321,8 +252,13 @@ export function registerListRoutes(app: FastifyInstance) {
           body.updatedAt,
         ])
       }
+
+      return { statusCode: 204 }
     })
 
-    reply.code(204)
+    reply.code(result.statusCode)
+    if (result.statusCode === 409) {
+      return { message: 'Item id belongs to another list' }
+    }
   })
 }

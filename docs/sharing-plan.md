@@ -81,8 +81,8 @@ The API contract is maintained in `apps/api-spec/openapi.yaml` (and related file
    - equal `updatedAt` conflicts are resolved by a stable tie-break value derived from item content
 2. Write paths are guarded with transactional row locking (`SELECT ... FOR UPDATE`) before mutating list/item state.
 3. Incremental sync support is implemented via `GET /v1/lists/{shareToken}/items?updatedAfter=...` with deterministic ordering by `updated_at` then `id`.
-4. Idempotency support is implemented for retried item creates via optional `Idempotency-Key` semantics backed by `idempotency_keys` (migration `002_idempotency_keys.sql`).
-5. **GitHub Actions update**: backend CI now exercises sync/conflict and retry/idempotency regression coverage via backend test suite additions in `apps/backend/src/server.integration.test.ts`.
+4. Item creation now uses client-generated IDs with `PUT /v1/lists/{shareToken}/items/{itemId}` (upsert semantics), removing the need for backend idempotency key storage.
+5. **GitHub Actions update**: backend CI now exercises sync/conflict regression coverage for deterministic upsert behavior in `apps/backend/src/server.integration.test.ts`.
 
 ### Phase 4 — Web app integration
 1. Add API client in `apps/web` for sharing and sync endpoints.
