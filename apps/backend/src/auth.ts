@@ -46,7 +46,6 @@ async function requireTokenInternal(
   request: FastifyRequest,
   reply: FastifyReply,
   requireRedeemedAccess: boolean,
-  allowCreatorAccess: boolean,
 ) {
   const bearerToken = getBearerToken(request)
   const params = shareTokenParamsSchema.safeParse(request.params)
@@ -89,11 +88,6 @@ async function requireTokenInternal(
     )
 
     if (!redeemedResult.rowCount) {
-      if (!allowCreatorAccess) {
-        reply.code(403).send({ message: 'Forbidden' })
-        return
-      }
-
       const creatorResult = await query<{ created_by_device_id: string }>(
         `SELECT created_by_device_id
            FROM shared_lists
@@ -118,13 +112,9 @@ async function requireTokenInternal(
 }
 
 export async function requireToken(request: FastifyRequest, reply: FastifyReply) {
-  await requireTokenInternal(request, reply, true, false)
-}
-
-export async function requireTokenForListUpdates(request: FastifyRequest, reply: FastifyReply) {
-  await requireTokenInternal(request, reply, true, true)
+  await requireTokenInternal(request, reply, true)
 }
 
 export async function requireTokenForRedeem(request: FastifyRequest, reply: FastifyReply) {
-  await requireTokenInternal(request, reply, false, false)
+  await requireTokenInternal(request, reply, false)
 }
