@@ -9,8 +9,7 @@
     "preview": "vite preview",
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run",
-    "test:integration": "vitest run src/integration/sharing.integration.test.ts"
+    "test": "vitest run"
   },
   "dependencies": {
     "@golist/shared": "0.1.0",

@@ -14,7 +14,19 @@ const readApiBaseUrl = () => {
   return "http://localhost:3000";
 };
 
+const readRequestTimeoutMs = () => {
+  const configured = Reflect.get(import.meta.env, "VITE_API_TIMEOUT_MS");
+  if (typeof configured === "string") {
+    const parsed = Number.parseInt(configured, 10);
+    if (Number.isFinite(parsed) && parsed > 0) {
+      return parsed;
+    }
+  }
+  return 4000;
+};
+
 const apiBaseUrl = readApiBaseUrl();
+const requestTimeoutMs = readRequestTimeoutMs();
 
 const createHeaders = (deviceId: string, shareToken?: string) => {
   const headers: HeadersInit = {
@@ -52,6 +64,24 @@ const readBoolean = (payload: unknown, key: string): boolean | null => {
   }
   const value = Reflect.get(payload, key);
   return typeof value === "boolean" ? value : null;
+};
+
+const fetchWithTimeout = async (url: string, options: RequestInit, context: string) => {
+  const controller = new AbortController();
+  const timeout = globalThis.setTimeout(() => {
+    controller.abort();
+  }, requestTimeoutMs);
+
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new Error(`${context} timed out after ${requestTimeoutMs}ms`);
+    }
+    throw error;
+  } finally {
+    globalThis.clearTimeout(timeout);
+  }
 };
 
 const parseApiListItem = (payload: unknown): ApiListItem => {
@@ -105,31 +135,43 @@ export const sharingApiClient = {
     body: ApiListUpsertRequest;
     shareToken?: string;
   }): Promise<ApiListUpsertResponse> {
-    const response = await fetch(`${apiBaseUrl}/v1/lists`, {
-      method: "PUT",
-      headers: createHeaders(params.deviceId, params.shareToken),
-      body: JSON.stringify(params.body),
-    });
+    const response = await fetchWithTimeout(
+      `${apiBaseUrl}/v1/lists`,
+      {
+        method: "PUT",
+        headers: createHeaders(params.deviceId, params.shareToken),
+        body: JSON.stringify(params.body),
+      },
+      "list upsert",
+    );
     await assertOk(response, "list upsert");
     return parseListUpsertResponse(await response.json());
   },
 
   async fetchList(params: { deviceId: string; shareToken: string }): Promise<ApiListDocument> {
-    const response = await fetch(`${apiBaseUrl}/v1/lists/${params.shareToken}`, {
-      method: "GET",
-      headers: createHeaders(params.deviceId, params.shareToken),
-    });
+    const response = await fetchWithTimeout(
+      `${apiBaseUrl}/v1/lists/${params.shareToken}`,
+      {
+        method: "GET",
+        headers: createHeaders(params.deviceId, params.shareToken),
+      },
+      "fetch list",
+    );
     await assertOk(response, "fetch list");
     return parseListDocumentResponse(await response.json());
   },
 
   async redeemShareToken(params: { deviceId: string; shareToken: string }): Promise<void> {
-    const response = await fetch(`${apiBaseUrl}/v1/share-tokens/${params.shareToken}/redeem`, {
-      method: "POST",
-      headers: {
-        "x-device-id": params.deviceId,
+    const response = await fetchWithTimeout(
+      `${apiBaseUrl}/v1/share-tokens/${params.shareToken}/redeem`,
+      {
+        method: "POST",
+        headers: {
+          "x-device-id": params.deviceId,
+        },
       },
-    });
+      "redeem token",
+    );
     await assertOk(response, "redeem token");
   },
 
@@ -139,11 +181,15 @@ export const sharingApiClient = {
     itemId: string;
     body: ApiItemUpsertRequest;
   }): Promise<void> {
-    const response = await fetch(`${apiBaseUrl}/v1/lists/${params.shareToken}/items/${params.itemId}`, {
-      method: "PUT",
-      headers: createHeaders(params.deviceId, params.shareToken),
-      body: JSON.stringify(params.body),
-    });
+    const response = await fetchWithTimeout(
+      `${apiBaseUrl}/v1/lists/${params.shareToken}/items/${params.itemId}`,
+      {
+        method: "PUT",
+        headers: createHeaders(params.deviceId, params.shareToken),
+        body: JSON.stringify(params.body),
+      },
+      "item upsert",
+    );
     await assertOk(response, "item upsert");
   },
 };

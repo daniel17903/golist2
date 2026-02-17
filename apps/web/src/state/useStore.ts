@@ -91,7 +91,7 @@ export const useStore = create<StoreState>((set, get) => ({
       isLoaded: true,
     });
 
-    await get().syncAllLists();
+    void get().syncAllLists();
   },
   addList: async (name: string) => {
     const now = Date.now();
@@ -286,11 +286,6 @@ export const useStore = create<StoreState>((set, get) => ({
     const remoteList = await sharingApiClient.fetchList({ deviceId, shareToken });
 
     const remoteListUpdatedAt = toMillis(remoteList.updatedAt);
-    const nextList =
-      remoteListUpdatedAt > localList.updatedAt
-        ? { ...localList, name: remoteList.name, updatedAt: remoteListUpdatedAt }
-        : localList;
-
     if (localList.updatedAt > remoteListUpdatedAt || localList.name !== remoteList.name) {
       await sharingApiClient.upsertList({
         deviceId,
@@ -301,48 +296,26 @@ export const useStore = create<StoreState>((set, get) => ({
 
     const localItemsForList = state.items.filter((item) => item.listId === listId);
     const localItemMap = new Map(localItemsForList.map((item) => [item.id, item]));
-    const merged = [...localItemsForList];
-    const localPushQueue: Item[] = [];
+    const localPushById = new Map<string, Item>();
 
     for (const remoteItem of remoteList.items) {
-      const mappedRemote: Item = {
-        id: remoteItem.id,
-        listId,
-        name: remoteItem.name,
-        quantityOrUnit: remoteItem.quantityOrUnit,
-        category: remoteItem.category,
-        deleted: remoteItem.deleted,
-        createdAt: toMillis(remoteItem.createdAt),
-        updatedAt: toMillis(remoteItem.updatedAt),
-      };
-
-      const local = localItemMap.get(mappedRemote.id);
-      if (!local) {
-        merged.push(mappedRemote);
-        continue;
-      }
-
-      if (mappedRemote.updatedAt > local.updatedAt) {
-        const index = merged.findIndex((item) => item.id === local.id);
-        if (index >= 0) {
-          merged[index] = mappedRemote;
+      const local = localItemMap.get(remoteItem.id);
+      const remoteUpdatedAt = toMillis(remoteItem.updatedAt);
+      if (!local || local.updatedAt > remoteUpdatedAt) {
+        if (local) {
+          localPushById.set(local.id, local);
         }
-      } else if (local.updatedAt > mappedRemote.updatedAt) {
-        localPushQueue.push(local);
       }
     }
 
     const remoteIds = new Set(remoteList.items.map((item) => item.id));
     for (const local of localItemsForList) {
       if (!remoteIds.has(local.id)) {
-        localPushQueue.push(local);
+        localPushById.set(local.id, local);
       }
     }
 
-    await db.lists.put(nextList);
-    await db.items.bulkPut(merged);
-
-    for (const item of localPushQueue) {
+    for (const item of localPushById.values()) {
       await sharingApiClient.upsertItem({
         deviceId,
         shareToken,
@@ -357,15 +330,35 @@ export const useStore = create<StoreState>((set, get) => ({
       });
     }
 
+    const refreshedList = await sharingApiClient.fetchList({ deviceId, shareToken });
+    const syncedList: List = {
+      id: refreshedList.listId,
+      name: refreshedList.name,
+      createdAt: toMillis(refreshedList.createdAt),
+      updatedAt: toMillis(refreshedList.updatedAt),
+    };
+    const syncedItems: Item[] = refreshedList.items.map((item) => ({
+      id: item.id,
+      listId,
+      name: item.name,
+      quantityOrUnit: item.quantityOrUnit,
+      category: item.category,
+      deleted: item.deleted,
+      createdAt: toMillis(item.createdAt),
+      updatedAt: toMillis(item.updatedAt),
+    }));
+
     const now = Date.now();
+    await db.lists.put(syncedList);
+    await db.items.bulkPut(syncedItems);
     await db.listShares.put({ listId, shareToken, lastSyncedAt: now });
 
     set((current) => {
       const remainingLists = current.lists.filter((entry) => entry.id !== listId);
       const remainingItems = current.items.filter((entry) => entry.listId !== listId);
       return {
-        lists: [...remainingLists, nextList].sort((a, b) => a.createdAt - b.createdAt),
-        items: [...remainingItems, ...merged],
+        lists: [...remainingLists, syncedList].sort((a, b) => a.createdAt - b.createdAt),
+        items: [...remainingItems, ...syncedItems],
       };
     });
   },
