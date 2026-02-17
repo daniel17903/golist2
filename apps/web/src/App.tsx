@@ -50,7 +50,6 @@ const App = () => {
     handleCreateList,
     handleDeleteList,
     handleShareActiveList,
-    joinSharedList,
   } = useAppState();
 
   const undoTimeoutsRef = useRef<Map<string, number>>(new Map());
@@ -133,31 +132,6 @@ const App = () => {
           setNewListName(activeList?.name ?? "");
           setEditingTitle(true);
         }}
-        onShareList={() => {
-          void (async () => {
-            try {
-              const shareLink = await handleShareActiveList();
-              await navigator.clipboard.writeText(shareLink);
-              window.alert("Teilen-Link wurde in die Zwischenablage kopiert.");
-            } catch {
-              window.alert("Teilen ist derzeit nicht verfügbar.");
-            }
-          })();
-        }}
-        onJoinList={() => {
-          const tokenInput = window.prompt("Teilen-Link oder Share-Token eingeben:", "");
-          if (!tokenInput) {
-            return;
-          }
-
-          void (async () => {
-            try {
-              await joinSharedList(tokenInput);
-            } catch {
-              window.alert("Link konnte nicht beigetreten werden.");
-            }
-          })();
-        }}
       />
 
       <ItemGrid
@@ -170,7 +144,21 @@ const App = () => {
         onPointerCancel={handlePointerCancel}
       />
 
-      <BottomBar onOpenDrawer={() => setIsDrawerOpen(true)} onAddItem={openAddDialog} />
+      <BottomBar
+        onOpenDrawer={() => setIsDrawerOpen(true)}
+        onAddItem={openAddDialog}
+        onShareList={() => {
+          void (async () => {
+            try {
+              const shareLink = await handleShareActiveList();
+              await navigator.clipboard.writeText(shareLink);
+              window.alert("Teilen-Link wurde in die Zwischenablage kopiert.");
+            } catch {
+              window.alert("Teilen ist derzeit nicht verfügbar.");
+            }
+          })();
+        }}
+      />
 
       <div className="undo-toast-stack" aria-live="polite" aria-atomic="false">
         {undoToasts.map((toast) => (

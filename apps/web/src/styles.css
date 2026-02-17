@@ -36,12 +36,6 @@ body {
 }
 
 
-.share-actions {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
 .ghost-button {
   border: 1px solid rgba(255, 255, 255, 0.7);
   background: transparent;

@@ -21,7 +21,6 @@ export const useAppState = () => {
     deleteList,
     ensureShareToken,
     joinSharedList,
-    listShareTokens,
     syncAllLists,
   } = useStore();
 
@@ -43,6 +42,29 @@ export const useAppState = () => {
       void addList(defaultListName);
     }
   }, [isLoaded, lists.length, addList]);
+
+  useEffect(() => {
+    if (!isLoaded) {
+      return;
+    }
+
+    const shareTokenFromUrl = new URLSearchParams(window.location.search).get("shareToken");
+    if (!shareTokenFromUrl) {
+      return;
+    }
+
+    void (async () => {
+      try {
+        await joinSharedList(shareTokenFromUrl);
+      } catch {
+        window.alert("Geteilter Link konnte nicht geöffnet werden.");
+      } finally {
+        const cleanedUrl = new URL(window.location.href);
+        cleanedUrl.searchParams.delete("shareToken");
+        window.history.replaceState({}, "", cleanedUrl.toString());
+      }
+    })();
+  }, [isLoaded, joinSharedList]);
 
   useEffect(() => {
     if (!isLoaded) {
@@ -205,7 +227,6 @@ export const useAppState = () => {
     editItemQuantity,
     isDrawerOpen,
     isAddDialogOpen,
-    activeListShareToken: activeListId ? listShareTokens[activeListId] : undefined,
     setNewListName,
     setEditingTitle,
     setItemName,

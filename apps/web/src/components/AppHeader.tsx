@@ -1,11 +1,9 @@
 type AppHeaderProps = {
   activeListName: string;
   onEditListName: () => void;
-  onShareList: () => void;
-  onJoinList: () => void;
 };
 
-const AppHeader = ({ activeListName, onEditListName, onShareList, onJoinList }: AppHeaderProps) => {
+const AppHeader = ({ activeListName, onEditListName }: AppHeaderProps) => {
   return (
     <header className="app__header">
       <div className="title-row">
@@ -22,14 +20,6 @@ const AppHeader = ({ activeListName, onEditListName, onShareList, onJoinList }: 
               fill="currentColor"
             />
           </svg>
-        </button>
-      </div>
-      <div className="share-actions">
-        <button type="button" className="ghost-button" onClick={onShareList}>
-          Liste teilen
-        </button>
-        <button type="button" className="ghost-button" onClick={onJoinList}>
-          Per Link beitreten
         </button>
       </div>
     </header>
