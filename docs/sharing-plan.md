@@ -96,6 +96,7 @@ The API contract is maintained in `apps/api-spec/openapi.yaml` (and related file
    - foreground/background periodic sync (`setInterval`, `visibilitychange`, and `online` hooks)
    - optimistic local updates with reconciliation against remote list/item state
 4. Local-first behavior is preserved when offline by keeping local mutations authoritative and treating sync errors as non-fatal.
+   - Frontend sync flow details are documented in `docs/frontend-sharing-sync.md` (immediate mutation push + background full reconciliation).
 5. **GitHub Actions update**: web CI continues to validate web lint/typecheck/test/build, while backend integration behavior remains covered by backend test suites/workflows.
 
 ### Phase 5 — Quality, observability, and hardening

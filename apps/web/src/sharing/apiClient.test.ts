@@ -5,13 +5,14 @@ const originalFetch = globalThis.fetch;
 afterEach(() => {
   globalThis.fetch = originalFetch;
   vi.useRealTimers();
-  vi.unstubAllEnvs();
+  vi.unstubAllGlobals();
   vi.resetModules();
 });
 
 describe("sharingApiClient", () => {
   it("uses configured API base URL when provided", async () => {
-    vi.stubEnv("VITE_API_BASE_URL", "https://api.example.test");
+    vi.stubGlobal("__API_BASE_URL__", "https://api.example.test");
+    vi.stubGlobal("__API_TIMEOUT_MS__", "4000");
 
     const fetchMock = vi.fn(async () =>
       new Response(JSON.stringify({ listId: crypto.randomUUID(), shareToken: crypto.randomUUID() }), {
@@ -34,7 +35,8 @@ describe("sharingApiClient", () => {
 
   it("aborts slow requests using configured timeout", async () => {
     vi.useFakeTimers();
-    vi.stubEnv("VITE_API_TIMEOUT_MS", "5");
+    vi.stubGlobal("__API_BASE_URL__", "http://localhost:3000");
+    vi.stubGlobal("__API_TIMEOUT_MS__", "5");
 
     globalThis.fetch = vi.fn(
       (_input: RequestInfo | URL, init?: RequestInit) =>

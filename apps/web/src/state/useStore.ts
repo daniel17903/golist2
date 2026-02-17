@@ -62,6 +62,44 @@ const triggerSyncInBackground = (listId: string) => {
     .catch(() => undefined);
 };
 
+const syncListNameImmediately = async (listId: string, listName: string) => {
+  const state = useStore.getState();
+  const shareToken = state.listShareTokens[listId];
+  if (!shareToken || !state.metadata?.deviceId) {
+    return;
+  }
+
+  await sharingApiClient.upsertList({
+    deviceId: state.metadata.deviceId,
+    shareToken,
+    body: {
+      listId,
+      name: listName,
+    },
+  });
+};
+
+const syncItemImmediately = async (item: Item) => {
+  const state = useStore.getState();
+  const shareToken = state.listShareTokens[item.listId];
+  if (!shareToken || !state.metadata?.deviceId) {
+    return;
+  }
+
+  await sharingApiClient.upsertItem({
+    deviceId: state.metadata.deviceId,
+    shareToken,
+    itemId: item.id,
+    body: {
+      name: item.name,
+      quantityOrUnit: item.quantityOrUnit,
+      category: item.category,
+      deleted: item.deleted,
+      updatedAt: toIsoTimestamp(item.updatedAt),
+    },
+  });
+};
+
 export const useStore = create<StoreState>((set, get) => ({
   lists: [],
   items: [],
@@ -115,6 +153,12 @@ export const useStore = create<StoreState>((set, get) => ({
         list.id === listId ? { ...list, name, updatedAt: now } : list,
       ),
     }));
+    try {
+      await syncListNameImmediately(listId, name);
+    } catch {
+      // keep local-first writes responsive when backend is unreachable
+    }
+
     triggerSyncInBackground(listId);
   },
   deleteList: async (listId: string) => {
@@ -150,6 +194,12 @@ export const useStore = create<StoreState>((set, get) => ({
     };
     await db.items.add(item);
     set((state) => ({ items: [...state.items, item] }));
+    try {
+      await syncItemImmediately(item);
+    } catch {
+      // keep local-first writes responsive when backend is unreachable
+    }
+
     triggerSyncInBackground(listId);
   },
   toggleItem: async (itemId: string) => {
@@ -165,6 +215,13 @@ export const useStore = create<StoreState>((set, get) => ({
     set((state) => ({
       items: state.items.map((entry) => (entry.id === itemId ? updated : entry)),
     }));
+
+    try {
+      await syncItemImmediately(updated);
+    } catch {
+      // keep local-first writes responsive when backend is unreachable
+    }
+
     triggerSyncInBackground(updated.listId);
   },
   updateItem: async (itemId: string, name: string, quantityOrUnit?: string) => {
@@ -182,6 +239,13 @@ export const useStore = create<StoreState>((set, get) => ({
     set((state) => ({
       items: state.items.map((entry) => (entry.id === itemId ? updated : entry)),
     }));
+
+    try {
+      await syncItemImmediately(updated);
+    } catch {
+      // keep local-first writes responsive when backend is unreachable
+    }
+
     triggerSyncInBackground(updated.listId);
   },
   ensureShareToken: async (listId: string) => {

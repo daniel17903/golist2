@@ -7,17 +7,15 @@ import type {
 } from "@golist/shared/domain/types";
 
 const readApiBaseUrl = () => {
-  const configured = Reflect.get(import.meta.env, "VITE_API_BASE_URL");
-  if (typeof configured === "string" && configured.trim().length > 0) {
-    return configured.trim();
+  if (typeof __API_BASE_URL__ === "string" && __API_BASE_URL__.trim().length > 0) {
+    return __API_BASE_URL__.trim();
   }
   return "http://localhost:3000";
 };
 
 const readRequestTimeoutMs = () => {
-  const configured = Reflect.get(import.meta.env, "VITE_API_TIMEOUT_MS");
-  if (typeof configured === "string") {
-    const parsed = Number.parseInt(configured, 10);
+  if (typeof __API_TIMEOUT_MS__ === "string") {
+    const parsed = Number.parseInt(__API_TIMEOUT_MS__, 10);
     if (Number.isFinite(parsed) && parsed > 0) {
       return parsed;
     }

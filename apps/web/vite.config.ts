@@ -5,6 +5,8 @@ import { VitePWA } from "vite-plugin-pwa";
 export default defineConfig({
   define: {
     __APP_VERSION__: JSON.stringify(process.env.npm_package_version ?? "dev"),
+    __API_BASE_URL__: JSON.stringify(process.env.API_BASE_URL ?? "http://localhost:3000"),
+    __API_TIMEOUT_MS__: JSON.stringify(process.env.API_TIMEOUT_MS ?? "4000"),
   },
   plugins: [
     react(),
