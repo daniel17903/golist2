@@ -54,7 +54,6 @@ describe("sharingApiClient", () => {
     const pendingExpectation = expect(
       sharingApiClient.fetchList({
         deviceId: crypto.randomUUID(),
-        shareToken: crypto.randomUUID(),
         listId: crypto.randomUUID(),
       }),
     ).rejects.toThrow("timed out");

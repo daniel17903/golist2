@@ -312,7 +312,7 @@ describe("useStore", () => {
     expect(itemsWhere).toHaveBeenCalledWith("listId");
   });
 
-  it("syncAllLists acquires share tokens and syncs local list changes", async () => {
+  it("syncAllLists syncs local list changes without share tokens", async () => {
     useStore.setState({
       lists: [{ id: "list-1", name: "Groceries", createdAt: 1, updatedAt: 1 }],
       items: [
@@ -336,12 +336,6 @@ describe("useStore", () => {
     });
 
     upsertListMock.mockResolvedValue({ listId: "list-1" });
-    createShareTokenMock.mockResolvedValue({
-      tokenId: "11111111-1111-4111-8111-111111111111",
-      listId: "list-1",
-      createdAt: "2026-01-01T00:00:00.000Z",
-      shareToken: "11111111-1111-4111-8111-111111111111",
-    });
     fetchListMock
       .mockResolvedValueOnce({
         listId: "list-1",
@@ -369,12 +363,9 @@ describe("useStore", () => {
 
     await useStore.getState().syncAllLists();
 
-    expect(upsertListMock).toHaveBeenCalledWith({
-      deviceId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-      listId: "list-1",
-      body: { name: "Groceries" },
-    });
-    expect(createShareTokenMock).toHaveBeenCalledWith({
+    expect(createShareTokenMock).not.toHaveBeenCalled();
+    expect(upsertListMock).not.toHaveBeenCalled();
+    expect(fetchListMock).toHaveBeenCalledWith({
       deviceId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
       listId: "list-1",
     });

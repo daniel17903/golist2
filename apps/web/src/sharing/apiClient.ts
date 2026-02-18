@@ -50,15 +50,12 @@ const readRequestTimeoutMs = () => {
 const apiBaseUrl = readApiBaseUrl();
 const requestTimeoutMs = readRequestTimeoutMs();
 
-const createHeaders = (deviceId: string, shareToken?: string) => {
+const createHeaders = (deviceId: string) => {
   const headers: HeadersInit = {
     "content-type": "application/json",
     "x-device-id": deviceId,
   };
 
-  if (shareToken) {
-    headers.authorization = `Bearer ${shareToken}`;
-  }
 
   return headers;
 };
@@ -189,13 +186,12 @@ export const sharingApiClient = {
     deviceId: string;
     listId: string;
     body: ApiListUpsertRequest;
-    shareToken?: string;
   }): Promise<ApiListUpsertResponse> {
     const response = await fetchWithTimeout(
       `${apiBaseUrl}/v1/lists/${params.listId}`,
       {
         method: "PUT",
-        headers: createHeaders(params.deviceId, params.shareToken),
+        headers: createHeaders(params.deviceId),
         body: JSON.stringify(params.body),
       },
       "list upsert",
@@ -204,12 +200,12 @@ export const sharingApiClient = {
     return parseListUpsertResponse(await response.json());
   },
 
-  async fetchList(params: { deviceId: string; shareToken: string; listId: string }): Promise<ApiListDocument> {
+  async fetchList(params: { deviceId: string; listId: string }): Promise<ApiListDocument> {
     const response = await fetchWithTimeout(
       `${apiBaseUrl}/v1/lists/${params.listId}`,
       {
         method: "GET",
-        headers: createHeaders(params.deviceId, params.shareToken),
+        headers: createHeaders(params.deviceId),
       },
       "fetch list",
     );
@@ -251,7 +247,6 @@ export const sharingApiClient = {
 
   async upsertItem(params: {
     deviceId: string;
-    shareToken: string;
     listId: string;
     itemId: string;
     body: ApiItemUpsertRequest;
@@ -260,7 +255,7 @@ export const sharingApiClient = {
       `${apiBaseUrl}/v1/lists/${params.listId}/items/${params.itemId}`,
       {
         method: "PUT",
-        headers: createHeaders(params.deviceId, params.shareToken),
+        headers: createHeaders(params.deviceId),
         body: JSON.stringify(params.body),
       },
       "item upsert",

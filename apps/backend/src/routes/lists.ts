@@ -1,7 +1,7 @@
 import { type FastifyInstance } from 'fastify'
 import { z } from 'zod'
 
-import { requireToken } from '../auth.js'
+import { requireListAccess } from '../auth.js'
 import { query, withTransaction } from '../db/client.js'
 
 const listIdParamsSchema = z.object({ listId: z.uuid() })
@@ -64,9 +64,6 @@ export function registerListRoutes(app: FastifyInstance) {
     const headers = listCreateHeadersSchema.parse(request.headers)
     const createdBy = headers['x-device-id']
 
-    const authHeader = request.headers.authorization
-    const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null
-
     const result = await withTransaction(async (client) => {
       const existingListResult = await client.query<{
         id: string
@@ -81,37 +78,27 @@ export function registerListRoutes(app: FastifyInstance) {
         return { statusCode: 201 as const }
       }
 
-      if (!bearerToken) {
-        return { statusCode: 403 as const }
-      }
-
-      const tokenResult = await client.query<{ id: string; list_id: string }>(
-        `SELECT id, list_id
-           FROM share_tokens
-          WHERE id = $1
-            AND list_id = $2
-            AND revoked_at IS NULL
-            AND (expires_at IS NULL OR expires_at > NOW())
-          LIMIT 1`,
-        [bearerToken, params.listId],
+      const accessResult = await client.query<{ has_access: boolean }>(
+        `SELECT EXISTS(
+           SELECT 1
+             FROM shared_lists
+            WHERE id = $1
+              AND created_by_device_id = $2
+         )
+         OR EXISTS(
+           SELECT 1
+             FROM share_token_redemptions redemptions
+             JOIN share_tokens tokens
+               ON tokens.id = redemptions.token_id
+            WHERE redemptions.device_id = $2
+              AND tokens.list_id = $1
+              AND tokens.revoked_at IS NULL
+              AND (tokens.expires_at IS NULL OR tokens.expires_at > NOW())
+         ) AS has_access`,
+        [params.listId, createdBy],
       )
 
-      if (!tokenResult.rowCount) {
-        return { statusCode: 403 as const }
-      }
-
-      const accessResult = await client.query(
-        `SELECT 1
-           FROM share_token_redemptions
-          WHERE token_id = $1
-            AND device_id = $2
-          LIMIT 1`,
-        [bearerToken, headers['x-device-id']],
-      )
-
-      const isCreator = existingListResult.rows[0].created_by_device_id === headers['x-device-id']
-
-      if (!accessResult.rowCount && !isCreator) {
+      if (!accessResult.rows[0]?.has_access) {
         return { statusCode: 403 as const }
       }
 
@@ -128,15 +115,14 @@ export function registerListRoutes(app: FastifyInstance) {
     return { listId: params.listId }
   })
 
-  app.get('/v1/lists/:listId', { preHandler: requireToken }, async (request) => {
-    const auth = request.auth!
+  app.get('/v1/lists/:listId', { preHandler: requireListAccess }, async (request) => {
 
     const listResult = await query<{
       id: string
       name: string
       created_at: string
       updated_at: string
-    }>('SELECT id, name, created_at, updated_at FROM shared_lists WHERE id = $1 LIMIT 1', [auth.listId])
+    }>('SELECT id, name, created_at, updated_at FROM shared_lists WHERE id = $1 LIMIT 1', [request.auth!.listId])
 
     if (!listResult.rowCount) {
       return {}
@@ -147,7 +133,7 @@ export function registerListRoutes(app: FastifyInstance) {
          FROM list_items
         WHERE list_id = $1
         ORDER BY created_at ASC, id ASC`,
-      [auth.listId],
+      [request.auth!.listId],
     )
 
     const list = listResult.rows[0]
@@ -161,7 +147,7 @@ export function registerListRoutes(app: FastifyInstance) {
     }
   })
 
-  app.delete('/v1/lists/:listId', { preHandler: requireToken }, async (request, reply) => {
+  app.delete('/v1/lists/:listId', { preHandler: requireListAccess }, async (request, reply) => {
     const result = await withTransaction(async (client) => {
       await client.query('SELECT id FROM shared_lists WHERE id = $1 FOR UPDATE', [request.auth!.listId])
 
@@ -179,7 +165,7 @@ export function registerListRoutes(app: FastifyInstance) {
     reply.code(204)
   })
 
-  app.get('/v1/lists/:listId/items', { preHandler: requireToken }, async (request) => {
+  app.get('/v1/lists/:listId/items', { preHandler: requireListAccess }, async (request) => {
     const querystring = z.object({ updatedAfter: z.iso.datetime() }).parse(request.query)
 
     const itemsResult = await query<ListItemRow>(
@@ -195,7 +181,7 @@ export function registerListRoutes(app: FastifyInstance) {
     }
   })
 
-  app.get('/v1/lists/:listId/items/:itemId', { preHandler: requireToken }, async (request, reply) => {
+  app.get('/v1/lists/:listId/items/:itemId', { preHandler: requireListAccess }, async (request, reply) => {
     const params = itemParamsSchema.parse(request.params)
     const itemResult = await query<ListItemRow>(
       `SELECT id, name, quantity_or_unit, category, deleted, created_at, updated_at
@@ -213,7 +199,7 @@ export function registerListRoutes(app: FastifyInstance) {
     return serializeListItem(itemResult.rows[0])
   })
 
-  app.put('/v1/lists/:listId/items/:itemId', { preHandler: requireToken }, async (request, reply) => {
+  app.put('/v1/lists/:listId/items/:itemId', { preHandler: requireListAccess }, async (request, reply) => {
     const params = itemParamsSchema.parse(request.params)
     const body = itemUpsertSchema.parse(request.body)
     const tieBreakValue = computeItemTieBreakValue(body)

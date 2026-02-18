@@ -23,7 +23,7 @@ The API contract is maintained in `apps/api-spec/openapi.yaml` (and related file
 ### Identity and access
 - Each client keeps a generated `deviceId` UUID for auditing and server-side token redemption tracking.
 - Share links use random UUID share tokens (token IDs).
-- Protected API calls use `Authorization: Bearer <shareToken>`.
+- Protected list/item API calls use only `X-Device-Id`; server-side access control is based on list ownership or redeemed-token access records.
 - If device identity is needed for an endpoint, require `X-Device-Id` header and do not accept `deviceId` in query parameters.
 
 ### Data model direction
@@ -84,7 +84,7 @@ The API contract is maintained in `apps/api-spec/openapi.yaml` (and related file
 3. Incremental sync support is implemented via `GET /v1/lists/{listId}/items?updatedAfter=...` with deterministic ordering by `updated_at` then `id`.
 4. Creation is idempotent with client-generated IDs: lists use `PUT /v1/lists/{listId}` and items use `PUT /v1/lists/{listId}/items/{itemId}`.
 5. Existing-list `PUT /v1/lists/{listId}` updates are access-controlled: only devices with list access (list creator or devices that redeemed the share token) may update an existing list.
-6. Authenticated list routes enforce creator-or-redeemed access: protected calls are allowed for the list creator or for devices that redeemed the active share token for that list.
+6. Protected list routes enforce creator-or-redeemed access using `X-Device-Id`: calls are allowed for the list creator or for devices that redeemed at least one valid token for that list.
 
 ### Phase 4 — Web app integration ✅ Implemented
 1. Sharing API client is implemented in `apps/web/src/sharing/apiClient.ts` for list upsert, explicit share-token creation, token redemption, list fetch, item upsert, and token extraction from links.

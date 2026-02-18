@@ -59,26 +59,6 @@ const triggerSyncInBackground = (listId: string) => {
     .catch(() => undefined);
 };
 
-const getShareTokenForList = async (listId: string) => {
-  const state = useStore.getState();
-  if (!state.metadata?.deviceId) {
-    logSkippedBackendCall("Sync skipped: device metadata missing.");
-    return null;
-  }
-
-  const existing = state.listShareTokens[listId];
-  if (existing) {
-    return existing;
-  }
-
-  try {
-    return await state.ensureShareToken(listId);
-  } catch {
-    logSkippedBackendCall("Sync skipped: unable to acquire share token.");
-    return null;
-  }
-};
-
 const syncListNameImmediately = async (listId: string, listName: string) => {
   const state = useStore.getState();
   if (!state.metadata?.deviceId) {
@@ -86,15 +66,9 @@ const syncListNameImmediately = async (listId: string, listName: string) => {
     return;
   }
 
-  const shareToken = await getShareTokenForList(listId);
-  if (!shareToken) {
-    return;
-  }
-
   await sharingApiClient.upsertList({
     deviceId: state.metadata.deviceId,
     listId,
-    shareToken,
     body: {
       name: listName,
     },
@@ -110,14 +84,8 @@ const syncItemImmediately = async (item: Item) => {
     return;
   }
 
-  const shareToken = await getShareTokenForList(item.listId);
-  if (!shareToken) {
-    return;
-  }
-
   await sharingApiClient.upsertItem({
     deviceId: state.metadata.deviceId,
-    shareToken,
     listId: item.listId,
     itemId: item.id,
     body: {
@@ -313,10 +281,6 @@ export const useStore = create<StoreState>((set, get) => ({
   },
   ensureShareToken: async (listId: string) => {
     const state = get();
-    const existing = state.listShareTokens[listId];
-    if (existing) {
-      return existing;
-    }
 
     const list = state.lists.find((entry) => entry.id === listId);
     if (!list || !state.metadata?.deviceId) {
@@ -335,13 +299,6 @@ export const useStore = create<StoreState>((set, get) => ({
     });
 
     markBackendOnline();
-    set((current) => ({
-      listShareTokens: {
-        ...current.listShareTokens,
-        [listId]: tokenResponse.shareToken,
-      },
-    }));
-
     return tokenResponse.shareToken;
   },
   joinSharedList: async (rawShareValue: string) => {
@@ -363,7 +320,6 @@ export const useStore = create<StoreState>((set, get) => ({
 
       const remoteList = await sharingApiClient.fetchList({
         deviceId: state.metadata.deviceId,
-        shareToken,
         listId: redemption.listId,
       });
 
@@ -394,10 +350,6 @@ export const useStore = create<StoreState>((set, get) => ({
           lists: [...withoutList, localList].sort((a, b) => a.createdAt - b.createdAt),
           items: [...withoutListItems, ...localItems],
           activeListId: localList.id,
-          listShareTokens: {
-            ...current.listShareTokens,
-            [localList.id]: shareToken,
-          },
         };
       });
 
@@ -414,25 +366,19 @@ export const useStore = create<StoreState>((set, get) => ({
       return;
     }
 
-    const shareToken = await getShareTokenForList(listId);
-    if (!shareToken) {
-      return;
-    }
-
     const localList = state.lists.find((entry) => entry.id === listId);
     if (!localList) {
       return;
     }
 
     const deviceId = state.metadata.deviceId;
-    const remoteList = await sharingApiClient.fetchList({ deviceId, shareToken, listId });
+    const remoteList = await sharingApiClient.fetchList({ deviceId, listId });
 
     const remoteListUpdatedAt = toMillis(remoteList.updatedAt);
     if (localList.updatedAt > remoteListUpdatedAt || localList.name !== remoteList.name) {
       await sharingApiClient.upsertList({
         deviceId,
         listId,
-        shareToken,
         body: { name: localList.name },
       });
     }
@@ -461,7 +407,6 @@ export const useStore = create<StoreState>((set, get) => ({
     for (const item of localPushById.values()) {
       await sharingApiClient.upsertItem({
         deviceId,
-        shareToken,
         listId,
         itemId: item.id,
         body: {
@@ -474,7 +419,7 @@ export const useStore = create<StoreState>((set, get) => ({
       });
     }
 
-    const refreshedList = await sharingApiClient.fetchList({ deviceId, shareToken, listId });
+    const refreshedList = await sharingApiClient.fetchList({ deviceId, listId });
     const syncedList: List = {
       id: refreshedList.listId,
       name: refreshedList.name,
