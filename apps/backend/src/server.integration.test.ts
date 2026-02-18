@@ -62,9 +62,11 @@ describe('backend runtime integration (real postgres)', () => {
       },
     )
 
-    expect(redeemResponse.status).toBe(204)
+    expect(redeemResponse.status).toBe(200)
 
-    const listResponse = await fetch(`${baseUrl}/v1/lists/${createPayload.shareToken}`, {
+    const redeemPayload = z.object({ listId: z.string().uuid() }).parse(await redeemResponse.json())
+
+    const listResponse = await fetch(`${baseUrl}/v1/lists/${redeemPayload.listId}`, {
       headers: authHeaders,
     })
 
@@ -101,7 +103,7 @@ describe('backend runtime integration (real postgres)', () => {
       },
     )
 
-    expect(redeemResponse.status).toBe(204)
+    expect(redeemResponse.status).toBe(200)
 
     const itemId = crypto.randomUUID()
     const createItemTimestamp = new Date().toISOString()
@@ -256,9 +258,11 @@ describe('backend runtime integration (real postgres)', () => {
       },
     )
 
-    expect(redeemPrimaryTokenResponse.status).toBe(204)
+    expect(redeemPrimaryTokenResponse.status).toBe(200)
 
-    const redeemedGuestListResponse = await fetch(`${baseUrl}/v1/lists/${createdList.shareToken}`, {
+    const primaryRedeemPayload = z.object({ listId: z.string().uuid() }).parse(await redeemPrimaryTokenResponse.json())
+
+    const redeemedGuestListResponse = await fetch(`${baseUrl}/v1/lists/${primaryRedeemPayload.listId}`, {
       headers: unredeemedGuestHeaders,
     })
 
@@ -297,9 +301,11 @@ describe('backend runtime integration (real postgres)', () => {
       },
     )
 
-    expect(redeemSecondaryTokenResponse.status).toBe(204)
+    expect(redeemSecondaryTokenResponse.status).toBe(200)
 
-    const secondRedeemedListResponse = await fetch(`${baseUrl}/v1/lists/${secondaryToken.shareToken}`, {
+    const secondaryRedeemPayload = z.object({ listId: z.string().uuid() }).parse(await redeemSecondaryTokenResponse.json())
+
+    const secondRedeemedListResponse = await fetch(`${baseUrl}/v1/lists/${secondaryRedeemPayload.listId}`, {
       headers: secondGuestHeaders,
     })
 

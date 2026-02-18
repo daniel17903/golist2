@@ -145,7 +145,7 @@ export function registerListRoutes(app: FastifyInstance) {
     return { listId: body.listId, shareToken: result.shareToken }
   })
 
-  app.get('/v1/lists/:shareToken', { preHandler: requireToken }, async (request) => {
+  app.get('/v1/lists/:listId', { preHandler: requireToken }, async (request) => {
     const auth = request.auth!
 
     const listResult = await query<{

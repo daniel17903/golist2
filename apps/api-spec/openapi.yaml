@@ -17,6 +17,13 @@ components:
       schema:
         type: string
         format: uuid
+    ListId:
+      name: listId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
     ItemId:
       name: itemId
       in: path
@@ -149,6 +156,13 @@ components:
             shareToken:
               type: string
               format: uuid
+    ShareTokenRedeemResponse:
+      type: object
+      required: [listId]
+      properties:
+        listId:
+          type: string
+          format: uuid
 security:
   - BearerAuth: []
 paths:
@@ -179,12 +193,12 @@ paths:
                 $ref: "#/components/schemas/ListCreateResponse"
         "403":
           description: Existing list update requires caller access to that list
-  /v1/lists/{shareToken}:
+  /v1/lists/{listId}:
     parameters:
-      - $ref: "#/components/parameters/ShareToken"
+      - $ref: "#/components/parameters/ListId"
       - $ref: "#/components/parameters/DeviceIdHeader"
     get:
-      summary: Fetch list by share token
+      summary: Fetch list by list id
       responses:
         "200":
           description: List document
@@ -265,8 +279,12 @@ paths:
     post:
       summary: Redeem a share token for the requesting device
       responses:
-        "204":
+        "200":
           description: Share token redeemed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ShareTokenRedeemResponse"
   /v1/lists/{shareToken}/share-tokens:
     parameters:
       - $ref: "#/components/parameters/ShareToken"

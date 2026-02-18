@@ -60,6 +60,10 @@ export type ApiListUpsertResponse = {
   shareToken: string;
 };
 
+export type ApiShareTokenRedeemResponse = {
+  listId: string;
+};
+
 export type ApiItemUpsertRequest = {
   name: string;
   quantityOrUnit?: string;

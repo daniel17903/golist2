@@ -179,7 +179,7 @@ describe('sharing API contract basics', () => {
       },
     })
 
-    expect(response.statusCode).toBe(204)
+    expect(response.statusCode).toBe(200)
 
     await app.close()
   })
@@ -280,8 +280,8 @@ describe('sharing API contract basics', () => {
       headers,
     })
 
-    expect(firstResponse.statusCode).toBe(204)
-    expect(secondResponse.statusCode).toBe(204)
+    expect(firstResponse.statusCode).toBe(200)
+    expect(secondResponse.statusCode).toBe(200)
 
     await app.close()
   })
