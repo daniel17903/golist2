@@ -25,6 +25,7 @@ export const useAppState = () => {
     backendConnection,
     syncNotice,
     clearSyncNotice,
+    backendLogs,
   } = useStore();
 
   const [newListName, setNewListName] = useState("");
@@ -253,5 +254,6 @@ export const useAppState = () => {
     backendConnection,
     syncNotice,
     clearSyncNotice,
+    backendLogs,
   };
 };

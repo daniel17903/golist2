@@ -66,4 +66,5 @@ This ensures eventual full convergence when backend is reachable.
 
 - Frontend tracks backend connectivity as `unknown` / `online` / `offline` and surfaces this via a small header indicator icon.
 - Sync errors publish a toast message in non-production Vercel contexts.
+- On Vercel non-production deployments, the UI includes a backend log panel with all backend call outcomes (success, error, timeout) and skipped-call reasons.
 - Toast display is suppressed only when deployed on Vercel production (`VERCEL=1` and `VERCEL_ENV=production`, exposed as `__IS_VERCEL_PRODUCTION__`).

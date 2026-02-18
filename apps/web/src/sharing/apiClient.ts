@@ -6,10 +6,32 @@ import type {
   ApiListUpsertResponse,
 } from "@golist/shared/domain/types";
 
+type BackendCallLog = {
+  endpoint: string;
+  message: string;
+  outcome: "success" | "error" | "skipped";
+};
+
+let backendCallLogger: ((entry: BackendCallLog) => void) | null = null;
+
+export const setBackendCallLogger = (logger: ((entry: BackendCallLog) => void) | null) => {
+  backendCallLogger = logger;
+};
+
+const logBackendCall = (entry: BackendCallLog) => {
+  backendCallLogger?.(entry);
+};
+
 const readApiBaseUrl = () => {
   if (typeof __API_BASE_URL__ === "string" && __API_BASE_URL__.trim().length > 0) {
     return __API_BASE_URL__.trim();
   }
+
+  logBackendCall({
+    endpoint: "configuration",
+    outcome: "skipped",
+    message: "Backend API URL missing. Falling back to http://localhost:3000.",
+  });
   return "http://localhost:3000";
 };
 
@@ -65,17 +87,29 @@ const readBoolean = (payload: unknown, key: string): boolean | null => {
 };
 
 const fetchWithTimeout = async (url: string, options: RequestInit, context: string) => {
+  const startedAt = Date.now();
   const controller = new AbortController();
   const timeout = globalThis.setTimeout(() => {
     controller.abort();
   }, requestTimeoutMs);
 
   try {
-    return await fetch(url, { ...options, signal: controller.signal });
+    const response = await fetch(url, { ...options, signal: controller.signal });
+    logBackendCall({
+      endpoint: url,
+      outcome: "success",
+      message: `${context} succeeded with ${response.status} in ${Date.now() - startedAt}ms`,
+    });
+    return response;
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") {
-      throw new Error(`${context} timed out after ${requestTimeoutMs}ms`);
+      const message = `${context} timed out after ${requestTimeoutMs}ms`;
+      logBackendCall({ endpoint: url, outcome: "error", message });
+      throw new Error(message);
     }
+
+    const message = `${context} request failed in ${Date.now() - startedAt}ms`;
+    logBackendCall({ endpoint: url, outcome: "error", message });
     throw error;
   } finally {
     globalThis.clearTimeout(timeout);

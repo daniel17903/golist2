@@ -2,7 +2,11 @@ import { create } from "zustand";
 import type { AppMetadata, Item, List } from "@golist/shared/domain/types";
 import { getCategoryForItem } from "../domain/categories";
 import { db } from "../storage/db";
-import { extractShareToken, sharingApiClient } from "../sharing/apiClient";
+import {
+  extractShareToken,
+  setBackendCallLogger,
+  sharingApiClient,
+} from "../sharing/apiClient";
 
 const createId = () => crypto.randomUUID();
 const appVersion = __APP_VERSION__;
@@ -30,6 +34,7 @@ type StoreState = {
   listShareTokens: Record<string, string>;
   backendConnection: "unknown" | "online" | "offline";
   syncNotice?: { id: string; message: string };
+  backendLogs: Array<{ id: string; message: string; outcome: "success" | "error" | "skipped" }>;
   isLoaded: boolean;
   load: () => Promise<void>;
   addList: (name: string) => Promise<void>;
@@ -44,6 +49,7 @@ type StoreState = {
   syncList: (listId: string) => Promise<void>;
   syncAllLists: () => Promise<void>;
   clearSyncNotice: () => void;
+  appendBackendLog: (entry: { message: string; outcome: "success" | "error" | "skipped" }) => void;
 };
 
 const loadShareTokenMap = async () => {
@@ -69,6 +75,7 @@ const syncListNameImmediately = async (listId: string, listName: string) => {
   const state = useStore.getState();
   const shareToken = state.listShareTokens[listId];
   if (!shareToken || !state.metadata?.deviceId) {
+    logSkippedBackendCall("List name sync skipped: missing share token or device metadata.");
     return;
   }
 
@@ -88,6 +95,7 @@ const syncItemImmediately = async (item: Item) => {
   const state = useStore.getState();
   const shareToken = state.listShareTokens[item.listId];
   if (!shareToken || !state.metadata?.deviceId) {
+    logSkippedBackendCall("Item sync skipped: missing share token or device metadata.");
     return;
   }
 
@@ -120,7 +128,20 @@ const reportSyncError = (message: string) => {
       message,
     },
   });
+
+  useStore.getState().appendBackendLog({
+    message,
+    outcome: "error",
+  });
 };
+
+const logSkippedBackendCall = (reason: string) => {
+  useStore.getState().appendBackendLog({
+    message: reason,
+    outcome: "skipped",
+  });
+};
+
 export const useStore = create<StoreState>((set, get) => ({
   lists: [],
   items: [],
@@ -129,6 +150,7 @@ export const useStore = create<StoreState>((set, get) => ({
   listShareTokens: {},
   backendConnection: "unknown",
   syncNotice: undefined,
+  backendLogs: [],
   load: async () => {
     const [lists, items, listShareTokens] = await Promise.all([
       db.lists.toArray(),
@@ -471,4 +493,18 @@ export const useStore = create<StoreState>((set, get) => ({
     );
   },
   clearSyncNotice: () => set({ syncNotice: undefined }),
+  appendBackendLog: (entry) =>
+    set((state) => ({
+      backendLogs: [
+        ...state.backendLogs.slice(-49),
+        { id: crypto.randomUUID(), message: entry.message, outcome: entry.outcome },
+      ],
+    })),
 }));
+
+setBackendCallLogger((entry) => {
+  useStore.getState().appendBackendLog({
+    message: `${entry.endpoint}: ${entry.message}`,
+    outcome: entry.outcome,
+  });
+});

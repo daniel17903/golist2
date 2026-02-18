@@ -31,6 +31,7 @@ vi.mock("../sharing/apiClient", () => ({
     redeemShareToken: vi.fn(),
     upsertItem: vi.fn(),
   },
+  setBackendCallLogger: vi.fn(),
 }));
 
 let listsData: List[] = [];
@@ -126,6 +127,7 @@ const resetStore = () => {
     listShareTokens: {},
     backendConnection: "unknown",
     syncNotice: undefined,
+    backendLogs: [],
   });
 };
 
