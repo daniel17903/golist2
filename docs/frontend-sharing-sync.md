@@ -61,3 +61,9 @@ This ensures eventual full convergence when backend is reachable.
 - API client uses `AbortController` timeout per request.
 - Sync errors are non-fatal to preserve local-first UX.
 - Local changes remain in IndexedDB and are retried by later sync attempts.
+
+## Error surfacing and connection indicator
+
+- Frontend tracks backend connectivity as `unknown` / `online` / `offline` and surfaces this via a small header indicator icon.
+- Sync errors publish a toast message in non-production Vercel contexts.
+- Toast display is suppressed only when deployed on Vercel production (`VERCEL=1` and `VERCEL_ENV=production`, exposed as `__IS_VERCEL_PRODUCTION__`).

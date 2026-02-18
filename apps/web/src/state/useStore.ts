@@ -28,6 +28,8 @@ type StoreState = {
   metadata?: AppMetadata;
   activeListId?: string;
   listShareTokens: Record<string, string>;
+  backendConnection: "unknown" | "online" | "offline";
+  syncNotice?: { id: string; message: string };
   isLoaded: boolean;
   load: () => Promise<void>;
   addList: (name: string) => Promise<void>;
@@ -41,6 +43,7 @@ type StoreState = {
   joinSharedList: (rawShareValue: string) => Promise<string>;
   syncList: (listId: string) => Promise<void>;
   syncAllLists: () => Promise<void>;
+  clearSyncNotice: () => void;
 };
 
 const loadShareTokenMap = async () => {
@@ -77,6 +80,8 @@ const syncListNameImmediately = async (listId: string, listName: string) => {
       name: listName,
     },
   });
+
+  markBackendOnline();
 };
 
 const syncItemImmediately = async (item: Item) => {
@@ -98,14 +103,32 @@ const syncItemImmediately = async (item: Item) => {
       updatedAt: toIsoTimestamp(item.updatedAt),
     },
   });
+
+  markBackendOnline();
 };
 
+
+const markBackendOnline = () => {
+  useStore.setState({ backendConnection: "online" });
+};
+
+const reportSyncError = (message: string) => {
+  useStore.setState({
+    backendConnection: "offline",
+    syncNotice: {
+      id: crypto.randomUUID(),
+      message,
+    },
+  });
+};
 export const useStore = create<StoreState>((set, get) => ({
   lists: [],
   items: [],
   isLoaded: false,
   activeListId: undefined,
   listShareTokens: {},
+  backendConnection: "unknown",
+  syncNotice: undefined,
   load: async () => {
     const [lists, items, listShareTokens] = await Promise.all([
       db.lists.toArray(),
@@ -156,7 +179,7 @@ export const useStore = create<StoreState>((set, get) => ({
     try {
       await syncListNameImmediately(listId, name);
     } catch {
-      // keep local-first writes responsive when backend is unreachable
+      reportSyncError("Backend-Verbindung fehlgeschlagen. Änderungen bleiben lokal und werden später synchronisiert.");
     }
 
     triggerSyncInBackground(listId);
@@ -197,7 +220,7 @@ export const useStore = create<StoreState>((set, get) => ({
     try {
       await syncItemImmediately(item);
     } catch {
-      // keep local-first writes responsive when backend is unreachable
+      reportSyncError("Backend-Verbindung fehlgeschlagen. Änderungen bleiben lokal und werden später synchronisiert.");
     }
 
     triggerSyncInBackground(listId);
@@ -219,7 +242,7 @@ export const useStore = create<StoreState>((set, get) => ({
     try {
       await syncItemImmediately(updated);
     } catch {
-      // keep local-first writes responsive when backend is unreachable
+      reportSyncError("Backend-Verbindung fehlgeschlagen. Änderungen bleiben lokal und werden später synchronisiert.");
     }
 
     triggerSyncInBackground(updated.listId);
@@ -243,7 +266,7 @@ export const useStore = create<StoreState>((set, get) => ({
     try {
       await syncItemImmediately(updated);
     } catch {
-      // keep local-first writes responsive when backend is unreachable
+      reportSyncError("Backend-Verbindung fehlgeschlagen. Änderungen bleiben lokal und werden später synchronisiert.");
     }
 
     triggerSyncInBackground(updated.listId);
@@ -265,6 +288,7 @@ export const useStore = create<StoreState>((set, get) => ({
       body: { listId: list.id, name: list.name },
     });
 
+    markBackendOnline();
     await setShareToken(listId, response.shareToken);
     set((current) => ({
       listShareTokens: {
@@ -286,53 +310,59 @@ export const useStore = create<StoreState>((set, get) => ({
       throw new Error("Invalid share token");
     }
 
-    await sharingApiClient.redeemShareToken({
-      deviceId: state.metadata.deviceId,
-      shareToken,
-    });
+    try {
+      await sharingApiClient.redeemShareToken({
+        deviceId: state.metadata.deviceId,
+        shareToken,
+      });
 
-    const remoteList = await sharingApiClient.fetchList({
-      deviceId: state.metadata.deviceId,
-      shareToken,
-    });
+      const remoteList = await sharingApiClient.fetchList({
+        deviceId: state.metadata.deviceId,
+        shareToken,
+      });
 
-    const localList: List = {
-      id: remoteList.listId,
-      name: remoteList.name,
-      createdAt: toMillis(remoteList.createdAt),
-      updatedAt: toMillis(remoteList.updatedAt),
-    };
-
-    const localItems: Item[] = remoteList.items.map((item) => ({
-      id: item.id,
-      listId: remoteList.listId,
-      name: item.name,
-      quantityOrUnit: item.quantityOrUnit,
-      category: item.category,
-      deleted: item.deleted,
-      createdAt: toMillis(item.createdAt),
-      updatedAt: toMillis(item.updatedAt),
-    }));
-
-    await db.lists.put(localList);
-    await db.items.bulkPut(localItems);
-    await setShareToken(localList.id, shareToken);
-
-    set((current) => {
-      const withoutListItems = current.items.filter((item) => item.listId !== localList.id);
-      const withoutList = current.lists.filter((list) => list.id !== localList.id);
-      return {
-        lists: [...withoutList, localList].sort((a, b) => a.createdAt - b.createdAt),
-        items: [...withoutListItems, ...localItems],
-        activeListId: localList.id,
-        listShareTokens: {
-          ...current.listShareTokens,
-          [localList.id]: shareToken,
-        },
+      const localList: List = {
+        id: remoteList.listId,
+        name: remoteList.name,
+        createdAt: toMillis(remoteList.createdAt),
+        updatedAt: toMillis(remoteList.updatedAt),
       };
-    });
 
-    return localList.id;
+      const localItems: Item[] = remoteList.items.map((item) => ({
+        id: item.id,
+        listId: remoteList.listId,
+        name: item.name,
+        quantityOrUnit: item.quantityOrUnit,
+        category: item.category,
+        deleted: item.deleted,
+        createdAt: toMillis(item.createdAt),
+        updatedAt: toMillis(item.updatedAt),
+      }));
+
+      await db.lists.put(localList);
+      await db.items.bulkPut(localItems);
+      await setShareToken(localList.id, shareToken);
+
+      set((current) => {
+        const withoutListItems = current.items.filter((item) => item.listId !== localList.id);
+        const withoutList = current.lists.filter((list) => list.id !== localList.id);
+        return {
+          lists: [...withoutList, localList].sort((a, b) => a.createdAt - b.createdAt),
+          items: [...withoutListItems, ...localItems],
+          activeListId: localList.id,
+          listShareTokens: {
+            ...current.listShareTokens,
+            [localList.id]: shareToken,
+          },
+        };
+      });
+
+      markBackendOnline();
+      return localList.id;
+    } catch (error) {
+      reportSyncError("Geteilte Liste konnte nicht geladen werden. Bitte Backend-Verbindung prüfen.");
+      throw error;
+    }
   },
   syncList: async (listId: string) => {
     const state = get();
@@ -425,6 +455,8 @@ export const useStore = create<StoreState>((set, get) => ({
         items: [...remainingItems, ...syncedItems],
       };
     });
+
+    markBackendOnline();
   },
   syncAllLists: async () => {
     const state = get();
@@ -433,9 +465,10 @@ export const useStore = create<StoreState>((set, get) => ({
         try {
           await get().syncList(listId);
         } catch {
-          // offline or unreachable backend should not break local-first behavior
+          reportSyncError("Backend derzeit nicht erreichbar. Synchronisierung wird erneut versucht.");
         }
       }),
     );
   },
+  clearSyncNotice: () => set({ syncNotice: undefined }),
 }));

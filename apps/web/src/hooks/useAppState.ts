@@ -22,6 +22,9 @@ export const useAppState = () => {
     ensureShareToken,
     joinSharedList,
     syncAllLists,
+    backendConnection,
+    syncNotice,
+    clearSyncNotice,
   } = useStore();
 
   const [newListName, setNewListName] = useState("");
@@ -247,5 +250,8 @@ export const useAppState = () => {
     handleDeleteList,
     handleShareActiveList,
     joinSharedList,
+    backendConnection,
+    syncNotice,
+    clearSyncNotice,
   };
 };

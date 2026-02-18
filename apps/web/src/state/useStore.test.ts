@@ -124,6 +124,8 @@ const resetStore = () => {
     activeListId: undefined,
     metadata: undefined,
     listShareTokens: {},
+    backendConnection: "unknown",
+    syncNotice: undefined,
   });
 };
 

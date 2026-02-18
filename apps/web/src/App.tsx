@@ -50,6 +50,9 @@ const App = () => {
     handleCreateList,
     handleDeleteList,
     handleShareActiveList,
+    backendConnection,
+    syncNotice,
+    clearSyncNotice,
   } = useAppState();
 
   const undoTimeoutsRef = useRef<Map<string, number>>(new Map());
@@ -124,6 +127,20 @@ const App = () => {
       onShortPress: handleToggleItem,
     });
 
+  useEffect(() => {
+    if (__IS_VERCEL_PRODUCTION__ || !syncNotice) {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      clearSyncNotice();
+    }, 6000);
+
+    return () => {
+      window.clearTimeout(timeout);
+    };
+  }, [syncNotice, clearSyncNotice]);
+
   return (
     <div className="app">
       <AppHeader
@@ -132,6 +149,7 @@ const App = () => {
           setNewListName(activeList?.name ?? "");
           setEditingTitle(true);
         }}
+        backendConnection={backendConnection}
       />
 
       <ItemGrid
@@ -159,6 +177,15 @@ const App = () => {
           })();
         }}
       />
+
+      {!__IS_VERCEL_PRODUCTION__ && syncNotice ? (
+        <div className="sync-toast" role="status" aria-live="polite">
+          <span>{syncNotice.message}</span>
+          <button type="button" className="sync-toast__close" onClick={clearSyncNotice}>
+            Schließen
+          </button>
+        </div>
+      ) : null}
 
       <div className="undo-toast-stack" aria-live="polite" aria-atomic="false">
         {undoToasts.map((toast) => (
