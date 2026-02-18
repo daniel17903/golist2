@@ -24,13 +24,15 @@ describe("sharingApiClient", () => {
 
     const { sharingApiClient } = await import("./apiClient");
 
+    const listId = crypto.randomUUID();
     await sharingApiClient.upsertList({
       deviceId: crypto.randomUUID(),
-      body: { listId: crypto.randomUUID(), name: "My List" },
+      listId,
+      body: { name: "My List" },
     });
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(fetchMock).toHaveBeenCalledWith("https://api.example.test/v1/lists", expect.any(Object));
+    expect(fetchMock).toHaveBeenCalledWith(`https://api.example.test/v1/lists/${listId}`, expect.any(Object));
   });
 
   it("aborts slow requests using configured timeout", async () => {

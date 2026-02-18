@@ -20,7 +20,7 @@ export function registerShareTokenRoutes(app: FastifyInstance) {
     return { listId: request.auth!.listId }
   })
 
-  app.post('/v1/lists/:shareToken/share-tokens', { preHandler: requireToken }, async (request, reply) => {
+  app.post('/v1/lists/:listId/share-tokens', { preHandler: requireToken }, async (request, reply) => {
     const tokenId = crypto.randomUUID()
     const createdBy = request.auth!.deviceId
 

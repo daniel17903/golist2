@@ -38,10 +38,10 @@ describe('backend runtime integration (real postgres)', () => {
     expect(await healthResponse.json()).toEqual({ status: 'ok' })
 
     const listId = crypto.randomUUID()
-    const createResponse = await fetch(`${baseUrl}/v1/lists`, {
+    const createResponse = await fetch(`${baseUrl}/v1/lists/${listId}`, {
       method: 'PUT',
       headers: { 'content-type': 'application/json', 'x-device-id': testDeviceId },
-      body: JSON.stringify({ listId, name: 'Integration Test List' }),
+      body: JSON.stringify({ name: 'Integration Test List' }),
     })
 
     expect(createResponse.status).toBe(201)
@@ -81,10 +81,10 @@ describe('backend runtime integration (real postgres)', () => {
 
   it('creates items via PUT and enforces deterministic LWW tie-break conflicts', async () => {
     const listId = crypto.randomUUID()
-    const createResponse = await fetch(`${baseUrl}/v1/lists`, {
+    const createResponse = await fetch(`${baseUrl}/v1/lists/${listId}`, {
       method: 'PUT',
       headers: { 'content-type': 'application/json', 'x-device-id': testDeviceId },
-      body: JSON.stringify({ listId, name: 'Conflict List' }),
+      body: JSON.stringify({ name: 'Conflict List' }),
     })
 
     expect(createResponse.status).toBe(201)
@@ -109,7 +109,7 @@ describe('backend runtime integration (real postgres)', () => {
     const createItemTimestamp = new Date().toISOString()
 
     const createItemResponse = await fetch(
-      `${baseUrl}/v1/lists/${createPayload.shareToken}/items/${itemId}`,
+      `${baseUrl}/v1/lists/${createPayload.listId}/items/${itemId}`,
       {
         method: 'PUT',
         headers: {
@@ -129,7 +129,7 @@ describe('backend runtime integration (real postgres)', () => {
     expect(createItemResponse.status).toBe(201)
 
     const baselineItemResponse = await fetch(
-      `${baseUrl}/v1/lists/${createPayload.shareToken}/items/${itemId}`,
+      `${baseUrl}/v1/lists/${createPayload.listId}/items/${itemId}`,
       {
         headers: authHeaders,
       },
@@ -147,7 +147,7 @@ describe('backend runtime integration (real postgres)', () => {
     const sameTimestamp = new Date(Date.parse(baselineItem.updatedAt) + 60_000).toISOString()
 
     const [largerTieBreakUpdateResponse, smallerTieBreakUpdateResponse] = await Promise.all([
-      fetch(`${baseUrl}/v1/lists/${createPayload.shareToken}/items/${itemId}`, {
+      fetch(`${baseUrl}/v1/lists/${createPayload.listId}/items/${itemId}`, {
         method: 'PUT',
         headers: {
           ...authHeaders,
@@ -161,7 +161,7 @@ describe('backend runtime integration (real postgres)', () => {
           updatedAt: sameTimestamp,
         }),
       }),
-      fetch(`${baseUrl}/v1/lists/${createPayload.shareToken}/items/${itemId}`, {
+      fetch(`${baseUrl}/v1/lists/${createPayload.listId}/items/${itemId}`, {
         method: 'PUT',
         headers: {
           ...authHeaders,
@@ -180,7 +180,7 @@ describe('backend runtime integration (real postgres)', () => {
     expect(largerTieBreakUpdateResponse.status).toBe(204)
     expect(smallerTieBreakUpdateResponse.status).toBe(204)
 
-    const itemResponse = await fetch(`${baseUrl}/v1/lists/${createPayload.shareToken}/items/${itemId}`, {
+    const itemResponse = await fetch(`${baseUrl}/v1/lists/${createPayload.listId}/items/${itemId}`, {
       headers: authHeaders,
     })
 
@@ -200,22 +200,22 @@ describe('backend runtime integration (real postgres)', () => {
   it('forbids putting an existing list without a valid access token', async () => {
     const listId = crypto.randomUUID()
 
-    const createResponse = await fetch(`${baseUrl}/v1/lists`, {
+    const createResponse = await fetch(`${baseUrl}/v1/lists/${listId}`, {
       method: 'PUT',
       headers: { 'content-type': 'application/json', 'x-device-id': testDeviceId },
-      body: JSON.stringify({ listId, name: 'Owned List' }),
+      body: JSON.stringify({ name: 'Owned List' }),
     })
 
     expect(createResponse.status).toBe(201)
 
     const intruderDeviceId = '22222222-2222-4222-8222-222222222222'
-    const forbiddenUpdateResponse = await fetch(`${baseUrl}/v1/lists`, {
+    const forbiddenUpdateResponse = await fetch(`${baseUrl}/v1/lists/${listId}`, {
       method: 'PUT',
       headers: {
         'content-type': 'application/json',
         'x-device-id': intruderDeviceId,
       },
-      body: JSON.stringify({ listId, name: 'Should Fail' }),
+      body: JSON.stringify({ name: 'Should Fail' }),
     })
 
     expect(forbiddenUpdateResponse.status).toBe(403)
@@ -227,10 +227,10 @@ describe('backend runtime integration (real postgres)', () => {
     const secondGuestDeviceId = '55555555-5555-4555-8555-555555555555'
     const listId = crypto.randomUUID()
 
-    const createResponse = await fetch(`${baseUrl}/v1/lists`, {
+    const createResponse = await fetch(`${baseUrl}/v1/lists/${listId}`, {
       method: 'PUT',
       headers: { 'content-type': 'application/json', 'x-device-id': ownerDeviceId },
-      body: JSON.stringify({ listId, name: 'Token Flow List' }),
+      body: JSON.stringify({ name: 'Token Flow List' }),
     })
 
     expect(createResponse.status).toBe(201)
@@ -244,7 +244,7 @@ describe('backend runtime integration (real postgres)', () => {
       'x-device-id': guestDeviceId,
     }
 
-    const unredeemedGuestListResponse = await fetch(`${baseUrl}/v1/lists/${createdList.shareToken}`, {
+    const unredeemedGuestListResponse = await fetch(`${baseUrl}/v1/lists/${createdList.listId}`, {
       headers: unredeemedGuestHeaders,
     })
 
@@ -268,7 +268,7 @@ describe('backend runtime integration (real postgres)', () => {
 
     expect(redeemedGuestListResponse.status).toBe(200)
 
-    const createSecondaryTokenResponse = await fetch(`${baseUrl}/v1/lists/${createdList.shareToken}/share-tokens`, {
+    const createSecondaryTokenResponse = await fetch(`${baseUrl}/v1/lists/${createdList.listId}/share-tokens`, {
       method: 'POST',
       headers: unredeemedGuestHeaders,
     })
@@ -287,7 +287,7 @@ describe('backend runtime integration (real postgres)', () => {
       'x-device-id': secondGuestDeviceId,
     }
 
-    const secondUnredeemedListResponse = await fetch(`${baseUrl}/v1/lists/${secondaryToken.shareToken}`, {
+    const secondUnredeemedListResponse = await fetch(`${baseUrl}/v1/lists/${secondaryToken.listId}`, {
       headers: secondGuestHeaders,
     })
 

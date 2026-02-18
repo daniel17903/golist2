@@ -51,7 +51,6 @@ export type ApiListDocument = {
 };
 
 export type ApiListUpsertRequest = {
-  listId: string;
   name: string;
 };
 

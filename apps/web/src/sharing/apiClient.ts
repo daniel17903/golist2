@@ -174,11 +174,12 @@ const parseListDocumentResponse = (payload: unknown): ApiListDocument => {
 export const sharingApiClient = {
   async upsertList(params: {
     deviceId: string;
+    listId: string;
     body: ApiListUpsertRequest;
     shareToken?: string;
   }): Promise<ApiListUpsertResponse> {
     const response = await fetchWithTimeout(
-      `${apiBaseUrl}/v1/lists`,
+      `${apiBaseUrl}/v1/lists/${params.listId}`,
       {
         method: "PUT",
         headers: createHeaders(params.deviceId, params.shareToken),
@@ -221,11 +222,12 @@ export const sharingApiClient = {
   async upsertItem(params: {
     deviceId: string;
     shareToken: string;
+    listId: string;
     itemId: string;
     body: ApiItemUpsertRequest;
   }): Promise<void> {
     const response = await fetchWithTimeout(
-      `${apiBaseUrl}/v1/lists/${params.shareToken}/items/${params.itemId}`,
+      `${apiBaseUrl}/v1/lists/${params.listId}/items/${params.itemId}`,
       {
         method: "PUT",
         headers: createHeaders(params.deviceId, params.shareToken),
