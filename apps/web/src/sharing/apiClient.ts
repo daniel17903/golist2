@@ -4,6 +4,7 @@ import type {
   ApiListItem,
   ApiListUpsertRequest,
   ApiListUpsertResponse,
+  ApiShareTokenRedeemResponse,
 } from "@golist/shared/domain/types";
 
 type BackendCallLog = {
@@ -141,6 +142,15 @@ const parseListUpsertResponse = (payload: unknown): ApiListUpsertResponse => {
   return { listId, shareToken };
 };
 
+const parseShareTokenRedeemResponse = (payload: unknown): ApiShareTokenRedeemResponse => {
+  const listId = readString(payload, "listId");
+  if (!listId) {
+    throw new Error("Invalid redeem token response payload");
+  }
+
+  return { listId };
+};
+
 const parseListDocumentResponse = (payload: unknown): ApiListDocument => {
   const listId = readString(payload, "listId");
   const name = readString(payload, "name");
@@ -164,11 +174,12 @@ const parseListDocumentResponse = (payload: unknown): ApiListDocument => {
 export const sharingApiClient = {
   async upsertList(params: {
     deviceId: string;
+    listId: string;
     body: ApiListUpsertRequest;
     shareToken?: string;
   }): Promise<ApiListUpsertResponse> {
     const response = await fetchWithTimeout(
-      `${apiBaseUrl}/v1/lists`,
+      `${apiBaseUrl}/v1/lists/${params.listId}`,
       {
         method: "PUT",
         headers: createHeaders(params.deviceId, params.shareToken),
@@ -180,9 +191,9 @@ export const sharingApiClient = {
     return parseListUpsertResponse(await response.json());
   },
 
-  async fetchList(params: { deviceId: string; shareToken: string }): Promise<ApiListDocument> {
+  async fetchList(params: { deviceId: string; shareToken: string; listId: string }): Promise<ApiListDocument> {
     const response = await fetchWithTimeout(
-      `${apiBaseUrl}/v1/lists/${params.shareToken}`,
+      `${apiBaseUrl}/v1/lists/${params.listId}`,
       {
         method: "GET",
         headers: createHeaders(params.deviceId, params.shareToken),
@@ -193,7 +204,7 @@ export const sharingApiClient = {
     return parseListDocumentResponse(await response.json());
   },
 
-  async redeemShareToken(params: { deviceId: string; shareToken: string }): Promise<void> {
+  async redeemShareToken(params: { deviceId: string; shareToken: string }): Promise<ApiShareTokenRedeemResponse> {
     const response = await fetchWithTimeout(
       `${apiBaseUrl}/v1/share-tokens/${params.shareToken}/redeem`,
       {
@@ -205,16 +216,18 @@ export const sharingApiClient = {
       "redeem token",
     );
     await assertOk(response, "redeem token");
+    return parseShareTokenRedeemResponse(await response.json());
   },
 
   async upsertItem(params: {
     deviceId: string;
     shareToken: string;
+    listId: string;
     itemId: string;
     body: ApiItemUpsertRequest;
   }): Promise<void> {
     const response = await fetchWithTimeout(
-      `${apiBaseUrl}/v1/lists/${params.shareToken}/items/${params.itemId}`,
+      `${apiBaseUrl}/v1/lists/${params.listId}/items/${params.itemId}`,
       {
         method: "PUT",
         headers: createHeaders(params.deviceId, params.shareToken),

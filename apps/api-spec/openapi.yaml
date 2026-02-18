@@ -17,6 +17,13 @@ components:
       schema:
         type: string
         format: uuid
+    ListId:
+      name: listId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
     ItemId:
       name: itemId
       in: path
@@ -79,13 +86,10 @@ components:
         updatedAt:
           type: string
           format: date-time
-    ListCreateRequest:
+    ListUpsertRequest:
       type: object
-      required: [listId, name]
+      required: [name]
       properties:
-        listId:
-          type: string
-          format: uuid
         name:
           type: string
     ListCreateResponse:
@@ -121,12 +125,6 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ListItem"
-    ListNameUpdateRequest:
-      type: object
-      required: [name]
-      properties:
-        name:
-          type: string
     ShareTokenEntry:
       type: object
       required: [tokenId, listId, createdAt]
@@ -149,21 +147,29 @@ components:
             shareToken:
               type: string
               format: uuid
+    ShareTokenRedeemResponse:
+      type: object
+      required: [listId]
+      properties:
+        listId:
+          type: string
+          format: uuid
 security:
   - BearerAuth: []
 paths:
-  /v1/lists:
+  /v1/lists/{listId}:
+    parameters:
+      - $ref: "#/components/parameters/ListId"
+      - $ref: "#/components/parameters/DeviceIdHeader"
     put:
       summary: Create list (idempotent) or update existing list when caller has access
       security: []
-      parameters:
-        - $ref: "#/components/parameters/DeviceIdHeader"
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/ListCreateRequest"
+              $ref: "#/components/schemas/ListUpsertRequest"
       responses:
         "201":
           description: List created
@@ -179,12 +185,8 @@ paths:
                 $ref: "#/components/schemas/ListCreateResponse"
         "403":
           description: Existing list update requires caller access to that list
-  /v1/lists/{shareToken}:
-    parameters:
-      - $ref: "#/components/parameters/ShareToken"
-      - $ref: "#/components/parameters/DeviceIdHeader"
     get:
-      summary: Fetch list by share token
+      summary: Fetch list by list id
       responses:
         "200":
           description: List document
@@ -199,24 +201,9 @@ paths:
           description: List deleted
         "403":
           description: Only the creator device may delete the list
-  /v1/lists/{shareToken}/name:
+  /v1/lists/{listId}/items:
     parameters:
-      - $ref: "#/components/parameters/ShareToken"
-      - $ref: "#/components/parameters/DeviceIdHeader"
-    patch:
-      summary: Update list name
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/ListNameUpdateRequest"
-      responses:
-        "204":
-          description: List name updated
-  /v1/lists/{shareToken}/items:
-    parameters:
-      - $ref: "#/components/parameters/ShareToken"
+      - $ref: "#/components/parameters/ListId"
       - $ref: "#/components/parameters/DeviceIdHeader"
     get:
       summary: Fetch items updated after timestamp
@@ -229,9 +216,9 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UpdatedItemsResponse"
-  /v1/lists/{shareToken}/items/{itemId}:
+  /v1/lists/{listId}/items/{itemId}:
     parameters:
-      - $ref: "#/components/parameters/ShareToken"
+      - $ref: "#/components/parameters/ListId"
       - $ref: "#/components/parameters/DeviceIdHeader"
       - $ref: "#/components/parameters/ItemId"
     get:
@@ -265,11 +252,15 @@ paths:
     post:
       summary: Redeem a share token for the requesting device
       responses:
-        "204":
+        "200":
           description: Share token redeemed
-  /v1/lists/{shareToken}/share-tokens:
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ShareTokenRedeemResponse"
+  /v1/lists/{listId}/share-tokens:
     parameters:
-      - $ref: "#/components/parameters/ShareToken"
+      - $ref: "#/components/parameters/ListId"
       - $ref: "#/components/parameters/DeviceIdHeader"
     post:
       summary: Create additional share token for a list

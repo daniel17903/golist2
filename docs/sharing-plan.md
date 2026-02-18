@@ -66,9 +66,8 @@ The API contract is maintained in `apps/api-spec/openapi.yaml` (and related file
    - request/response logging
    - error normalization
 3. Implement list lifecycle:
-   - create shared list
-   - fetch list state
-   - update list name
+   - create/update shared list via `PUT /v1/lists/{listId}` (client-generated list IDs)
+   - fetch list state via list id
    - add/update/tombstone items
 4. Implement share token lifecycle:
    - generate token
@@ -81,9 +80,9 @@ The API contract is maintained in `apps/api-spec/openapi.yaml` (and related file
    - writes with newer `updatedAt` win
    - equal `updatedAt` conflicts are resolved by a stable tie-break value derived from item content
 2. Write paths are guarded with transactional row locking (`SELECT ... FOR UPDATE`) before mutating list/item state.
-3. Incremental sync support is implemented via `GET /v1/lists/{shareToken}/items?updatedAfter=...` with deterministic ordering by `updated_at` then `id`.
-4. Creation is idempotent with client-generated IDs: lists use `PUT /v1/lists` with a client `listId`, and items use `PUT /v1/lists/{shareToken}/items/{itemId}`.
-5. Existing-list `PUT /v1/lists` updates are access-controlled: only devices with list access (list creator or devices that redeemed the share token) may update an existing list.
+3. Incremental sync support is implemented via `GET /v1/lists/{listId}/items?updatedAfter=...` with deterministic ordering by `updated_at` then `id`.
+4. Creation is idempotent with client-generated IDs: lists use `PUT /v1/lists/{listId}` and items use `PUT /v1/lists/{listId}/items/{itemId}`.
+5. Existing-list `PUT /v1/lists/{listId}` updates are access-controlled: only devices with list access (list creator or devices that redeemed the share token) may update an existing list.
 6. Authenticated list routes enforce creator-or-redeemed access: protected calls are allowed for the list creator or for devices that redeemed the active share token for that list.
 
 ### Phase 4 — Web app integration ✅ Implemented

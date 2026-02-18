@@ -51,13 +51,16 @@ export type ApiListDocument = {
 };
 
 export type ApiListUpsertRequest = {
-  listId: string;
   name: string;
 };
 
 export type ApiListUpsertResponse = {
   listId: string;
   shareToken: string;
+};
+
+export type ApiShareTokenRedeemResponse = {
+  listId: string;
 };
 
 export type ApiItemUpsertRequest = {

@@ -6,12 +6,10 @@ import { z } from 'zod'
 import { requireToken } from '../auth.js'
 import { query, withTransaction } from '../db/client.js'
 
-const listPutSchema = z.object({
-  listId: z.uuid(),
-  name: z.string().min(1),
-})
-const listNameUpdateSchema = z.object({ name: z.string().min(1) })
+const listIdParamsSchema = z.object({ listId: z.uuid() })
+const listPutBodySchema = z.object({ name: z.string().min(1) })
 const listCreateHeadersSchema = z.object({ 'x-device-id': z.uuid() })
+const itemParamsSchema = z.object({ listId: z.uuid(), itemId: z.uuid() })
 const itemUpsertSchema = z.object({
   name: z.string().min(1),
   quantityOrUnit: z.string().min(1).optional(),
@@ -21,7 +19,6 @@ const itemUpsertSchema = z.object({
 })
 
 const itemUpdateTieBreakDelimiter = '\u0001'
-
 
 type ListItemRow = {
   id: string
@@ -63,8 +60,9 @@ function computeItemTieBreakValue(item: {
 }
 
 export function registerListRoutes(app: FastifyInstance) {
-  app.put('/v1/lists', async (request, reply) => {
-    const body = listPutSchema.parse(request.body)
+  app.put('/v1/lists/:listId', async (request, reply) => {
+    const params = listIdParamsSchema.parse(request.params)
+    const body = listPutBodySchema.parse(request.body)
     const headers = listCreateHeadersSchema.parse(request.headers)
     const createdBy = headers['x-device-id']
 
@@ -75,18 +73,18 @@ export function registerListRoutes(app: FastifyInstance) {
       const existingListResult = await client.query<{
         id: string
         created_by_device_id: string
-      }>('SELECT id, created_by_device_id FROM shared_lists WHERE id = $1 FOR UPDATE', [body.listId])
+      }>('SELECT id, created_by_device_id FROM shared_lists WHERE id = $1 FOR UPDATE', [params.listId])
 
       if (!existingListResult.rowCount) {
         const tokenId = crypto.randomUUID()
 
         await client.query(
           'INSERT INTO shared_lists(id, name, created_by_device_id, created_at, updated_at) VALUES ($1, $2, $3, NOW(), NOW())',
-          [body.listId, body.name, createdBy],
+          [params.listId, body.name, createdBy],
         )
         await client.query(
           'INSERT INTO share_tokens(id, list_id, created_by_device_id, created_at) VALUES ($1, $2, $3, NOW())',
-          [tokenId, body.listId, createdBy],
+          [tokenId, params.listId, createdBy],
         )
         await client.query(
           `INSERT INTO share_token_redemptions(token_id, device_id, redeemed_at)
@@ -110,7 +108,7 @@ export function registerListRoutes(app: FastifyInstance) {
             AND revoked_at IS NULL
             AND (expires_at IS NULL OR expires_at > NOW())
           LIMIT 1`,
-        [bearerToken, body.listId],
+        [bearerToken, params.listId],
       )
 
       if (!tokenResult.rowCount) {
@@ -132,7 +130,7 @@ export function registerListRoutes(app: FastifyInstance) {
         return { statusCode: 403 as const }
       }
 
-      await client.query('UPDATE shared_lists SET name = $1, updated_at = NOW() WHERE id = $2', [body.name, body.listId])
+      await client.query('UPDATE shared_lists SET name = $1, updated_at = NOW() WHERE id = $2', [body.name, params.listId])
 
       return { statusCode: 200 as const, shareToken: bearerToken }
     })
@@ -142,10 +140,10 @@ export function registerListRoutes(app: FastifyInstance) {
       return { message: 'Forbidden' }
     }
 
-    return { listId: body.listId, shareToken: result.shareToken }
+    return { listId: params.listId, shareToken: result.shareToken }
   })
 
-  app.get('/v1/lists/:shareToken', { preHandler: requireToken }, async (request) => {
+  app.get('/v1/lists/:listId', { preHandler: requireToken }, async (request) => {
     const auth = request.auth!
 
     const listResult = await query<{
@@ -178,7 +176,7 @@ export function registerListRoutes(app: FastifyInstance) {
     }
   })
 
-  app.delete('/v1/lists/:shareToken', { preHandler: requireToken }, async (request, reply) => {
+  app.delete('/v1/lists/:listId', { preHandler: requireToken }, async (request, reply) => {
     const result = await withTransaction(async (client) => {
       await client.query('SELECT id FROM shared_lists WHERE id = $1 FOR UPDATE', [request.auth!.listId])
 
@@ -196,18 +194,7 @@ export function registerListRoutes(app: FastifyInstance) {
     reply.code(204)
   })
 
-  app.patch('/v1/lists/:shareToken/name', { preHandler: requireToken }, async (request, reply) => {
-    const body = listNameUpdateSchema.parse(request.body)
-
-    await withTransaction(async (client) => {
-      await client.query('SELECT id FROM shared_lists WHERE id = $1 FOR UPDATE', [request.auth!.listId])
-      await client.query('UPDATE shared_lists SET name = $1, updated_at = NOW() WHERE id = $2', [body.name, request.auth!.listId])
-    })
-
-    reply.code(204)
-  })
-
-  app.get('/v1/lists/:shareToken/items', { preHandler: requireToken }, async (request) => {
+  app.get('/v1/lists/:listId/items', { preHandler: requireToken }, async (request) => {
     const querystring = z.object({ updatedAfter: z.iso.datetime() }).parse(request.query)
 
     const itemsResult = await query<ListItemRow>(
@@ -223,8 +210,8 @@ export function registerListRoutes(app: FastifyInstance) {
     }
   })
 
-  app.get('/v1/lists/:shareToken/items/:itemId', { preHandler: requireToken }, async (request, reply) => {
-    const params = z.object({ itemId: z.uuid() }).parse(request.params)
+  app.get('/v1/lists/:listId/items/:itemId', { preHandler: requireToken }, async (request, reply) => {
+    const params = itemParamsSchema.parse(request.params)
     const itemResult = await query<ListItemRow>(
       `SELECT id, name, quantity_or_unit, category, deleted, created_at, updated_at
          FROM list_items
@@ -241,8 +228,8 @@ export function registerListRoutes(app: FastifyInstance) {
     return serializeListItem(itemResult.rows[0])
   })
 
-  app.put('/v1/lists/:shareToken/items/:itemId', { preHandler: requireToken }, async (request, reply) => {
-    const params = z.object({ itemId: z.uuid() }).parse(request.params)
+  app.put('/v1/lists/:listId/items/:itemId', { preHandler: requireToken }, async (request, reply) => {
+    const params = itemParamsSchema.parse(request.params)
     const body = itemUpsertSchema.parse(request.body)
     const tieBreakValue = computeItemTieBreakValue(body)
 

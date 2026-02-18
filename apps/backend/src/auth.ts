@@ -21,6 +21,7 @@ declare module 'fastify' {
 const uuidSchema = z.uuid()
 const deviceIdHeaderSchema = z.object({ 'x-device-id': z.uuid() })
 const shareTokenParamsSchema = z.object({ shareToken: z.uuid() })
+const listIdParamsSchema = z.object({ listId: z.uuid() })
 const deviceIdQuerySchema = z.object({ deviceId: z.uuid() })
 
 function getBearerToken(request: FastifyRequest): string | null {
@@ -63,8 +64,12 @@ async function requireTokenInternal(
   requireRedeemedAccess: boolean,
 ) {
   const bearerToken = getBearerToken(request)
-  const params = shareTokenParamsSchema.safeParse(request.params)
-  const shareToken = params.success ? params.data.shareToken : null
+  const shareTokenParams = shareTokenParamsSchema.safeParse(request.params)
+  const listIdParams = listIdParamsSchema.safeParse(request.params)
+
+  const shareToken = shareTokenParams.success
+    ? shareTokenParams.data.shareToken
+    : bearerToken
 
   if (!bearerToken || !shareToken || bearerToken !== shareToken) {
     reply.code(401).send({ message: 'Unauthorized' })
@@ -90,6 +95,11 @@ async function requireTokenInternal(
 
   if (!tokenResult.rowCount) {
     reply.code(401).send({ message: 'Unauthorized' })
+    return
+  }
+
+  if (listIdParams.success && tokenResult.rows[0].list_id !== listIdParams.data.listId) {
+    reply.code(403).send({ message: 'Forbidden' })
     return
   }
 

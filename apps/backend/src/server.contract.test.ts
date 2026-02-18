@@ -27,9 +27,9 @@ describe('sharing API contract basics', () => {
 
     const response = await app.inject({
       method: 'PUT',
-      url: '/v1/lists',
+      url: '/v1/lists/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
       headers: { 'x-device-id': '11111111-1111-4111-8111-111111111111' },
-      payload: { listId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'Groceries' },
+      payload: { name: 'Groceries' },
     })
 
     expect(response.statusCode).toBe(201)
@@ -58,8 +58,8 @@ describe('sharing API contract basics', () => {
 
     const response = await app.inject({
       method: 'PUT',
-      url: '/v1/lists',
-      payload: { listId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', name: 'Groceries' },
+      url: '/v1/lists/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      payload: { name: 'Groceries' },
     })
 
     expect(response.statusCode).toBe(400)
@@ -71,7 +71,7 @@ describe('sharing API contract basics', () => {
     const { buildServer } = await import('./server.js')
     const app = buildServer()
 
-    const response = await app.inject({ method: 'GET', url: '/v1/lists/sample-token' })
+    const response = await app.inject({ method: 'GET', url: '/v1/lists/11111111-1111-4111-8111-111111111111' })
 
     expect(response.statusCode).toBe(401)
 
@@ -140,7 +140,7 @@ describe('sharing API contract basics', () => {
 
     const response = await app.inject({
       method: 'PUT',
-      url: '/v1/lists/11111111-1111-4111-8111-111111111111/items/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      url: '/v1/lists/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/items/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
       headers: {
         authorization: 'Bearer 11111111-1111-4111-8111-111111111111',
         'x-device-id': '11111111-1111-4111-8111-111111111111',
@@ -179,7 +179,7 @@ describe('sharing API contract basics', () => {
       },
     })
 
-    expect(response.statusCode).toBe(204)
+    expect(response.statusCode).toBe(200)
 
     await app.close()
   })
@@ -197,7 +197,7 @@ describe('sharing API contract basics', () => {
 
     const response = await app.inject({
       method: 'POST',
-      url: '/v1/lists/11111111-1111-4111-8111-111111111111/share-tokens',
+      url: '/v1/lists/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/share-tokens',
       headers: {
         authorization: 'Bearer 11111111-1111-4111-8111-111111111111',
         'x-device-id': '22222222-2222-4222-8222-222222222222',
@@ -235,7 +235,7 @@ describe('sharing API contract basics', () => {
 
     const response = await app.inject({
       method: 'POST',
-      url: '/v1/lists/11111111-1111-4111-8111-111111111111/share-tokens',
+      url: '/v1/lists/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/share-tokens',
       headers: {
         authorization: 'Bearer 11111111-1111-4111-8111-111111111111',
         'x-device-id': '22222222-2222-4222-8222-222222222222',
@@ -280,8 +280,8 @@ describe('sharing API contract basics', () => {
       headers,
     })
 
-    expect(firstResponse.statusCode).toBe(204)
-    expect(secondResponse.statusCode).toBe(204)
+    expect(firstResponse.statusCode).toBe(200)
+    expect(secondResponse.statusCode).toBe(200)
 
     await app.close()
   })

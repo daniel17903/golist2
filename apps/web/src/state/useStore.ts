@@ -81,9 +81,9 @@ const syncListNameImmediately = async (listId: string, listName: string) => {
 
   await sharingApiClient.upsertList({
     deviceId: state.metadata.deviceId,
+    listId,
     shareToken,
     body: {
-      listId,
       name: listName,
     },
   });
@@ -102,6 +102,7 @@ const syncItemImmediately = async (item: Item) => {
   await sharingApiClient.upsertItem({
     deviceId: state.metadata.deviceId,
     shareToken,
+    listId: item.listId,
     itemId: item.id,
     body: {
       name: item.name,
@@ -307,7 +308,8 @@ export const useStore = create<StoreState>((set, get) => ({
 
     const response = await sharingApiClient.upsertList({
       deviceId: state.metadata.deviceId,
-      body: { listId: list.id, name: list.name },
+      listId: list.id,
+      body: { name: list.name },
     });
 
     markBackendOnline();
@@ -333,7 +335,7 @@ export const useStore = create<StoreState>((set, get) => ({
     }
 
     try {
-      await sharingApiClient.redeemShareToken({
+      const redemption = await sharingApiClient.redeemShareToken({
         deviceId: state.metadata.deviceId,
         shareToken,
       });
@@ -341,6 +343,7 @@ export const useStore = create<StoreState>((set, get) => ({
       const remoteList = await sharingApiClient.fetchList({
         deviceId: state.metadata.deviceId,
         shareToken,
+        listId: redemption.listId,
       });
 
       const localList: List = {
@@ -399,14 +402,15 @@ export const useStore = create<StoreState>((set, get) => ({
     }
 
     const deviceId = state.metadata.deviceId;
-    const remoteList = await sharingApiClient.fetchList({ deviceId, shareToken });
+    const remoteList = await sharingApiClient.fetchList({ deviceId, shareToken, listId });
 
     const remoteListUpdatedAt = toMillis(remoteList.updatedAt);
     if (localList.updatedAt > remoteListUpdatedAt || localList.name !== remoteList.name) {
       await sharingApiClient.upsertList({
         deviceId,
+        listId,
         shareToken,
-        body: { listId, name: localList.name },
+        body: { name: localList.name },
       });
     }
 
@@ -435,6 +439,7 @@ export const useStore = create<StoreState>((set, get) => ({
       await sharingApiClient.upsertItem({
         deviceId,
         shareToken,
+        listId,
         itemId: item.id,
         body: {
           name: item.name,
@@ -446,7 +451,7 @@ export const useStore = create<StoreState>((set, get) => ({
       });
     }
 
-    const refreshedList = await sharingApiClient.fetchList({ deviceId, shareToken });
+    const refreshedList = await sharingApiClient.fetchList({ deviceId, shareToken, listId });
     const syncedList: List = {
       id: refreshedList.listId,
       name: refreshedList.name,
