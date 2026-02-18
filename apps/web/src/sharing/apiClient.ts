@@ -100,9 +100,19 @@ const fetchWithTimeout = async (url: string, options: RequestInit, context: stri
 
   try {
     const response = await fetch(url, { ...options, signal: controller.signal });
+    if (!response.ok) {
+      const responseBody = await response.clone().text();
+      logBackendCall({
+        endpoint: url,
+        outcome: "error",
+        message: `${context} failed with ${response.status} in ${Date.now() - startedAt}ms: ${responseBody}`,
+      });
+      return response;
+    }
+
     logBackendCall({
       endpoint: url,
-      outcome: response.ok ? "success" : "error",
+      outcome: "success",
       message: `${context} completed with ${response.status} in ${Date.now() - startedAt}ms`,
     });
     return response;
@@ -113,7 +123,7 @@ const fetchWithTimeout = async (url: string, options: RequestInit, context: stri
       throw new Error(message);
     }
 
-    const message = `${context} request failed in ${Date.now() - startedAt}ms`;
+    const message = `${context} request failed in ${Date.now() - startedAt}ms: no response status/body available`;
     logBackendCall({ endpoint: url, outcome: "error", message });
     throw error;
   } finally {

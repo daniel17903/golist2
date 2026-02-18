@@ -35,6 +35,45 @@ describe("sharingApiClient", () => {
     expect(fetchMock).toHaveBeenCalledWith(`https://api.example.test/v1/lists/${listId}`, expect.any(Object));
   });
 
+
+
+  it("logs failed responses with status code and body", async () => {
+    vi.stubGlobal("__API_BASE_URL__", "http://localhost:3000");
+    vi.stubGlobal("__API_TIMEOUT_MS__", "4000");
+
+    const fetchMock = vi.fn(async () =>
+      new Response('{"error":"forbidden"}', {
+        status: 403,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+    globalThis.fetch = fetchMock;
+
+    const { setBackendCallLogger, sharingApiClient } = await import("./apiClient");
+    const logger = vi.fn();
+    setBackendCallLogger(logger);
+
+    await expect(
+      sharingApiClient.fetchList({
+        deviceId: crypto.randomUUID(),
+        listId: crypto.randomUUID(),
+      }),
+    ).rejects.toThrow('fetch list failed: 403 {"error":"forbidden"}');
+
+    expect(logger).toHaveBeenCalledWith(
+      expect.objectContaining({
+        outcome: "error",
+        message: expect.stringContaining('fetch list failed with 403'),
+      }),
+    );
+    expect(logger).toHaveBeenCalledWith(
+      expect.objectContaining({
+        outcome: "error",
+        message: 'fetch list failed: 403 {"error":"forbidden"}',
+      }),
+    );
+  });
+
   it("aborts slow requests using configured timeout", async () => {
     vi.useFakeTimers();
     vi.stubGlobal("__API_BASE_URL__", "http://localhost:3000");
