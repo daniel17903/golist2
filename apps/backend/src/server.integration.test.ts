@@ -281,7 +281,7 @@ describe('backend runtime integration (real postgres)', () => {
 
     expect(redeemedGuestListResponse.status).toBe(200)
 
-    const secondaryToken = await createShareTokenForList(createdList.listId, ownerDeviceId)
+    const secondaryToken = await createShareTokenForList(createdList.listId, guestDeviceId)
 
     expect(secondaryToken.listId).toBe(listId)
     expect(secondaryToken.shareToken).toBe(secondaryToken.tokenId)

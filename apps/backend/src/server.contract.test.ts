@@ -98,9 +98,11 @@ describe('sharing API contract basics', () => {
 
     queryMock
       .mockResolvedValueOnce({
-        rowCount: 0,
-        rows: [],
+        rowCount: 1,
+        rows: [{ token_id: '11111111-1111-4111-8111-111111111111', list_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' }],
       })
+      .mockResolvedValueOnce({ rowCount: 0, rows: [] })
+      .mockResolvedValueOnce({ rowCount: 0, rows: [] })
 
     const response = await app.inject({
       method: 'GET',
@@ -111,7 +113,7 @@ describe('sharing API contract basics', () => {
       },
     })
 
-    expect(response.statusCode).toBe(401)
+    expect(response.statusCode).toBe(403)
 
     await app.close()
   })
@@ -187,7 +189,7 @@ describe('sharing API contract basics', () => {
     queryMock
       .mockResolvedValueOnce({
         rowCount: 1,
-        rows: [{ id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' }],
+        rows: [{ has_access: true }],
       })
       .mockResolvedValueOnce({ rowCount: 1, rows: [{ created_at: '2026-01-01T00:00:00.000Z' }] })
       .mockResolvedValueOnce({ rowCount: 1, rows: [] })
@@ -224,9 +226,11 @@ describe('sharing API contract basics', () => {
 
     queryMock
       .mockResolvedValueOnce({
-        rowCount: 0,
-        rows: [],
+        rowCount: 1,
+        rows: [{ token_id: '11111111-1111-4111-8111-111111111111', list_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' }],
       })
+      .mockResolvedValueOnce({ rowCount: 0, rows: [] })
+      .mockResolvedValueOnce({ rowCount: 0, rows: [] })
 
     const response = await app.inject({
       method: 'POST',

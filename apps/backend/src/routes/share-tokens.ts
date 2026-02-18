@@ -29,12 +29,27 @@ export function registerShareTokenRoutes(app: FastifyInstance) {
     const headers = deviceHeaderSchema.parse(request.headers)
     const deviceId = headers['x-device-id']
 
-    const creatorResult = await query<{ id: string }>(
-      'SELECT id FROM shared_lists WHERE id = $1 AND created_by_device_id = $2 LIMIT 1',
+    const listAccessResult = await query<{ has_access: boolean }>(
+      `SELECT EXISTS(
+         SELECT 1
+           FROM shared_lists
+          WHERE id = $1
+            AND created_by_device_id = $2
+       )
+       OR EXISTS(
+         SELECT 1
+           FROM share_token_redemptions redemptions
+           JOIN share_tokens tokens
+             ON tokens.id = redemptions.token_id
+          WHERE redemptions.device_id = $2
+            AND tokens.list_id = $1
+            AND tokens.revoked_at IS NULL
+            AND (tokens.expires_at IS NULL OR tokens.expires_at > NOW())
+       ) AS has_access`,
       [listId, deviceId],
     )
 
-    if (!creatorResult.rowCount) {
+    if (!listAccessResult.rows[0]?.has_access) {
       reply.code(403)
       return { message: 'Forbidden' }
     }

@@ -71,7 +71,7 @@ The API contract is maintained in `apps/api-spec/openapi.yaml` (and related file
    - add/update/tombstone items
 4. Implement share token lifecycle:
    - create lists without auto-generating share tokens
-   - generate token only from explicit `POST /v1/lists/{listId}/share-tokens` calls (for creator device)
+   - generate token only from explicit `POST /v1/lists/{listId}/share-tokens` calls (for creator or redeemed devices with list access)
    - redeem token
    - track redemptions/devices
 5. **GitHub Actions update**: backend bootstrap workflow now runs backend tests (including API contract baseline tests in `apps/backend/src/server.contract.test.ts`).
