@@ -19,6 +19,13 @@ export const useAppState = () => {
     toggleItem,
     updateItem,
     deleteList,
+    ensureShareToken,
+    joinSharedList,
+    syncAllLists,
+    backendConnection,
+    syncNotice,
+    clearSyncNotice,
+    backendLogs,
   } = useStore();
 
   const [newListName, setNewListName] = useState("");
@@ -39,6 +46,54 @@ export const useAppState = () => {
       void addList(defaultListName);
     }
   }, [isLoaded, lists.length, addList]);
+
+  useEffect(() => {
+    if (!isLoaded) {
+      return;
+    }
+
+    const shareTokenFromUrl = new URLSearchParams(window.location.search).get("shareToken");
+    if (!shareTokenFromUrl) {
+      return;
+    }
+
+    void (async () => {
+      try {
+        await joinSharedList(shareTokenFromUrl);
+      } catch {
+        window.alert("Geteilter Link konnte nicht geöffnet werden.");
+      } finally {
+        const cleanedUrl = new URL(window.location.href);
+        cleanedUrl.searchParams.delete("shareToken");
+        window.history.replaceState({}, "", cleanedUrl.toString());
+      }
+    })();
+  }, [isLoaded, joinSharedList]);
+
+  useEffect(() => {
+    if (!isLoaded) {
+      return;
+    }
+
+    const interval = window.setInterval(() => {
+      void syncAllLists();
+    }, 60_000);
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        void syncAllLists();
+      }
+    };
+
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    window.addEventListener("online", onVisibilityChange);
+
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      window.removeEventListener("online", onVisibilityChange);
+    };
+  }, [isLoaded, syncAllLists]);
 
   const activeList = lists.find((list) => list.id === activeListId) ?? null;
   const listItems = useMemo(() => {
@@ -153,6 +208,14 @@ export const useAppState = () => {
     setIsDrawerOpen(false);
   };
 
+  const handleShareActiveList = async () => {
+    if (!activeListId) {
+      throw new Error("Keine aktive Liste ausgewählt");
+    }
+    const token = await ensureShareToken(activeListId);
+    return `${window.location.origin}/?shareToken=${token}`;
+  };
+
   return {
     lists,
     items,
@@ -186,5 +249,11 @@ export const useAppState = () => {
     openAddDialog,
     handleCreateList,
     handleDeleteList,
+    handleShareActiveList,
+    joinSharedList,
+    backendConnection,
+    syncNotice,
+    clearSyncNotice,
+    backendLogs,
   };
 };

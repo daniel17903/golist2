@@ -49,6 +49,11 @@ const App = () => {
     openAddDialog,
     handleCreateList,
     handleDeleteList,
+    handleShareActiveList,
+    backendConnection,
+    syncNotice,
+    clearSyncNotice,
+    backendLogs,
   } = useAppState();
 
   const undoTimeoutsRef = useRef<Map<string, number>>(new Map());
@@ -123,6 +128,20 @@ const App = () => {
       onShortPress: handleToggleItem,
     });
 
+  useEffect(() => {
+    if (!__IS_VERCEL_NON_PRODUCTION__ || !syncNotice) {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      clearSyncNotice();
+    }, 6000);
+
+    return () => {
+      window.clearTimeout(timeout);
+    };
+  }, [syncNotice, clearSyncNotice]);
+
   return (
     <div className="app">
       <AppHeader
@@ -131,6 +150,7 @@ const App = () => {
           setNewListName(activeList?.name ?? "");
           setEditingTitle(true);
         }}
+        backendConnection={backendConnection}
       />
 
       <ItemGrid
@@ -143,7 +163,52 @@ const App = () => {
         onPointerCancel={handlePointerCancel}
       />
 
-      <BottomBar onOpenDrawer={() => setIsDrawerOpen(true)} onAddItem={openAddDialog} />
+      <BottomBar
+        onOpenDrawer={() => setIsDrawerOpen(true)}
+        onAddItem={openAddDialog}
+        onShareList={() => {
+          void (async () => {
+            try {
+              const shareLink = await handleShareActiveList();
+              await navigator.clipboard.writeText(shareLink);
+              window.alert("Teilen-Link wurde in die Zwischenablage kopiert.");
+            } catch {
+              window.alert("Teilen ist derzeit nicht verfügbar.");
+            }
+          })();
+        }}
+      />
+
+      {__IS_VERCEL_NON_PRODUCTION__ && syncNotice ? (
+        <div className="sync-toast" role="status" aria-live="polite">
+          <span>{syncNotice.message}</span>
+          <button type="button" className="sync-toast__close" onClick={clearSyncNotice}>
+            Schließen
+          </button>
+        </div>
+      ) : null}
+
+      {__IS_VERCEL_NON_PRODUCTION__ ? (
+        <div className="backend-log-panel" aria-live="polite">
+          <p className="backend-log-panel__title">Backend-Logs</p>
+          <ul className="backend-log-panel__list">
+            {backendLogs.length === 0 ? (
+              <li className="backend-log-panel__entry backend-log-panel__entry--skipped">
+                Noch keine Backend-Aufrufe protokolliert.
+              </li>
+            ) : (
+              backendLogs.slice().reverse().map((entry) => (
+                <li
+                  key={entry.id}
+                  className={`backend-log-panel__entry backend-log-panel__entry--${entry.outcome}`}
+                >
+                  {entry.message}
+                </li>
+              ))
+            )}
+          </ul>
+        </div>
+      ) : null}
 
       <div className="undo-toast-stack" aria-live="polite" aria-atomic="false">
         {undoToasts.map((toast) => (

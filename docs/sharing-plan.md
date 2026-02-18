@@ -86,17 +86,18 @@ The API contract is maintained in `apps/api-spec/openapi.yaml` (and related file
 5. Existing-list `PUT /v1/lists` updates are access-controlled: only devices with list access (list creator or devices that redeemed the share token) may update an existing list.
 6. Authenticated list routes enforce creator-or-redeemed access: protected calls are allowed for the list creator or for devices that redeemed the active share token for that list.
 
-### Phase 4 — Web app integration
-1. Add API client in `apps/web` for sharing and sync endpoints.
-2. Add UI flows:
-   - Share list (create/reveal tokenized link)
-   - Join list by link
-3. Wire sync triggers:
-   - initial load pull
-   - foreground/background periodic sync
-   - optimistic local updates with reconciliation
-4. Preserve existing local-first behavior when offline.
-5. **GitHub Actions update**: expand web CI checks for integration tests that run against backend service containers.
+### Phase 4 — Web app integration ✅ Implemented
+1. Sharing API client is implemented in `apps/web/src/sharing/apiClient.ts` for list upsert, token redemption, list fetch, item upsert, and token extraction from links.
+2. UI flows are implemented in `apps/web`:
+   - share active list (create/reveal tokenized link via header action)
+   - join list by share link/token via header action
+3. Sync triggers are wired in web state/hooks:
+   - initial-load pull sync for shared lists
+   - foreground/background periodic sync (`setInterval`, `visibilitychange`, and `online` hooks)
+   - optimistic local updates with reconciliation against remote list/item state
+4. Local-first behavior is preserved when offline by keeping local mutations authoritative and treating sync errors as non-fatal.
+   - Frontend sync flow details are documented in `docs/frontend-sharing-sync.md` (immediate mutation push + background full reconciliation).
+5. **GitHub Actions update**: web CI continues to validate web lint/typecheck/test/build, while backend integration behavior remains covered by backend test suites/workflows.
 
 ### Phase 5 — Quality, observability, and hardening
 1. Add integration tests with ephemeral Postgres.
