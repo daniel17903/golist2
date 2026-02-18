@@ -59,11 +59,35 @@ const triggerSyncInBackground = (listId: string) => {
     .catch(() => undefined);
 };
 
+const getShareTokenForList = async (listId: string) => {
+  const state = useStore.getState();
+  if (!state.metadata?.deviceId) {
+    logSkippedBackendCall("Sync skipped: device metadata missing.");
+    return null;
+  }
+
+  const existing = state.listShareTokens[listId];
+  if (existing) {
+    return existing;
+  }
+
+  try {
+    return await state.ensureShareToken(listId);
+  } catch {
+    logSkippedBackendCall("Sync skipped: unable to acquire share token.");
+    return null;
+  }
+};
+
 const syncListNameImmediately = async (listId: string, listName: string) => {
   const state = useStore.getState();
-  const shareToken = state.listShareTokens[listId];
-  if (!shareToken || !state.metadata?.deviceId) {
-    logSkippedBackendCall("List name sync skipped: missing share token or device metadata.");
+  if (!state.metadata?.deviceId) {
+    logSkippedBackendCall("List name sync skipped: device metadata missing.");
+    return;
+  }
+
+  const shareToken = await getShareTokenForList(listId);
+  if (!shareToken) {
     return;
   }
 
@@ -81,9 +105,13 @@ const syncListNameImmediately = async (listId: string, listName: string) => {
 
 const syncItemImmediately = async (item: Item) => {
   const state = useStore.getState();
-  const shareToken = state.listShareTokens[item.listId];
-  if (!shareToken || !state.metadata?.deviceId) {
-    logSkippedBackendCall("Item sync skipped: missing share token or device metadata.");
+  if (!state.metadata?.deviceId) {
+    logSkippedBackendCall("Item sync skipped: device metadata missing.");
+    return;
+  }
+
+  const shareToken = await getShareTokenForList(item.listId);
+  if (!shareToken) {
     return;
   }
 
@@ -178,6 +206,7 @@ export const useStore = create<StoreState>((set, get) => ({
       activeListId: list.id,
     }));
 
+    triggerSyncInBackground(list.id);
   },
   renameList: async (listId: string, name: string) => {
     const now = Date.now();
@@ -381,8 +410,12 @@ export const useStore = create<StoreState>((set, get) => ({
   },
   syncList: async (listId: string) => {
     const state = get();
-    const shareToken = state.listShareTokens[listId];
-    if (!shareToken || !state.metadata?.deviceId) {
+    if (!state.metadata?.deviceId) {
+      return;
+    }
+
+    const shareToken = await getShareTokenForList(listId);
+    if (!shareToken) {
       return;
     }
 
