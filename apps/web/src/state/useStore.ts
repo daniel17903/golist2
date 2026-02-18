@@ -105,6 +105,13 @@ const markBackendOnline = () => {
   useStore.setState({ backendConnection: "online" });
 };
 
+const describeSyncError = (error: unknown) => {
+  if (error instanceof Error && error.message.trim()) {
+    return error.message;
+  }
+  return null;
+};
+
 const reportSyncError = (message: string) => {
   useStore.setState({
     backendConnection: "offline",
@@ -176,8 +183,13 @@ export const useStore = create<StoreState>((set, get) => ({
 
     try {
       await syncListNameImmediately(list.id, list.name);
-    } catch {
-      reportSyncError("Backend-Verbindung fehlgeschlagen. Änderungen bleiben lokal und werden später synchronisiert.");
+    } catch (error) {
+      const details = describeSyncError(error);
+      reportSyncError(
+        details
+          ? `Backend-Verbindung fehlgeschlagen (${details}). Änderungen bleiben lokal und werden später synchronisiert.`
+          : "Backend-Verbindung fehlgeschlagen. Änderungen bleiben lokal und werden später synchronisiert.",
+      );
     }
 
     triggerSyncInBackground(list.id);
@@ -192,8 +204,13 @@ export const useStore = create<StoreState>((set, get) => ({
     }));
     try {
       await syncListNameImmediately(listId, name);
-    } catch {
-      reportSyncError("Backend-Verbindung fehlgeschlagen. Änderungen bleiben lokal und werden später synchronisiert.");
+    } catch (error) {
+      const details = describeSyncError(error);
+      reportSyncError(
+        details
+          ? `Backend-Verbindung fehlgeschlagen (${details}). Änderungen bleiben lokal und werden später synchronisiert.`
+          : "Backend-Verbindung fehlgeschlagen. Änderungen bleiben lokal und werden später synchronisiert.",
+      );
     }
 
     triggerSyncInBackground(listId);
@@ -233,8 +250,13 @@ export const useStore = create<StoreState>((set, get) => ({
     set((state) => ({ items: [...state.items, item] }));
     try {
       await syncItemImmediately(item);
-    } catch {
-      reportSyncError("Backend-Verbindung fehlgeschlagen. Änderungen bleiben lokal und werden später synchronisiert.");
+    } catch (error) {
+      const details = describeSyncError(error);
+      reportSyncError(
+        details
+          ? `Backend-Verbindung fehlgeschlagen (${details}). Änderungen bleiben lokal und werden später synchronisiert.`
+          : "Backend-Verbindung fehlgeschlagen. Änderungen bleiben lokal und werden später synchronisiert.",
+      );
     }
 
     triggerSyncInBackground(listId);
@@ -255,8 +277,13 @@ export const useStore = create<StoreState>((set, get) => ({
 
     try {
       await syncItemImmediately(updated);
-    } catch {
-      reportSyncError("Backend-Verbindung fehlgeschlagen. Änderungen bleiben lokal und werden später synchronisiert.");
+    } catch (error) {
+      const details = describeSyncError(error);
+      reportSyncError(
+        details
+          ? `Backend-Verbindung fehlgeschlagen (${details}). Änderungen bleiben lokal und werden später synchronisiert.`
+          : "Backend-Verbindung fehlgeschlagen. Änderungen bleiben lokal und werden später synchronisiert.",
+      );
     }
 
     triggerSyncInBackground(updated.listId);
@@ -279,8 +306,13 @@ export const useStore = create<StoreState>((set, get) => ({
 
     try {
       await syncItemImmediately(updated);
-    } catch {
-      reportSyncError("Backend-Verbindung fehlgeschlagen. Änderungen bleiben lokal und werden später synchronisiert.");
+    } catch (error) {
+      const details = describeSyncError(error);
+      reportSyncError(
+        details
+          ? `Backend-Verbindung fehlgeschlagen (${details}). Änderungen bleiben lokal und werden später synchronisiert.`
+          : "Backend-Verbindung fehlgeschlagen. Änderungen bleiben lokal und werden später synchronisiert.",
+      );
     }
 
     triggerSyncInBackground(updated.listId);
@@ -362,7 +394,12 @@ export const useStore = create<StoreState>((set, get) => ({
       markBackendOnline();
       return localList.id;
     } catch (error) {
-      reportSyncError("Geteilte Liste konnte nicht geladen werden. Bitte Backend-Verbindung prüfen.");
+      const details = describeSyncError(error);
+      reportSyncError(
+        details
+          ? `Geteilte Liste konnte nicht geladen werden (${details}). Bitte Backend-Verbindung prüfen.`
+          : "Geteilte Liste konnte nicht geladen werden. Bitte Backend-Verbindung prüfen.",
+      );
       throw error;
     }
   },
@@ -462,8 +499,13 @@ export const useStore = create<StoreState>((set, get) => ({
       state.lists.map(async (list) => {
         try {
           await get().syncList(list.id);
-        } catch {
-          reportSyncError("Backend derzeit nicht erreichbar. Synchronisierung wird erneut versucht.");
+        } catch (error) {
+          const details = describeSyncError(error);
+          reportSyncError(
+            details
+              ? `Backend derzeit nicht erreichbar (${details}). Synchronisierung wird erneut versucht.`
+              : "Backend derzeit nicht erreichbar. Synchronisierung wird erneut versucht.",
+          );
         }
       }),
     );

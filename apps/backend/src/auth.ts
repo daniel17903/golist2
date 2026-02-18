@@ -4,6 +4,7 @@ import { type FastifyReply, type FastifyRequest } from 'fastify'
 import { z } from 'zod'
 
 import { query } from './db/client.js'
+import { hasListAccess } from './access.js'
 
 export type AuthContext = {
   listId: string
@@ -48,27 +49,7 @@ export async function requireListAccess(request: FastifyRequest, reply: FastifyR
   }
 
   const listId = listIdParams.data.listId
-  const accessResult = await query<{ has_access: boolean }>(
-    `SELECT EXISTS(
-       SELECT 1
-         FROM shared_lists
-        WHERE id = $1
-          AND created_by_device_id = $2
-     )
-     OR EXISTS(
-       SELECT 1
-         FROM share_token_redemptions redemptions
-         JOIN share_tokens tokens
-           ON tokens.id = redemptions.token_id
-        WHERE redemptions.device_id = $2
-          AND tokens.list_id = $1
-          AND tokens.revoked_at IS NULL
-          AND (tokens.expires_at IS NULL OR tokens.expires_at > NOW())
-     ) AS has_access`,
-    [listId, deviceId],
-  )
-
-  if (!accessResult.rows[0]?.has_access) {
+  if (!(await hasListAccess(listId, deviceId))) {
     reply.code(403).send({ message: 'Forbidden' })
     return
   }

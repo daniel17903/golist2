@@ -3,6 +3,7 @@ import { z } from 'zod'
 
 import { requireListAccess } from '../auth.js'
 import { query, withTransaction } from '../db/client.js'
+import { hasListAccessWithClient } from '../access.js'
 
 const listIdParamsSchema = z.object({ listId: z.uuid() })
 const listPutBodySchema = z.object({ name: z.string().min(1) })
@@ -78,27 +79,7 @@ export function registerListRoutes(app: FastifyInstance) {
         return { statusCode: 201 as const }
       }
 
-      const accessResult = await client.query<{ has_access: boolean }>(
-        `SELECT EXISTS(
-           SELECT 1
-             FROM shared_lists
-            WHERE id = $1
-              AND created_by_device_id = $2
-         )
-         OR EXISTS(
-           SELECT 1
-             FROM share_token_redemptions redemptions
-             JOIN share_tokens tokens
-               ON tokens.id = redemptions.token_id
-            WHERE redemptions.device_id = $2
-              AND tokens.list_id = $1
-              AND tokens.revoked_at IS NULL
-              AND (tokens.expires_at IS NULL OR tokens.expires_at > NOW())
-         ) AS has_access`,
-        [params.listId, createdBy],
-      )
-
-      if (!accessResult.rows[0]?.has_access) {
+      if (!(await hasListAccessWithClient(client, params.listId, createdBy))) {
         return { statusCode: 403 as const }
       }
 
