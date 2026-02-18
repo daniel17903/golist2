@@ -174,6 +174,12 @@ export const useStore = create<StoreState>((set, get) => ({
       activeListId: list.id,
     }));
 
+    try {
+      await syncListNameImmediately(list.id, list.name);
+    } catch {
+      reportSyncError("Backend-Verbindung fehlgeschlagen. Änderungen bleiben lokal und werden später synchronisiert.");
+    }
+
     triggerSyncInBackground(list.id);
   },
   renameList: async (listId: string, name: string) => {

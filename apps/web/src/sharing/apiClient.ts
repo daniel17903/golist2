@@ -65,8 +65,14 @@ const assertOk = async (response: Response, context: string) => {
     return;
   }
 
-  const message = await response.text();
-  throw new Error(`${context} failed: ${response.status} ${message}`);
+  const body = await response.text();
+  const message = `${context} failed: ${response.status} ${body}`;
+  logBackendCall({
+    endpoint: response.url || context,
+    outcome: "error",
+    message,
+  });
+  throw new Error(message);
 };
 
 const readString = (payload: unknown, key: string): string | null => {
@@ -96,8 +102,8 @@ const fetchWithTimeout = async (url: string, options: RequestInit, context: stri
     const response = await fetch(url, { ...options, signal: controller.signal });
     logBackendCall({
       endpoint: url,
-      outcome: "success",
-      message: `${context} succeeded with ${response.status} in ${Date.now() - startedAt}ms`,
+      outcome: response.ok ? "success" : "error",
+      message: `${context} completed with ${response.status} in ${Date.now() - startedAt}ms`,
     });
     return response;
   } catch (error) {
