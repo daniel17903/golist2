@@ -190,6 +190,16 @@ export const useStore = create<StoreState>((set, get) => ({
       lists: [...state.lists, list],
       activeListId: list.id,
     }));
+
+    if (get().metadata?.deviceId) {
+      try {
+        await get().ensureShareToken(list.id);
+      } catch {
+        reportSyncError("Backend-Verbindung fehlgeschlagen. Änderungen bleiben lokal und werden später synchronisiert.");
+      }
+    } else {
+      logSkippedBackendCall("List create sync skipped: device metadata missing.");
+    }
   },
   renameList: async (listId: string, name: string) => {
     const now = Date.now();
@@ -488,9 +498,12 @@ export const useStore = create<StoreState>((set, get) => ({
   syncAllLists: async () => {
     const state = get();
     await Promise.all(
-      Object.keys(state.listShareTokens).map(async (listId) => {
+      state.lists.map(async (list) => {
         try {
-          await get().syncList(listId);
+          if (!get().listShareTokens[list.id]) {
+            await get().ensureShareToken(list.id);
+          }
+          await get().syncList(list.id);
         } catch {
           reportSyncError("Backend derzeit nicht erreichbar. Synchronisierung wird erneut versucht.");
         }
