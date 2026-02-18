@@ -52,18 +52,6 @@ type StoreState = {
   appendBackendLog: (entry: { message: string; outcome: "success" | "error" | "skipped" }) => void;
 };
 
-const loadShareTokenMap = async () => {
-  const entries = await db.listShares.toArray();
-  return entries.reduce<Record<string, string>>((accumulator, entry) => {
-    accumulator[entry.listId] = entry.shareToken;
-    return accumulator;
-  }, {});
-};
-
-const setShareToken = async (listId: string, shareToken: string) => {
-  await db.listShares.put({ listId, shareToken, lastSyncedAt: Date.now() });
-};
-
 const triggerSyncInBackground = (listId: string) => {
   void useStore
     .getState()
@@ -153,10 +141,9 @@ export const useStore = create<StoreState>((set, get) => ({
   syncNotice: undefined,
   backendLogs: [],
   load: async () => {
-    const [lists, items, listShareTokens] = await Promise.all([
+    const [lists, items] = await Promise.all([
       db.lists.toArray(),
       db.items.toArray(),
-      loadShareTokenMap(),
     ]);
     const sortedLists = lists.sort((a, b) => a.createdAt - b.createdAt);
     const metadata: AppMetadata = {
@@ -171,7 +158,7 @@ export const useStore = create<StoreState>((set, get) => ({
       items,
       activeListId: sortedLists[0]?.id,
       metadata,
-      listShareTokens,
+      listShareTokens: {},
       isLoaded: true,
     });
 
@@ -191,15 +178,6 @@ export const useStore = create<StoreState>((set, get) => ({
       activeListId: list.id,
     }));
 
-    if (get().metadata?.deviceId) {
-      try {
-        await get().ensureShareToken(list.id);
-      } catch {
-        reportSyncError("Backend-Verbindung fehlgeschlagen. Änderungen bleiben lokal und werden später synchronisiert.");
-      }
-    } else {
-      logSkippedBackendCall("List create sync skipped: device metadata missing.");
-    }
   },
   renameList: async (listId: string, name: string) => {
     const now = Date.now();
@@ -316,22 +294,26 @@ export const useStore = create<StoreState>((set, get) => ({
       throw new Error("List or device metadata missing");
     }
 
-    const response = await sharingApiClient.upsertList({
+    await sharingApiClient.upsertList({
       deviceId: state.metadata.deviceId,
       listId: list.id,
       body: { name: list.name },
     });
 
+    const tokenResponse = await sharingApiClient.createShareToken({
+      deviceId: state.metadata.deviceId,
+      listId: list.id,
+    });
+
     markBackendOnline();
-    await setShareToken(listId, response.shareToken);
     set((current) => ({
       listShareTokens: {
         ...current.listShareTokens,
-        [listId]: response.shareToken,
+        [listId]: tokenResponse.shareToken,
       },
     }));
 
-    return response.shareToken;
+    return tokenResponse.shareToken;
   },
   joinSharedList: async (rawShareValue: string) => {
     const state = get();
@@ -376,8 +358,6 @@ export const useStore = create<StoreState>((set, get) => ({
 
       await db.lists.put(localList);
       await db.items.bulkPut(localItems);
-      await setShareToken(localList.id, shareToken);
-
       set((current) => {
         const withoutListItems = current.items.filter((item) => item.listId !== localList.id);
         const withoutList = current.lists.filter((list) => list.id !== localList.id);
@@ -479,11 +459,8 @@ export const useStore = create<StoreState>((set, get) => ({
       updatedAt: toMillis(item.updatedAt),
     }));
 
-    const now = Date.now();
     await db.lists.put(syncedList);
     await db.items.bulkPut(syncedItems);
-    await db.listShares.put({ listId, shareToken, lastSyncedAt: now });
-
     set((current) => {
       const remainingLists = current.lists.filter((entry) => entry.id !== listId);
       const remainingItems = current.items.filter((entry) => entry.listId !== listId);
@@ -500,9 +477,6 @@ export const useStore = create<StoreState>((set, get) => ({
     await Promise.all(
       state.lists.map(async (list) => {
         try {
-          if (!get().listShareTokens[list.id]) {
-            await get().ensureShareToken(list.id);
-          }
           await get().syncList(list.id);
         } catch {
           reportSyncError("Backend derzeit nicht erreichbar. Synchronisierung wird erneut versucht.");

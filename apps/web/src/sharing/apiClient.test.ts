@@ -15,7 +15,7 @@ describe("sharingApiClient", () => {
     vi.stubGlobal("__API_TIMEOUT_MS__", "4000");
 
     const fetchMock = vi.fn(async () =>
-      new Response(JSON.stringify({ listId: crypto.randomUUID(), shareToken: crypto.randomUUID() }), {
+      new Response(JSON.stringify({ listId: crypto.randomUUID() }), {
         status: 201,
         headers: { "content-type": "application/json" },
       }),

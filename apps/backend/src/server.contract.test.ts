@@ -19,7 +19,7 @@ describe('sharing API contract basics', () => {
     queryMock.mockResolvedValue({ rowCount: 1, rows: [] })
   })
 
-  it('creates a list and returns listId and shareToken', async () => {
+  it('creates a list and returns listId', async () => {
     const { buildServer } = await import('./server.js')
     const app = buildServer()
 
@@ -36,7 +36,6 @@ describe('sharing API contract basics', () => {
     expect(response.json()).toEqual(
       expect.objectContaining({
         listId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
-        shareToken: expect.stringMatching(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i),
       }),
     )
 
@@ -99,11 +98,9 @@ describe('sharing API contract basics', () => {
 
     queryMock
       .mockResolvedValueOnce({
-        rowCount: 1,
-        rows: [{ token_id: '11111111-1111-4111-8111-111111111111', list_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' }],
+        rowCount: 0,
+        rows: [],
       })
-      .mockResolvedValueOnce({ rowCount: 0, rows: [] })
-      .mockResolvedValueOnce({ rowCount: 0, rows: [] })
 
     const response = await app.inject({
       method: 'GET',
@@ -114,7 +111,7 @@ describe('sharing API contract basics', () => {
       },
     })
 
-    expect(response.statusCode).toBe(403)
+    expect(response.statusCode).toBe(401)
 
     await app.close()
   })
@@ -190,10 +187,10 @@ describe('sharing API contract basics', () => {
     queryMock
       .mockResolvedValueOnce({
         rowCount: 1,
-        rows: [{ token_id: '11111111-1111-4111-8111-111111111111', list_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' }],
+        rows: [{ id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' }],
       })
-      .mockResolvedValueOnce({ rowCount: 1, rows: [] })
       .mockResolvedValueOnce({ rowCount: 1, rows: [{ created_at: '2026-01-01T00:00:00.000Z' }] })
+      .mockResolvedValueOnce({ rowCount: 1, rows: [] })
 
     const response = await app.inject({
       method: 'POST',
@@ -227,11 +224,9 @@ describe('sharing API contract basics', () => {
 
     queryMock
       .mockResolvedValueOnce({
-        rowCount: 1,
-        rows: [{ token_id: '11111111-1111-4111-8111-111111111111', list_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' }],
+        rowCount: 0,
+        rows: [],
       })
-      .mockResolvedValueOnce({ rowCount: 0, rows: [] })
-      .mockResolvedValueOnce({ rowCount: 0, rows: [] })
 
     const response = await app.inject({
       method: 'POST',

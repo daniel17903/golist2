@@ -1,9 +1,13 @@
 import crypto from 'node:crypto'
 
 import { type FastifyInstance } from 'fastify'
+import { z } from 'zod'
 
-import { requireToken, requireTokenForRedeem } from '../auth.js'
+import { requireTokenForRedeem } from '../auth.js'
 import { query } from '../db/client.js'
+
+const listIdParamsSchema = z.object({ listId: z.uuid() })
+const deviceHeaderSchema = z.object({ 'x-device-id': z.uuid() })
 
 export function registerShareTokenRoutes(app: FastifyInstance) {
   app.post('/v1/share-tokens/:shareToken/redeem', { preHandler: requireTokenForRedeem }, async (request, reply) => {
@@ -20,21 +24,41 @@ export function registerShareTokenRoutes(app: FastifyInstance) {
     return { listId: request.auth!.listId }
   })
 
-  app.post('/v1/lists/:listId/share-tokens', { preHandler: requireToken }, async (request, reply) => {
+  app.post('/v1/lists/:listId/share-tokens', async (request, reply) => {
+    const { listId } = listIdParamsSchema.parse(request.params)
+    const headers = deviceHeaderSchema.parse(request.headers)
+    const deviceId = headers['x-device-id']
+
+    const creatorResult = await query<{ id: string }>(
+      'SELECT id FROM shared_lists WHERE id = $1 AND created_by_device_id = $2 LIMIT 1',
+      [listId, deviceId],
+    )
+
+    if (!creatorResult.rowCount) {
+      reply.code(403)
+      return { message: 'Forbidden' }
+    }
+
     const tokenId = crypto.randomUUID()
-    const createdBy = request.auth!.deviceId
 
     const result = await query<{ created_at: string }>(
       `INSERT INTO share_tokens(id, list_id, created_by_device_id, created_at)
        VALUES ($1, $2, $3, NOW())
        RETURNING created_at`,
-      [tokenId, request.auth!.listId, createdBy],
+      [tokenId, listId, deviceId],
+    )
+
+    await query(
+      `INSERT INTO share_token_redemptions(token_id, device_id, redeemed_at)
+       VALUES ($1, $2, NOW())
+       ON CONFLICT (token_id, device_id) DO NOTHING`,
+      [tokenId, deviceId],
     )
 
     reply.code(201)
     return {
       tokenId,
-      listId: request.auth!.listId,
+      listId,
       createdAt: result.rows[0].created_at,
       shareToken: tokenId,
     }

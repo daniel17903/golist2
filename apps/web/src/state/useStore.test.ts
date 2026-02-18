@@ -29,6 +29,7 @@ vi.mock("../sharing/apiClient", () => ({
     upsertList: vi.fn(),
     fetchList: vi.fn(),
     redeemShareToken: vi.fn(),
+    createShareToken: vi.fn(),
     upsertItem: vi.fn(),
   },
   setBackendCallLogger: vi.fn(),
@@ -187,15 +188,10 @@ describe("useStore", () => {
     expect(metadataPut).toHaveBeenCalledTimes(1);
   });
 
-  it("adds a list, sets it active, and upserts it to backend", async () => {
+  it("adds a list and sets it active", async () => {
     const uuidSpy = vi
       .spyOn(globalThis.crypto, "randomUUID")
       .mockReturnValue("00000000-0000-0000-0000-000000000001");
-
-    upsertListMock.mockResolvedValue({
-      listId: "00000000-0000-0000-0000-000000000001",
-      shareToken: "11111111-1111-4111-8111-111111111111",
-    });
 
     await useStore.getState().load();
 
@@ -209,15 +205,6 @@ describe("useStore", () => {
     expect(typeof state.lists[0]?.updatedAt).toBe("number");
     expect(state.activeListId).toBe("00000000-0000-0000-0000-000000000001");
     expect(listAdd).toHaveBeenCalledTimes(1);
-    expect(upsertListMock).toHaveBeenCalledWith({
-      deviceId: expect.any(String),
-      listId: "00000000-0000-0000-0000-000000000001",
-      body: { name: "Groceries" },
-    });
-    expect(state.listShareTokens["00000000-0000-0000-0000-000000000001"]).toBe(
-      "11111111-1111-4111-8111-111111111111",
-    );
-
     uuidSpy.mockRestore();
   });
 
@@ -319,7 +306,7 @@ describe("useStore", () => {
     expect(itemsWhere).toHaveBeenCalledWith("listId");
   });
 
-  it("syncAllLists creates remote list for local lists missing share token", async () => {
+  it("syncAllLists skips lists without share tokens", async () => {
     useStore.setState({
       lists: [{ id: "list-1", name: "Groceries", createdAt: 1, updatedAt: 1 }],
       items: [],
@@ -332,17 +319,8 @@ describe("useStore", () => {
       listShareTokens: {},
     });
 
-    upsertListMock.mockResolvedValue({
-      listId: "list-1",
-      shareToken: "11111111-1111-4111-8111-111111111111",
-    });
-
     await useStore.getState().syncAllLists();
 
-    expect(upsertListMock).toHaveBeenCalledWith({
-      deviceId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-      listId: "list-1",
-      body: { name: "Groceries" },
-    });
+    expect(upsertListMock).not.toHaveBeenCalled();
   });
 });

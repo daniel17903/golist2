@@ -4,6 +4,7 @@ import type {
   ApiListItem,
   ApiListUpsertRequest,
   ApiListUpsertResponse,
+  ApiShareTokenCreateResponse,
   ApiShareTokenRedeemResponse,
 } from "@golist/shared/domain/types";
 
@@ -135,11 +136,23 @@ const parseApiListItem = (payload: unknown): ApiListItem => {
 
 const parseListUpsertResponse = (payload: unknown): ApiListUpsertResponse => {
   const listId = readString(payload, "listId");
-  const shareToken = readString(payload, "shareToken");
-  if (!listId || !shareToken) {
+  if (!listId) {
     throw new Error("Invalid list upsert response payload");
   }
-  return { listId, shareToken };
+  return { listId };
+};
+
+const parseShareTokenCreateResponse = (payload: unknown): ApiShareTokenCreateResponse => {
+  const tokenId = readString(payload, "tokenId");
+  const listId = readString(payload, "listId");
+  const createdAt = readString(payload, "createdAt");
+  const shareToken = readString(payload, "shareToken");
+
+  if (!tokenId || !listId || !createdAt || !shareToken) {
+    throw new Error("Invalid share token create response payload");
+  }
+
+  return { tokenId, listId, createdAt, shareToken };
 };
 
 const parseShareTokenRedeemResponse = (payload: unknown): ApiShareTokenRedeemResponse => {
@@ -217,6 +230,23 @@ export const sharingApiClient = {
     );
     await assertOk(response, "redeem token");
     return parseShareTokenRedeemResponse(await response.json());
+  },
+
+
+  async createShareToken(params: {
+    deviceId: string;
+    listId: string;
+  }): Promise<ApiShareTokenCreateResponse> {
+    const response = await fetchWithTimeout(
+      `${apiBaseUrl}/v1/lists/${params.listId}/share-tokens`,
+      {
+        method: "POST",
+        headers: createHeaders(params.deviceId),
+      },
+      "share token create",
+    );
+    await assertOk(response, "share token create");
+    return parseShareTokenCreateResponse(await response.json());
   },
 
   async upsertItem(params: {

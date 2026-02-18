@@ -1,5 +1,3 @@
-import crypto from 'node:crypto'
-
 import { type FastifyInstance } from 'fastify'
 import { z } from 'zod'
 
@@ -76,24 +74,11 @@ export function registerListRoutes(app: FastifyInstance) {
       }>('SELECT id, created_by_device_id FROM shared_lists WHERE id = $1 FOR UPDATE', [params.listId])
 
       if (!existingListResult.rowCount) {
-        const tokenId = crypto.randomUUID()
-
         await client.query(
           'INSERT INTO shared_lists(id, name, created_by_device_id, created_at, updated_at) VALUES ($1, $2, $3, NOW(), NOW())',
           [params.listId, body.name, createdBy],
         )
-        await client.query(
-          'INSERT INTO share_tokens(id, list_id, created_by_device_id, created_at) VALUES ($1, $2, $3, NOW())',
-          [tokenId, params.listId, createdBy],
-        )
-        await client.query(
-          `INSERT INTO share_token_redemptions(token_id, device_id, redeemed_at)
-           VALUES ($1, $2, NOW())
-           ON CONFLICT (token_id, device_id) DO NOTHING`,
-          [tokenId, createdBy],
-        )
-
-        return { statusCode: 201, shareToken: tokenId }
+        return { statusCode: 201 as const }
       }
 
       if (!bearerToken) {
@@ -132,7 +117,7 @@ export function registerListRoutes(app: FastifyInstance) {
 
       await client.query('UPDATE shared_lists SET name = $1, updated_at = NOW() WHERE id = $2', [body.name, params.listId])
 
-      return { statusCode: 200 as const, shareToken: bearerToken }
+      return { statusCode: 200 as const }
     })
 
     reply.code(result.statusCode)
@@ -140,7 +125,7 @@ export function registerListRoutes(app: FastifyInstance) {
       return { message: 'Forbidden' }
     }
 
-    return { listId: params.listId, shareToken: result.shareToken }
+    return { listId: params.listId }
   })
 
   app.get('/v1/lists/:listId', { preHandler: requireToken }, async (request) => {
