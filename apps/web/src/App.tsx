@@ -6,13 +6,18 @@ import AddItemDialog from "./components/AddItemDialog";
 import EditItemModal from "./components/EditItemModal";
 import ItemGrid from "./components/ItemGrid";
 import ListsDrawer from "./components/ListsDrawer";
-import RenameListModal from "./components/RenameListModal";
 import { useAppState } from "./hooks/useAppState";
 import { useLongPressItem } from "./hooks/useLongPressItem";
 
 type UndoToast = {
   id: string;
   item: Item;
+};
+
+type InfoToast = {
+  id: string;
+  message: string;
+  tone: "success" | "error";
 };
 
 const App = () => {
@@ -57,8 +62,10 @@ const App = () => {
   } = useAppState();
 
   const undoTimeoutsRef = useRef<Map<string, number>>(new Map());
+  const infoToastTimeoutsRef = useRef<Map<string, number>>(new Map());
   const [exitingItemIds, setExitingItemIds] = useState<Set<string>>(new Set());
   const [undoToasts, setUndoToasts] = useState<UndoToast[]>([]);
+  const [infoToasts, setInfoToasts] = useState<InfoToast[]>([]);
 
   const clearUndoTimeout = (toastId: string) => {
     const timeout = undoTimeoutsRef.current.get(toastId);
@@ -71,6 +78,24 @@ const App = () => {
   const removeUndoToast = (toastId: string) => {
     clearUndoTimeout(toastId);
     setUndoToasts((current) => current.filter((toast) => toast.id !== toastId));
+  };
+
+  const removeInfoToast = (toastId: string) => {
+    const timeout = infoToastTimeoutsRef.current.get(toastId);
+    if (timeout !== undefined) {
+      window.clearTimeout(timeout);
+      infoToastTimeoutsRef.current.delete(toastId);
+    }
+    setInfoToasts((current) => current.filter((toast) => toast.id !== toastId));
+  };
+
+  const showInfoToast = (message: string, tone: "success" | "error") => {
+    const id = crypto.randomUUID();
+    setInfoToasts((current) => [...current, { id, message, tone }]);
+    const timeout = window.setTimeout(() => {
+      removeInfoToast(id);
+    }, 3800);
+    infoToastTimeoutsRef.current.set(id, timeout);
   };
 
   const showUndo = (item: Item) => {
@@ -86,6 +111,8 @@ const App = () => {
     () => () => {
       undoTimeoutsRef.current.forEach((timeout) => window.clearTimeout(timeout));
       undoTimeoutsRef.current.clear();
+      infoToastTimeoutsRef.current.forEach((timeout) => window.clearTimeout(timeout));
+      infoToastTimeoutsRef.current.clear();
     },
     [],
   );
@@ -146,7 +173,13 @@ const App = () => {
     <div className="app">
       <AppHeader
         activeListName={activeList?.name ?? ""}
-        onEditListName={() => {
+        isEditingName={editingTitle}
+        draftListName={newListName}
+        itemCount={listItems.length}
+        onDraftNameChange={setNewListName}
+        onSaveListName={handleRenameList}
+        onCancelEditingName={() => setEditingTitle(false)}
+        onStartEditingName={() => {
           setNewListName(activeList?.name ?? "");
           setEditingTitle(true);
         }}
@@ -171,9 +204,9 @@ const App = () => {
             try {
               const shareLink = await handleShareActiveList();
               await navigator.clipboard.writeText(shareLink);
-              window.alert("Teilen-Link wurde in die Zwischenablage kopiert.");
+              showInfoToast("Teilen-Link wurde in die Zwischenablage kopiert.", "success");
             } catch {
-              window.alert("Teilen ist derzeit nicht verfügbar.");
+              showInfoToast("Teilen ist derzeit nicht verfügbar.", "error");
             }
           })();
         }}
@@ -189,8 +222,8 @@ const App = () => {
       ) : null}
 
       {__IS_VERCEL_NON_PRODUCTION__ ? (
-        <div className="backend-log-panel" aria-live="polite">
-          <p className="backend-log-panel__title">Backend-Logs</p>
+        <details className="backend-log-panel" aria-live="polite">
+          <summary className="backend-log-panel__title">Backend-Logs</summary>
           <ul className="backend-log-panel__list">
             {backendLogs.length === 0 ? (
               <li className="backend-log-panel__entry backend-log-panel__entry--skipped">
@@ -207,10 +240,18 @@ const App = () => {
               ))
             )}
           </ul>
-        </div>
+        </details>
       ) : null}
 
-      <div className="undo-toast-stack" aria-live="polite" aria-atomic="false">
+      <div className="toast-stack" aria-live="polite" aria-atomic="false">
+        {infoToasts.map((toast) => (
+          <div key={toast.id} className={`info-toast info-toast--${toast.tone}`} role="status">
+            <span>{toast.message}</span>
+            <button type="button" className="info-toast__close" onClick={() => removeInfoToast(toast.id)}>
+              ×
+            </button>
+          </div>
+        ))}
         {undoToasts.map((toast) => (
           <div key={toast.id} className="undo-toast" role="status">
             <span className="undo-toast__text">{`„${toast.item.name}“ gelöscht.`}</span>
@@ -228,6 +269,7 @@ const App = () => {
       <ListsDrawer
         isOpen={isDrawerOpen}
         lists={lists}
+        items={items}
         activeListId={activeListId}
         onClose={() => setIsDrawerOpen(false)}
         onOpen={() => setIsDrawerOpen(true)}
@@ -247,14 +289,6 @@ const App = () => {
         onClose={() => setIsAddDialogOpen(false)}
         onAddItem={handleAddItem}
         onAddSuggestion={handleAddSuggestion}
-      />
-
-      <RenameListModal
-        isOpen={editingTitle}
-        value={newListName}
-        onChange={setNewListName}
-        onCancel={() => setEditingTitle(false)}
-        onSave={handleRenameList}
       />
 
       <EditItemModal
