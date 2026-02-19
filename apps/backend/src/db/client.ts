@@ -13,30 +13,45 @@ function resolveSsl(sslMode: string): false | { rejectUnauthorized: boolean } {
 }
 
 const ssl = resolveSsl(env.PGSSLMODE)
+const hasDatabaseUrl = Boolean(env.DATABASE_URL)
 
-console.info('[db] Creating PostgreSQL pool', {
-  host: env.PGHOST,
-  user: env.PGUSER,
-  database: env.PGDATABASE,
-  sslMode: env.PGSSLMODE,
-})
+console.info(
+  '[db] Creating PostgreSQL pool',
+  hasDatabaseUrl
+    ? {
+        connection: 'DATABASE_URL',
+      }
+    : {
+        host: env.PGHOST,
+        user: env.PGUSER,
+        database: env.PGDATABASE,
+        sslMode: env.PGSSLMODE,
+      },
+)
 
-export const pool = new Pool({
-  host: env.PGHOST,
-  user: env.PGUSER,
-  database: env.PGDATABASE,
-  password: env.PGPASSWORD,
-  ssl,
-})
+export const pool = new Pool(
+  hasDatabaseUrl
+    ? {
+        connectionString: env.DATABASE_URL,
+      }
+    : {
+        host: env.PGHOST,
+        user: env.PGUSER,
+        database: env.PGDATABASE,
+        password: env.PGPASSWORD,
+        ssl,
+      },
+)
 
 pool.on('error', (error) => {
   console.error('[db] Unexpected PostgreSQL pool error', {
     message: error.message,
     stack: error.stack,
-    host: env.PGHOST,
-    user: env.PGUSER,
-    database: env.PGDATABASE,
-    sslMode: env.PGSSLMODE,
+    connection: hasDatabaseUrl ? 'DATABASE_URL' : undefined,
+    host: hasDatabaseUrl ? undefined : env.PGHOST,
+    user: hasDatabaseUrl ? undefined : env.PGUSER,
+    database: hasDatabaseUrl ? undefined : env.PGDATABASE,
+    sslMode: hasDatabaseUrl ? undefined : env.PGSSLMODE,
   })
 })
 
@@ -69,10 +84,11 @@ export async function withTransaction<T>(work: (client: PoolClient) => Promise<T
       console.error('[db] Failed to obtain PostgreSQL client from pool', {
         message: error.message,
         stack: error.stack,
-        host: env.PGHOST,
-        user: env.PGUSER,
-        database: env.PGDATABASE,
-        sslMode: env.PGSSLMODE,
+        connection: hasDatabaseUrl ? 'DATABASE_URL' : undefined,
+        host: hasDatabaseUrl ? undefined : env.PGHOST,
+        user: hasDatabaseUrl ? undefined : env.PGUSER,
+        database: hasDatabaseUrl ? undefined : env.PGDATABASE,
+        sslMode: hasDatabaseUrl ? undefined : env.PGSSLMODE,
       })
     }
 

@@ -25,6 +25,18 @@ describe('resolveEnv', () => {
     expect(resolved.PGSSLMODE).toBe('require')
   })
 
+  it('keeps DATABASE_URL when provided', () => {
+    const resolved = resolveEnv({
+      DATABASE_URL: 'postgres://user:pass@example.com:5432/app',
+      PGHOST: 'primary-host',
+      PGUSER: 'primary-user',
+      PGDATABASE: 'primary-db',
+      PGPASSWORD: 'primary-pass',
+    })
+
+    expect(resolved.DATABASE_URL).toBe('postgres://user:pass@example.com:5432/app')
+  })
+
   it('prefers non-prefixed PG env vars when both are set', () => {
     const resolved = resolveEnv({
       PGHOST: 'primary-host',
