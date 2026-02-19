@@ -11,6 +11,19 @@ const testDeviceId = '11111111-1111-4111-8111-111111111111'
 let baseUrl = ''
 let app: ReturnType<typeof buildServer>
 
+const createShareTokenForList = async (listId: string, deviceId: string) => {
+  const response = await fetch(`${baseUrl}/v1/lists/${listId}/share-tokens`, {
+    method: 'POST',
+    headers: { 'x-device-id': deviceId },
+  })
+
+  expect(response.status).toBe(201)
+
+  return z
+    .object({ tokenId: z.string().uuid(), listId: z.string().uuid(), shareToken: z.string().uuid() })
+    .parse(await response.json())
+}
+
 describe('backend runtime integration (real postgres)', () => {
   beforeAll(async () => {
     await runMigrations()
@@ -46,16 +59,16 @@ describe('backend runtime integration (real postgres)', () => {
 
     expect(createResponse.status).toBe(201)
 
-    const createPayload = z
-      .object({ listId: z.string().uuid(), shareToken: z.string().uuid() })
-      .parse(await createResponse.json())
+    const createPayload = z.object({ listId: z.string().uuid() }).parse(await createResponse.json())
 
     expect(createPayload.listId).toBe(listId)
 
-    const authHeaders = { authorization: `Bearer ${createPayload.shareToken}`, 'x-device-id': testDeviceId }
+    const initialToken = await createShareTokenForList(createPayload.listId, testDeviceId)
+
+    const authHeaders = { 'x-device-id': testDeviceId }
 
     const redeemResponse = await fetch(
-      `${baseUrl}/v1/share-tokens/${createPayload.shareToken}/redeem`,
+      `${baseUrl}/v1/share-tokens/${initialToken.shareToken}/redeem`,
       {
         method: 'POST',
         headers: authHeaders,
@@ -89,14 +102,14 @@ describe('backend runtime integration (real postgres)', () => {
 
     expect(createResponse.status).toBe(201)
 
-    const createPayload = z
-      .object({ listId: z.string().uuid(), shareToken: z.string().uuid() })
-      .parse(await createResponse.json())
+    const createPayload = z.object({ listId: z.string().uuid() }).parse(await createResponse.json())
 
-    const authHeaders = { authorization: `Bearer ${createPayload.shareToken}`, 'x-device-id': testDeviceId }
+    const initialToken = await createShareTokenForList(createPayload.listId, testDeviceId)
+
+    const authHeaders = { 'x-device-id': testDeviceId }
 
     const redeemResponse = await fetch(
-      `${baseUrl}/v1/share-tokens/${createPayload.shareToken}/redeem`,
+      `${baseUrl}/v1/share-tokens/${initialToken.shareToken}/redeem`,
       {
         method: 'POST',
         headers: authHeaders,
@@ -235,14 +248,11 @@ describe('backend runtime integration (real postgres)', () => {
 
     expect(createResponse.status).toBe(201)
 
-    const createdList = z
-      .object({ listId: z.string().uuid(), shareToken: z.string().uuid() })
-      .parse(await createResponse.json())
+    const createdList = z.object({ listId: z.string().uuid() }).parse(await createResponse.json())
 
-    const unredeemedGuestHeaders = {
-      authorization: `Bearer ${createdList.shareToken}`,
-      'x-device-id': guestDeviceId,
-    }
+    const primaryToken = await createShareTokenForList(createdList.listId, ownerDeviceId)
+
+    const unredeemedGuestHeaders = { 'x-device-id': guestDeviceId }
 
     const unredeemedGuestListResponse = await fetch(`${baseUrl}/v1/lists/${createdList.listId}`, {
       headers: unredeemedGuestHeaders,
@@ -251,7 +261,7 @@ describe('backend runtime integration (real postgres)', () => {
     expect(unredeemedGuestListResponse.status).toBe(403)
 
     const redeemPrimaryTokenResponse = await fetch(
-      `${baseUrl}/v1/share-tokens/${createdList.shareToken}/redeem`,
+      `${baseUrl}/v1/share-tokens/${primaryToken.shareToken}/redeem`,
       {
         method: 'POST',
         headers: unredeemedGuestHeaders,
@@ -268,24 +278,12 @@ describe('backend runtime integration (real postgres)', () => {
 
     expect(redeemedGuestListResponse.status).toBe(200)
 
-    const createSecondaryTokenResponse = await fetch(`${baseUrl}/v1/lists/${createdList.listId}/share-tokens`, {
-      method: 'POST',
-      headers: unredeemedGuestHeaders,
-    })
-
-    expect(createSecondaryTokenResponse.status).toBe(201)
-
-    const secondaryToken = z
-      .object({ tokenId: z.string().uuid(), listId: z.string().uuid(), shareToken: z.string().uuid() })
-      .parse(await createSecondaryTokenResponse.json())
+    const secondaryToken = await createShareTokenForList(createdList.listId, guestDeviceId)
 
     expect(secondaryToken.listId).toBe(listId)
     expect(secondaryToken.shareToken).toBe(secondaryToken.tokenId)
 
-    const secondGuestHeaders = {
-      authorization: `Bearer ${secondaryToken.shareToken}`,
-      'x-device-id': secondGuestDeviceId,
-    }
+    const secondGuestHeaders = { 'x-device-id': secondGuestDeviceId }
 
     const secondUnredeemedListResponse = await fetch(`${baseUrl}/v1/lists/${secondaryToken.listId}`, {
       headers: secondGuestHeaders,

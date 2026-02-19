@@ -29,6 +29,7 @@ vi.mock("../sharing/apiClient", () => ({
     upsertList: vi.fn(),
     fetchList: vi.fn(),
     redeemShareToken: vi.fn(),
+    createShareToken: vi.fn(),
     upsertItem: vi.fn(),
   },
   setBackendCallLogger: vi.fn(),
@@ -119,6 +120,9 @@ const { useStore } = await import("./useStore");
 const { sharingApiClient } = await import("../sharing/apiClient");
 
 const upsertListMock = vi.mocked(sharingApiClient.upsertList);
+const createShareTokenMock = vi.mocked(sharingApiClient.createShareToken);
+const fetchListMock = vi.mocked(sharingApiClient.fetchList);
+const upsertItemMock = vi.mocked(sharingApiClient.upsertItem);
 
 const resetStore = () => {
   useStore.setState({
@@ -148,6 +152,9 @@ describe("useStore", () => {
     itemBulkPut.mockClear();
     itemsWhere.mockClear();
     upsertListMock.mockReset();
+    createShareTokenMock.mockReset();
+    fetchListMock.mockReset();
+    upsertItemMock.mockReset();
     globalThis.localStorage.clear();
     resetStore();
     vi.useFakeTimers();
@@ -187,15 +194,10 @@ describe("useStore", () => {
     expect(metadataPut).toHaveBeenCalledTimes(1);
   });
 
-  it("adds a list, sets it active, and upserts it to backend", async () => {
+  it("adds a list and sets it active", async () => {
     const uuidSpy = vi
       .spyOn(globalThis.crypto, "randomUUID")
       .mockReturnValue("00000000-0000-0000-0000-000000000001");
-
-    upsertListMock.mockResolvedValue({
-      listId: "00000000-0000-0000-0000-000000000001",
-      shareToken: "11111111-1111-4111-8111-111111111111",
-    });
 
     await useStore.getState().load();
 
@@ -209,15 +211,6 @@ describe("useStore", () => {
     expect(typeof state.lists[0]?.updatedAt).toBe("number");
     expect(state.activeListId).toBe("00000000-0000-0000-0000-000000000001");
     expect(listAdd).toHaveBeenCalledTimes(1);
-    expect(upsertListMock).toHaveBeenCalledWith({
-      deviceId: expect.any(String),
-      listId: "00000000-0000-0000-0000-000000000001",
-      body: { name: "Groceries" },
-    });
-    expect(state.listShareTokens["00000000-0000-0000-0000-000000000001"]).toBe(
-      "11111111-1111-4111-8111-111111111111",
-    );
-
     uuidSpy.mockRestore();
   });
 
@@ -319,10 +312,20 @@ describe("useStore", () => {
     expect(itemsWhere).toHaveBeenCalledWith("listId");
   });
 
-  it("syncAllLists creates remote list for local lists missing share token", async () => {
+  it("syncAllLists syncs local list changes without share tokens", async () => {
     useStore.setState({
       lists: [{ id: "list-1", name: "Groceries", createdAt: 1, updatedAt: 1 }],
-      items: [],
+      items: [
+        {
+          id: "item-1",
+          listId: "list-1",
+          name: "Milk",
+          category: "milkCheese",
+          deleted: false,
+          createdAt: 1,
+          updatedAt: 2,
+        },
+      ],
       metadata: {
         id: "app",
         deviceId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
@@ -332,17 +335,40 @@ describe("useStore", () => {
       listShareTokens: {},
     });
 
-    upsertListMock.mockResolvedValue({
-      listId: "list-1",
-      shareToken: "11111111-1111-4111-8111-111111111111",
-    });
+    upsertListMock.mockResolvedValue({ listId: "list-1" });
+    fetchListMock
+      .mockResolvedValueOnce({
+        listId: "list-1",
+        name: "Groceries",
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+        items: [],
+      })
+      .mockResolvedValueOnce({
+        listId: "list-1",
+        name: "Groceries",
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+        items: [
+          {
+            id: "item-1",
+            name: "Milk",
+            category: "milkCheese",
+            deleted: false,
+            createdAt: "2026-01-01T00:00:00.000Z",
+            updatedAt: "2026-01-01T00:00:00.000Z",
+          },
+        ],
+      });
 
     await useStore.getState().syncAllLists();
 
-    expect(upsertListMock).toHaveBeenCalledWith({
+    expect(createShareTokenMock).not.toHaveBeenCalled();
+    expect(upsertListMock).not.toHaveBeenCalled();
+    expect(fetchListMock).toHaveBeenCalledWith({
       deviceId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
       listId: "list-1",
-      body: { name: "Groceries" },
     });
+    expect(upsertItemMock).toHaveBeenCalled();
   });
 });

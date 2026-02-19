@@ -56,6 +56,12 @@ export type ApiListUpsertRequest = {
 
 export type ApiListUpsertResponse = {
   listId: string;
+};
+
+export type ApiShareTokenCreateResponse = {
+  tokenId: string;
+  listId: string;
+  createdAt: string;
   shareToken: string;
 };
 

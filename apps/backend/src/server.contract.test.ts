@@ -19,7 +19,7 @@ describe('sharing API contract basics', () => {
     queryMock.mockResolvedValue({ rowCount: 1, rows: [] })
   })
 
-  it('creates a list and returns listId and shareToken', async () => {
+  it('creates a list and returns listId', async () => {
     const { buildServer } = await import('./server.js')
     const app = buildServer()
 
@@ -36,7 +36,6 @@ describe('sharing API contract basics', () => {
     expect(response.json()).toEqual(
       expect.objectContaining({
         listId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
-        shareToken: expect.stringMatching(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i),
       }),
     )
 
@@ -67,28 +66,30 @@ describe('sharing API contract basics', () => {
     await app.close()
   })
 
-  it('requires bearer token for protected routes', async () => {
+  it('requires X-Device-Id header for protected routes', async () => {
     const { buildServer } = await import('./server.js')
     const app = buildServer()
 
     const response = await app.inject({ method: 'GET', url: '/v1/lists/11111111-1111-4111-8111-111111111111' })
 
-    expect(response.statusCode).toBe(401)
+    expect(response.statusCode).toBe(400)
 
     await app.close()
   })
 
-  it('requires X-Device-Id header for protected routes', async () => {
+  it('forbids devices without list access on protected routes', async () => {
     const { buildServer } = await import('./server.js')
     const app = buildServer()
+
+    queryMock.mockResolvedValueOnce({ rowCount: 1, rows: [{ has_access: false }] })
 
     const response = await app.inject({
       method: 'GET',
       url: '/v1/lists/11111111-1111-4111-8111-111111111111',
-      headers: { authorization: 'Bearer 11111111-1111-4111-8111-111111111111' },
+      headers: { 'x-device-id': '22222222-2222-4222-8222-222222222222' },
     })
 
-    expect(response.statusCode).toBe(400)
+    expect(response.statusCode).toBe(403)
 
     await app.close()
   })
@@ -100,18 +101,13 @@ describe('sharing API contract basics', () => {
     queryMock
       .mockResolvedValueOnce({
         rowCount: 1,
-        rows: [{ token_id: '11111111-1111-4111-8111-111111111111', list_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' }],
+        rows: [{ has_access: false }],
       })
-      .mockResolvedValueOnce({ rowCount: 0, rows: [] })
-      .mockResolvedValueOnce({ rowCount: 0, rows: [] })
 
     const response = await app.inject({
       method: 'GET',
       url: '/v1/lists/11111111-1111-4111-8111-111111111111',
-      headers: {
-        authorization: 'Bearer 11111111-1111-4111-8111-111111111111',
-        'x-device-id': '22222222-2222-4222-8222-222222222222',
-      },
+      headers: { 'x-device-id': '22222222-2222-4222-8222-222222222222' },
     })
 
     expect(response.statusCode).toBe(403)
@@ -126,12 +122,7 @@ describe('sharing API contract basics', () => {
     queryMock
       .mockResolvedValueOnce({
         rowCount: 1,
-        rows: [{ token_id: '11111111-1111-4111-8111-111111111111', list_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' }],
-      })
-      .mockResolvedValueOnce({ rowCount: 0, rows: [] })
-      .mockResolvedValueOnce({
-        rowCount: 1,
-        rows: [{ created_by_device_id: '11111111-1111-4111-8111-111111111111' }],
+        rows: [{ has_access: true }],
       })
       .mockResolvedValueOnce({ rowCount: 1, rows: [{ id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' }] })
       .mockResolvedValueOnce({ rowCount: 0, rows: [] })
@@ -142,7 +133,6 @@ describe('sharing API contract basics', () => {
       method: 'PUT',
       url: '/v1/lists/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/items/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
       headers: {
-        authorization: 'Bearer 11111111-1111-4111-8111-111111111111',
         'x-device-id': '11111111-1111-4111-8111-111111111111',
       },
       payload: {
@@ -173,10 +163,7 @@ describe('sharing API contract basics', () => {
     const response = await app.inject({
       method: 'POST',
       url: '/v1/share-tokens/11111111-1111-4111-8111-111111111111/redeem',
-      headers: {
-        authorization: 'Bearer 11111111-1111-4111-8111-111111111111',
-        'x-device-id': '22222222-2222-4222-8222-222222222222',
-      },
+      headers: { 'x-device-id': '22222222-2222-4222-8222-222222222222' },
     })
 
     expect(response.statusCode).toBe(200)
@@ -190,18 +177,15 @@ describe('sharing API contract basics', () => {
     queryMock
       .mockResolvedValueOnce({
         rowCount: 1,
-        rows: [{ token_id: '11111111-1111-4111-8111-111111111111', list_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' }],
+        rows: [{ has_access: true }],
       })
-      .mockResolvedValueOnce({ rowCount: 1, rows: [] })
       .mockResolvedValueOnce({ rowCount: 1, rows: [{ created_at: '2026-01-01T00:00:00.000Z' }] })
+      .mockResolvedValueOnce({ rowCount: 1, rows: [] })
 
     const response = await app.inject({
       method: 'POST',
       url: '/v1/lists/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/share-tokens',
-      headers: {
-        authorization: 'Bearer 11111111-1111-4111-8111-111111111111',
-        'x-device-id': '22222222-2222-4222-8222-222222222222',
-      },
+      headers: { 'x-device-id': '22222222-2222-4222-8222-222222222222' },
     })
 
     expect(response.statusCode).toBe(201)
@@ -228,18 +212,13 @@ describe('sharing API contract basics', () => {
     queryMock
       .mockResolvedValueOnce({
         rowCount: 1,
-        rows: [{ token_id: '11111111-1111-4111-8111-111111111111', list_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' }],
+        rows: [{ has_access: false }],
       })
-      .mockResolvedValueOnce({ rowCount: 0, rows: [] })
-      .mockResolvedValueOnce({ rowCount: 0, rows: [] })
 
     const response = await app.inject({
       method: 'POST',
       url: '/v1/lists/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/share-tokens',
-      headers: {
-        authorization: 'Bearer 11111111-1111-4111-8111-111111111111',
-        'x-device-id': '22222222-2222-4222-8222-222222222222',
-      },
+      headers: { 'x-device-id': '22222222-2222-4222-8222-222222222222' },
     })
 
     expect(response.statusCode).toBe(403)
@@ -263,10 +242,7 @@ describe('sharing API contract basics', () => {
       })
       .mockResolvedValueOnce({ rowCount: 1, rows: [] })
 
-    const headers = {
-      authorization: 'Bearer 11111111-1111-4111-8111-111111111111',
-      'x-device-id': '22222222-2222-4222-8222-222222222222',
-    }
+    const headers = { 'x-device-id': '22222222-2222-4222-8222-222222222222' }
 
     const firstResponse = await app.inject({
       method: 'POST',

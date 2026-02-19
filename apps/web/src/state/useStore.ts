@@ -52,18 +52,6 @@ type StoreState = {
   appendBackendLog: (entry: { message: string; outcome: "success" | "error" | "skipped" }) => void;
 };
 
-const loadShareTokenMap = async () => {
-  const entries = await db.listShares.toArray();
-  return entries.reduce<Record<string, string>>((accumulator, entry) => {
-    accumulator[entry.listId] = entry.shareToken;
-    return accumulator;
-  }, {});
-};
-
-const setShareToken = async (listId: string, shareToken: string) => {
-  await db.listShares.put({ listId, shareToken, lastSyncedAt: Date.now() });
-};
-
 const triggerSyncInBackground = (listId: string) => {
   void useStore
     .getState()
@@ -73,16 +61,14 @@ const triggerSyncInBackground = (listId: string) => {
 
 const syncListNameImmediately = async (listId: string, listName: string) => {
   const state = useStore.getState();
-  const shareToken = state.listShareTokens[listId];
-  if (!shareToken || !state.metadata?.deviceId) {
-    logSkippedBackendCall("List name sync skipped: missing share token or device metadata.");
+  if (!state.metadata?.deviceId) {
+    logSkippedBackendCall("List name sync skipped: device metadata missing.");
     return;
   }
 
   await sharingApiClient.upsertList({
     deviceId: state.metadata.deviceId,
     listId,
-    shareToken,
     body: {
       name: listName,
     },
@@ -93,15 +79,13 @@ const syncListNameImmediately = async (listId: string, listName: string) => {
 
 const syncItemImmediately = async (item: Item) => {
   const state = useStore.getState();
-  const shareToken = state.listShareTokens[item.listId];
-  if (!shareToken || !state.metadata?.deviceId) {
-    logSkippedBackendCall("Item sync skipped: missing share token or device metadata.");
+  if (!state.metadata?.deviceId) {
+    logSkippedBackendCall("Item sync skipped: device metadata missing.");
     return;
   }
 
   await sharingApiClient.upsertItem({
     deviceId: state.metadata.deviceId,
-    shareToken,
     listId: item.listId,
     itemId: item.id,
     body: {
@@ -119,6 +103,13 @@ const syncItemImmediately = async (item: Item) => {
 
 const markBackendOnline = () => {
   useStore.setState({ backendConnection: "online" });
+};
+
+const describeSyncError = (error: unknown) => {
+  if (error instanceof Error && error.message.trim()) {
+    return error.message;
+  }
+  return null;
 };
 
 const reportSyncError = (message: string) => {
@@ -153,10 +144,9 @@ export const useStore = create<StoreState>((set, get) => ({
   syncNotice: undefined,
   backendLogs: [],
   load: async () => {
-    const [lists, items, listShareTokens] = await Promise.all([
+    const [lists, items] = await Promise.all([
       db.lists.toArray(),
       db.items.toArray(),
-      loadShareTokenMap(),
     ]);
     const sortedLists = lists.sort((a, b) => a.createdAt - b.createdAt);
     const metadata: AppMetadata = {
@@ -171,7 +161,7 @@ export const useStore = create<StoreState>((set, get) => ({
       items,
       activeListId: sortedLists[0]?.id,
       metadata,
-      listShareTokens,
+      listShareTokens: {},
       isLoaded: true,
     });
 
@@ -191,15 +181,18 @@ export const useStore = create<StoreState>((set, get) => ({
       activeListId: list.id,
     }));
 
-    if (get().metadata?.deviceId) {
-      try {
-        await get().ensureShareToken(list.id);
-      } catch {
-        reportSyncError("Backend-Verbindung fehlgeschlagen. Änderungen bleiben lokal und werden später synchronisiert.");
-      }
-    } else {
-      logSkippedBackendCall("List create sync skipped: device metadata missing.");
+    try {
+      await syncListNameImmediately(list.id, list.name);
+    } catch (error) {
+      const details = describeSyncError(error);
+      reportSyncError(
+        details
+          ? `Backend-Verbindung fehlgeschlagen (${details}). Änderungen bleiben lokal und werden später synchronisiert.`
+          : "Backend-Verbindung fehlgeschlagen. Änderungen bleiben lokal und werden später synchronisiert.",
+      );
     }
+
+    triggerSyncInBackground(list.id);
   },
   renameList: async (listId: string, name: string) => {
     const now = Date.now();
@@ -211,8 +204,13 @@ export const useStore = create<StoreState>((set, get) => ({
     }));
     try {
       await syncListNameImmediately(listId, name);
-    } catch {
-      reportSyncError("Backend-Verbindung fehlgeschlagen. Änderungen bleiben lokal und werden später synchronisiert.");
+    } catch (error) {
+      const details = describeSyncError(error);
+      reportSyncError(
+        details
+          ? `Backend-Verbindung fehlgeschlagen (${details}). Änderungen bleiben lokal und werden später synchronisiert.`
+          : "Backend-Verbindung fehlgeschlagen. Änderungen bleiben lokal und werden später synchronisiert.",
+      );
     }
 
     triggerSyncInBackground(listId);
@@ -252,8 +250,13 @@ export const useStore = create<StoreState>((set, get) => ({
     set((state) => ({ items: [...state.items, item] }));
     try {
       await syncItemImmediately(item);
-    } catch {
-      reportSyncError("Backend-Verbindung fehlgeschlagen. Änderungen bleiben lokal und werden später synchronisiert.");
+    } catch (error) {
+      const details = describeSyncError(error);
+      reportSyncError(
+        details
+          ? `Backend-Verbindung fehlgeschlagen (${details}). Änderungen bleiben lokal und werden später synchronisiert.`
+          : "Backend-Verbindung fehlgeschlagen. Änderungen bleiben lokal und werden später synchronisiert.",
+      );
     }
 
     triggerSyncInBackground(listId);
@@ -274,8 +277,13 @@ export const useStore = create<StoreState>((set, get) => ({
 
     try {
       await syncItemImmediately(updated);
-    } catch {
-      reportSyncError("Backend-Verbindung fehlgeschlagen. Änderungen bleiben lokal und werden später synchronisiert.");
+    } catch (error) {
+      const details = describeSyncError(error);
+      reportSyncError(
+        details
+          ? `Backend-Verbindung fehlgeschlagen (${details}). Änderungen bleiben lokal und werden später synchronisiert.`
+          : "Backend-Verbindung fehlgeschlagen. Änderungen bleiben lokal und werden später synchronisiert.",
+      );
     }
 
     triggerSyncInBackground(updated.listId);
@@ -298,40 +306,38 @@ export const useStore = create<StoreState>((set, get) => ({
 
     try {
       await syncItemImmediately(updated);
-    } catch {
-      reportSyncError("Backend-Verbindung fehlgeschlagen. Änderungen bleiben lokal und werden später synchronisiert.");
+    } catch (error) {
+      const details = describeSyncError(error);
+      reportSyncError(
+        details
+          ? `Backend-Verbindung fehlgeschlagen (${details}). Änderungen bleiben lokal und werden später synchronisiert.`
+          : "Backend-Verbindung fehlgeschlagen. Änderungen bleiben lokal und werden später synchronisiert.",
+      );
     }
 
     triggerSyncInBackground(updated.listId);
   },
   ensureShareToken: async (listId: string) => {
     const state = get();
-    const existing = state.listShareTokens[listId];
-    if (existing) {
-      return existing;
-    }
 
     const list = state.lists.find((entry) => entry.id === listId);
     if (!list || !state.metadata?.deviceId) {
       throw new Error("List or device metadata missing");
     }
 
-    const response = await sharingApiClient.upsertList({
+    await sharingApiClient.upsertList({
       deviceId: state.metadata.deviceId,
       listId: list.id,
       body: { name: list.name },
     });
 
-    markBackendOnline();
-    await setShareToken(listId, response.shareToken);
-    set((current) => ({
-      listShareTokens: {
-        ...current.listShareTokens,
-        [listId]: response.shareToken,
-      },
-    }));
+    const tokenResponse = await sharingApiClient.createShareToken({
+      deviceId: state.metadata.deviceId,
+      listId: list.id,
+    });
 
-    return response.shareToken;
+    markBackendOnline();
+    return tokenResponse.shareToken;
   },
   joinSharedList: async (rawShareValue: string) => {
     const state = get();
@@ -352,7 +358,6 @@ export const useStore = create<StoreState>((set, get) => ({
 
       const remoteList = await sharingApiClient.fetchList({
         deviceId: state.metadata.deviceId,
-        shareToken,
         listId: redemption.listId,
       });
 
@@ -376,8 +381,6 @@ export const useStore = create<StoreState>((set, get) => ({
 
       await db.lists.put(localList);
       await db.items.bulkPut(localItems);
-      await setShareToken(localList.id, shareToken);
-
       set((current) => {
         const withoutListItems = current.items.filter((item) => item.listId !== localList.id);
         const withoutList = current.lists.filter((list) => list.id !== localList.id);
@@ -385,24 +388,24 @@ export const useStore = create<StoreState>((set, get) => ({
           lists: [...withoutList, localList].sort((a, b) => a.createdAt - b.createdAt),
           items: [...withoutListItems, ...localItems],
           activeListId: localList.id,
-          listShareTokens: {
-            ...current.listShareTokens,
-            [localList.id]: shareToken,
-          },
         };
       });
 
       markBackendOnline();
       return localList.id;
     } catch (error) {
-      reportSyncError("Geteilte Liste konnte nicht geladen werden. Bitte Backend-Verbindung prüfen.");
+      const details = describeSyncError(error);
+      reportSyncError(
+        details
+          ? `Geteilte Liste konnte nicht geladen werden (${details}). Bitte Backend-Verbindung prüfen.`
+          : "Geteilte Liste konnte nicht geladen werden. Bitte Backend-Verbindung prüfen.",
+      );
       throw error;
     }
   },
   syncList: async (listId: string) => {
     const state = get();
-    const shareToken = state.listShareTokens[listId];
-    if (!shareToken || !state.metadata?.deviceId) {
+    if (!state.metadata?.deviceId) {
       return;
     }
 
@@ -412,14 +415,13 @@ export const useStore = create<StoreState>((set, get) => ({
     }
 
     const deviceId = state.metadata.deviceId;
-    const remoteList = await sharingApiClient.fetchList({ deviceId, shareToken, listId });
+    const remoteList = await sharingApiClient.fetchList({ deviceId, listId });
 
     const remoteListUpdatedAt = toMillis(remoteList.updatedAt);
     if (localList.updatedAt > remoteListUpdatedAt || localList.name !== remoteList.name) {
       await sharingApiClient.upsertList({
         deviceId,
         listId,
-        shareToken,
         body: { name: localList.name },
       });
     }
@@ -448,7 +450,6 @@ export const useStore = create<StoreState>((set, get) => ({
     for (const item of localPushById.values()) {
       await sharingApiClient.upsertItem({
         deviceId,
-        shareToken,
         listId,
         itemId: item.id,
         body: {
@@ -461,7 +462,7 @@ export const useStore = create<StoreState>((set, get) => ({
       });
     }
 
-    const refreshedList = await sharingApiClient.fetchList({ deviceId, shareToken, listId });
+    const refreshedList = await sharingApiClient.fetchList({ deviceId, listId });
     const syncedList: List = {
       id: refreshedList.listId,
       name: refreshedList.name,
@@ -479,11 +480,8 @@ export const useStore = create<StoreState>((set, get) => ({
       updatedAt: toMillis(item.updatedAt),
     }));
 
-    const now = Date.now();
     await db.lists.put(syncedList);
     await db.items.bulkPut(syncedItems);
-    await db.listShares.put({ listId, shareToken, lastSyncedAt: now });
-
     set((current) => {
       const remainingLists = current.lists.filter((entry) => entry.id !== listId);
       const remainingItems = current.items.filter((entry) => entry.listId !== listId);
@@ -500,12 +498,14 @@ export const useStore = create<StoreState>((set, get) => ({
     await Promise.all(
       state.lists.map(async (list) => {
         try {
-          if (!get().listShareTokens[list.id]) {
-            await get().ensureShareToken(list.id);
-          }
           await get().syncList(list.id);
-        } catch {
-          reportSyncError("Backend derzeit nicht erreichbar. Synchronisierung wird erneut versucht.");
+        } catch (error) {
+          const details = describeSyncError(error);
+          reportSyncError(
+            details
+              ? `Backend derzeit nicht erreichbar (${details}). Synchronisierung wird erneut versucht.`
+              : "Backend derzeit nicht erreichbar. Synchronisierung wird erneut versucht.",
+          );
         }
       }),
     );
