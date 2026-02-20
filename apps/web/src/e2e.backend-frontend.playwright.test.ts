@@ -12,15 +12,41 @@ type SharedList = {
   updatedAt: string;
 };
 
-type SharedListInsertWrite = {
-  kind: "insert-shared-list";
+type DbWrite =
+  | {
+      kind: "insert-shared-list";
+      id: string;
+      name: string;
+      createdByDeviceId: string;
+    }
+  | {
+      kind: "insert-list-item";
+      id: string;
+      listId: string;
+      name: string;
+      createdByDeviceId: string;
+    }
+  | {
+      kind: "insert-share-token";
+      tokenId: string;
+      listId: string;
+      createdByDeviceId: string;
+    };
+
+type StoredItem = {
   id: string;
+  listId: string;
   name: string;
-  createdByDeviceId: string;
+  quantityOrUnit?: string;
+  category: string;
+  deleted: boolean;
+  createdAt: string;
+  updatedAt: string;
 };
 
 const sharedLists = new Map<string, SharedList>();
-const dbWrites: SharedListInsertWrite[] = [];
+const listItems = new Map<string, StoredItem>();
+const dbWrites: DbWrite[] = [];
 
 const toResult = <T extends QueryResultRow>(rows: T[]): QueryResult<T> => ({
   command: "SELECT",
@@ -33,6 +59,13 @@ const toResult = <T extends QueryResultRow>(rows: T[]): QueryResult<T> => ({
 const asString = (value: unknown, label: string) => {
   if (typeof value !== "string") {
     throw new Error(`Expected ${label} to be a string`);
+  }
+  return value;
+};
+
+const asBoolean = (value: unknown, label: string) => {
+  if (typeof value !== "boolean") {
+    throw new Error(`Expected ${label} to be a boolean`);
   }
   return value;
 };
@@ -93,6 +126,48 @@ const queryMock = vi.fn(async (text: string, values: unknown[] = []) => {
     return toResult([]);
   }
 
+  if (text.includes("UPDATE shared_lists SET updated_at = GREATEST(updated_at, $2::timestamptz) WHERE id = $1")) {
+    const listId = asString(values[0], "listId");
+    const updatedAt = asString(values[1], "updatedAt");
+    const current = sharedLists.get(listId);
+    if (current) {
+      sharedLists.set(listId, { ...current, updatedAt });
+      return toResult([{ id: listId }]);
+    }
+    return toResult([]);
+  }
+
+  if (text.includes("SELECT id, list_id FROM list_items WHERE id = $1 FOR UPDATE")) {
+    const itemId = asString(values[0], "itemId");
+    const item = listItems.get(itemId);
+    return toResult(item ? [{ id: item.id, list_id: item.listId }] : []);
+  }
+
+  if (text.includes("INSERT INTO list_items(id, list_id, name, quantity_or_unit, category, deleted, created_by_device_id")) {
+    const id = asString(values[0], "itemId");
+    const listId = asString(values[1], "listId");
+    const name = asString(values[2], "itemName");
+    const quantityOrUnitRaw = values[3];
+    const quantityOrUnit = typeof quantityOrUnitRaw === "string" ? quantityOrUnitRaw : undefined;
+    const category = asString(values[4], "category");
+    const deleted = asBoolean(values[5], "deleted");
+    const createdByDeviceId = asString(values[6], "createdByDeviceId");
+    const updatedAt = asString(values[7], "updatedAt");
+
+    listItems.set(id, {
+      id,
+      listId,
+      name,
+      quantityOrUnit,
+      category,
+      deleted,
+      createdAt: updatedAt,
+      updatedAt,
+    });
+    dbWrites.push({ kind: "insert-list-item", id, listId, name, createdByDeviceId });
+    return toResult([]);
+  }
+
   if (text.includes("SELECT id, name, created_at, updated_at FROM shared_lists WHERE id = $1 LIMIT 1")) {
     const listId = asString(values[0], "listId");
     const list = sharedLists.get(listId);
@@ -111,6 +186,32 @@ const queryMock = vi.fn(async (text: string, values: unknown[] = []) => {
   }
 
   if (text.includes("FROM list_items") && text.includes("WHERE list_id = $1")) {
+    const listId = asString(values[0], "listId");
+    const itemsForList = Array.from(listItems.values())
+      .filter((entry) => entry.listId === listId)
+      .map((item) => ({
+        id: item.id,
+        name: item.name,
+        quantity_or_unit: item.quantityOrUnit ?? null,
+        category: item.category,
+        deleted: item.deleted,
+        created_at: item.createdAt,
+        updated_at: item.updatedAt,
+      }));
+    return toResult(itemsForList);
+  }
+
+  if (text.includes("INSERT INTO share_tokens(id, list_id, created_by_device_id, created_at)")) {
+    const tokenId = asString(values[0], "tokenId");
+    const listId = asString(values[1], "listId");
+    const createdByDeviceId = asString(values[2], "createdByDeviceId");
+    const createdAt = new Date().toISOString();
+
+    dbWrites.push({ kind: "insert-share-token", tokenId, listId, createdByDeviceId });
+    return toResult([{ created_at: createdAt }]);
+  }
+
+  if (text.includes("INSERT INTO share_token_redemptions(token_id, device_id, redeemed_at)")) {
     return toResult([]);
   }
 
@@ -138,6 +239,7 @@ const isUuid = (value: string) =>
 describe("frontend/backend integration via playwright", () => {
   beforeAll(async () => {
     sharedLists.clear();
+    listItems.clear();
     dbWrites.length = 0;
 
     const { buildServer } = await import("../../backend/src/server.js");
@@ -196,13 +298,26 @@ describe("frontend/backend integration via playwright", () => {
     const browser = await chromium.launch();
 
     try {
-      const context = await browser.newContext();
+      const context = await browser.newContext({ permissions: ["clipboard-write"] });
       const page = await context.newPage();
+
+      page.on("dialog", async (dialog) => {
+        await dialog.accept();
+      });
+
+      await page.addInitScript(() => {
+        Object.defineProperty(window.navigator, "clipboard", {
+          configurable: true,
+          value: {
+            writeText: async () => undefined,
+          },
+        });
+      });
 
       await page.goto(frontendUrl);
 
       await expect.poll(() => sharedLists.size).toBeGreaterThanOrEqual(1);
-      await expect.poll(() => dbWrites.length).toBeGreaterThanOrEqual(1);
+      await expect.poll(() => dbWrites.filter((entry) => entry.kind === "insert-shared-list").length).toBe(1);
 
       await page.getByLabel("Open list menu").click();
       await expect.poll(async () => page.locator(".drawer.drawer--open").isVisible()).toBe(true);
@@ -212,21 +327,46 @@ describe("frontend/backend integration via playwright", () => {
         }
       });
 
-      await expect.poll(() => sharedLists.size).toBeGreaterThanOrEqual(2);
-      await expect.poll(() => dbWrites.length).toBeGreaterThanOrEqual(2);
+      await expect.poll(() => dbWrites.filter((entry) => entry.kind === "insert-shared-list").length).toBe(2);
 
-      const insertedNames = dbWrites.map((entry) => entry.name);
-      expect(insertedNames).toContain("Einkaufsliste");
-      expect(insertedNames).toContain("Liste 2");
+      await page.getByLabel("Add item").click();
+      await page.getByLabel("Item name").fill("Milch 1L");
+      await page.getByLabel("Item name").press("Enter");
 
-      for (const write of dbWrites) {
+      await expect.poll(() => dbWrites.filter((entry) => entry.kind === "insert-list-item").length).toBe(1);
+
+      const secondListWrite = dbWrites
+        .filter((entry): entry is Extract<DbWrite, { kind: "insert-shared-list" }> => entry.kind === "insert-shared-list")
+        .find((entry) => entry.name === "Liste 2");
+      expect(secondListWrite).toBeDefined();
+
+      await page.evaluate(async ({ listId, deviceId }) => {
+        await fetch(`/v1/lists/${listId}/share-tokens`, {
+          method: "POST",
+          headers: {
+            "x-device-id": deviceId,
+          },
+        });
+      }, { listId: secondListWrite?.id ?? "", deviceId: secondListWrite?.createdByDeviceId ?? "" });
+
+      await expect.poll(() => dbWrites.filter((entry) => entry.kind === "insert-share-token").length).toBe(1);
+
+      const listWrites = dbWrites.filter((entry) => entry.kind === "insert-shared-list");
+      expect(listWrites.map((entry) => entry.name)).toEqual(expect.arrayContaining(["Einkaufsliste", "Liste 2"]));
+      for (const write of listWrites) {
         expect(isUuid(write.id)).toBe(true);
         expect(isUuid(write.createdByDeviceId)).toBe(true);
       }
 
-      const createdList = Array.from(sharedLists.values()).find((list) => list.name === "Liste 2");
-      expect(createdList).toBeDefined();
-      expect(createdList?.createdByDeviceId).toBeTruthy();
+      const itemWrites = dbWrites.filter((entry) => entry.kind === "insert-list-item");
+      expect(itemWrites[0]?.name).toBe("Milch");
+      expect(itemWrites[0] ? isUuid(itemWrites[0].id) : false).toBe(true);
+      expect(itemWrites[0] ? isUuid(itemWrites[0].createdByDeviceId) : false).toBe(true);
+
+      const tokenWrites = dbWrites.filter((entry) => entry.kind === "insert-share-token");
+      expect(tokenWrites[0] ? isUuid(tokenWrites[0].tokenId) : false).toBe(true);
+      expect(tokenWrites[0] ? isUuid(tokenWrites[0].listId) : false).toBe(true);
+      expect(tokenWrites[0] ? isUuid(tokenWrites[0].createdByDeviceId) : false).toBe(true);
     } finally {
       await browser.close();
     }
