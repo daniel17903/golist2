@@ -11,7 +11,7 @@ const envSchema = z.object({
   PGUSER: z.string().min(1).default('golist'),
   PGDATABASE: z.string().min(1).default('golist'),
   PGPASSWORD: z.string().min(1).default('golist'),
-  PGSSLMODE: sslModeSchema.default('disable'),
+  PGSSLMODE: sslModeSchema.default('require'),
   NEON_PGHOST: z.string().min(1).optional(),
   NEON_PGUSER: z.string().min(1).optional(),
   NEON_PGDATABASE: z.string().min(1).optional(),
