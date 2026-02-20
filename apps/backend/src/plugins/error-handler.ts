@@ -10,13 +10,16 @@ const hasIssues = (value: unknown): boolean => {
 
 export function registerErrorHandler(app: FastifyInstance) {
   app.setErrorHandler((error, request, reply) => {
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    const errorStack = error instanceof Error ? error.stack : undefined
+
     request.log.error(
       {
         requestId: request.id,
         method: request.method,
         url: request.url,
-        errorMessage: error.message,
-        errorStack: error.stack,
+        errorMessage,
+        errorStack,
       },
       'error handler captured an exception',
     )

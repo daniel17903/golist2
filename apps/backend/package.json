@@ -14,7 +14,7 @@
     "db:seed": "tsx src/db/cli.ts seed"
   },
   "dependencies": {
-    "fastify": "5.6.1",
+    "fastify": "5.7.4",
     "pg": "8.18.0",
     "zod": "4.3.6"
   },
