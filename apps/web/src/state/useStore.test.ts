@@ -194,6 +194,33 @@ describe("useStore", () => {
     expect(metadataPut).toHaveBeenCalledTimes(1);
   });
 
+
+  it("restores a previously selected list from localStorage", async () => {
+    listsData = [
+      { id: "list-a", name: "A", createdAt: 1, updatedAt: 1 },
+      { id: "list-b", name: "B", createdAt: 2, updatedAt: 2 },
+    ];
+    globalThis.localStorage.setItem("golist.selectedListId", "list-b");
+
+    await useStore.getState().load();
+
+    const state = useStore.getState();
+    expect(state.activeListId).toBe("list-b");
+  });
+
+  it("falls back to the first list when stored selected list is missing", async () => {
+    listsData = [
+      { id: "list-a", name: "A", createdAt: 1, updatedAt: 1 },
+      { id: "list-b", name: "B", createdAt: 2, updatedAt: 2 },
+    ];
+    globalThis.localStorage.setItem("golist.selectedListId", "missing-list");
+
+    await useStore.getState().load();
+
+    const state = useStore.getState();
+    expect(state.activeListId).toBe("list-a");
+    expect(globalThis.localStorage.getItem("golist.selectedListId")).toBe("list-a");
+  });
   it("adds a list and sets it active", async () => {
     const uuidSpy = vi
       .spyOn(globalThis.crypto, "randomUUID")
@@ -210,8 +237,19 @@ describe("useStore", () => {
     expect(typeof state.lists[0]?.createdAt).toBe("number");
     expect(typeof state.lists[0]?.updatedAt).toBe("number");
     expect(state.activeListId).toBe("00000000-0000-0000-0000-000000000001");
+    expect(globalThis.localStorage.getItem("golist.selectedListId")).toBe(
+      "00000000-0000-0000-0000-000000000001",
+    );
     expect(listAdd).toHaveBeenCalledTimes(1);
     uuidSpy.mockRestore();
+  });
+
+  it("persists selected list when setting active list", () => {
+    useStore.getState().setActiveList("list-10");
+
+    const state = useStore.getState();
+    expect(state.activeListId).toBe("list-10");
+    expect(globalThis.localStorage.getItem("golist.selectedListId")).toBe("list-10");
   });
 
   it("renames a list and updates timestamps", async () => {
@@ -344,6 +382,7 @@ describe("useStore", () => {
     expect(state.lists.map((list) => list.id)).toEqual(["list-2"]);
     expect(state.items.map((item) => item.id)).toEqual(["item-2"]);
     expect(state.activeListId).toBe("list-2");
+    expect(globalThis.localStorage.getItem("golist.selectedListId")).toBe("list-2");
     expect(listDelete).toHaveBeenCalledWith("list-1");
     expect(itemsWhere).toHaveBeenCalledWith("listId");
   });
