@@ -64,6 +64,10 @@
 - The PWA service worker can cache aggressively; use hard refresh or clear site data
   when debugging PWA changes.
 
+- Playwright E2E in fresh containers may require both browser binaries and OS deps.
+  Run `npx playwright install chromium` and `npx playwright install-deps chromium`
+  before running `RUN_PLAYWRIGHT_E2E=1 npm run test -w apps/web -- src/e2e.backend-frontend.playwright.test.ts`.
+
 
 ## Documentation maintenance
 - Keep `docs/sharing-plan.md` up to date when backend sharing architecture, sequencing, or CI expectations change.
