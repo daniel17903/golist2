@@ -1,3 +1,5 @@
+import crypto from 'node:crypto'
+
 import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
 
@@ -5,6 +7,37 @@ import { buildServer } from './server.js'
 import { InMemoryListRepository } from './test/in-memory-list-repository.js'
 
 describe('sharing API contract basics', () => {
+  it('allows a client to create a new list using a self-generated list id via PUT', async () => {
+    const app = buildServer({ listRepository: new InMemoryListRepository() })
+    const listId = crypto.randomUUID()
+
+    const createResponse = await app.inject({
+      method: 'PUT',
+      url: `/v1/lists/${listId}`,
+      headers: { 'x-device-id': '11111111-1111-4111-8111-111111111111' },
+      payload: { name: 'Client Generated Id List' },
+    })
+
+    expect(createResponse.statusCode).toBe(201)
+    expect(createResponse.json()).toEqual({ listId })
+
+    const fetchResponse = await app.inject({
+      method: 'GET',
+      url: `/v1/lists/${listId}`,
+      headers: { 'x-device-id': '11111111-1111-4111-8111-111111111111' },
+    })
+
+    expect(fetchResponse.statusCode).toBe(200)
+    expect(fetchResponse.json()).toEqual(
+      expect.objectContaining({
+        listId,
+        name: 'Client Generated Id List',
+      }),
+    )
+
+    await app.close()
+  })
+
   it('creates a list and returns listId', async () => {
     const app = buildServer({ listRepository: new InMemoryListRepository() })
 
