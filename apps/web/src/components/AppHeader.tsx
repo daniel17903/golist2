@@ -1,5 +1,6 @@
 type AppHeaderProps = {
   activeListName: string;
+  openItemsCount: number;
   isEditingTitle: boolean;
   newListName: string;
   onListNameChange: (value: string) => void;
@@ -10,13 +11,14 @@ type AppHeaderProps = {
 };
 
 const connectionLabelMap = {
-  online: "Backend verbunden",
-  offline: "Backend nicht erreichbar",
-  unknown: "Backend wird geprüft",
+  online: "Online",
+  offline: "Offline",
+  unknown: "Prüfung",
 } as const;
 
 const AppHeader = ({
   activeListName,
+  openItemsCount,
   isEditingTitle,
   newListName,
   onListNameChange,
@@ -29,17 +31,11 @@ const AppHeader = ({
 
   return (
     <header className="app__header">
-      <div className="title-row">
+      <div className="app__header-shell">
         {!isEditingTitle ? (
           <>
-            <h1>{activeListName}</h1>
-            <div className="header-actions">
-              <p className="connection-text">{connectionLabel}</p>
-              <span
-                className={`connection-indicator connection-indicator--${backendConnection}`}
-                aria-label={connectionLabel}
-                title={connectionLabel}
-              />
+            <div className="title-row">
+              <h1>{activeListName}</h1>
               <button
                 type="button"
                 className="icon-button"
@@ -53,6 +49,17 @@ const AppHeader = ({
                   />
                 </svg>
               </button>
+            </div>
+            <div className="header-meta-row">
+              <p className="header-open-count">{`${openItemsCount} offen`}</p>
+              <div
+                className={`connection-pill connection-pill--${backendConnection}`}
+                aria-label={`Backend Status: ${connectionLabel}`}
+                title={`Backend Status: ${connectionLabel}`}
+              >
+                <span className="connection-indicator" aria-hidden="true" />
+                <span>{connectionLabel}</span>
+              </div>
             </div>
           </>
         ) : (

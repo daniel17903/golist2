@@ -47,34 +47,28 @@ input:focus-visible {
   padding: 20px 16px calc(108px + env(safe-area-inset-bottom));
 }
 
-.header-glass {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 108px;
-  background: linear-gradient(
-    180deg,
-    rgba(9, 46, 68, 0.36) 0%,
-    rgba(9, 46, 68, 0.22) 58%,
-    rgba(9, 46, 68, 0.05) 100%
-  );
-  backdrop-filter: blur(14px) saturate(140%);
-  -webkit-backdrop-filter: blur(14px) saturate(140%);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-  pointer-events: none;
-  z-index: 0;
-}
-
 .app__header {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
   color: var(--shell-text);
-  position: relative;
-  z-index: 1;
+  margin-bottom: 10px;
 }
 
+.app__header-shell {
+  border-radius: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: linear-gradient(
+    160deg,
+    rgba(136, 201, 229, 0.34) 0%,
+    rgba(137, 212, 162, 0.2) 56%,
+    rgba(182, 221, 164, 0.12) 100%
+  );
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.34);
+  backdrop-filter: blur(18px) saturate(150%);
+  -webkit-backdrop-filter: blur(18px) saturate(150%);
+  padding: clamp(16px, 4vw, 28px);
+  min-height: 132px;
+  display: grid;
+  gap: 14px;
+}
 
 .ghost-button {
   border: 1px solid var(--shell-outline);
@@ -94,12 +88,26 @@ input:focus-visible {
 
 .title-row h1 {
   margin: 0;
-  font-size: clamp(1.6rem, 5vw, 2rem);
+  font-size: clamp(1.8rem, 5vw, 3rem);
   font-weight: 600;
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.header-meta-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.header-open-count {
+  margin: 0;
+  color: var(--shell-text-muted);
+  font-size: clamp(1rem, 2.5vw, 1.1rem);
 }
 
 .title-edit {
@@ -120,20 +128,17 @@ input:focus-visible {
   font-size: 14px;
 }
 
-
-.header-actions {
-  display: inline-grid;
-  grid-template-columns: auto auto auto;
+.connection-pill {
+  margin-left: auto;
+  display: inline-flex;
   align-items: center;
   gap: 8px;
-  min-width: 0;
-}
-
-.connection-text {
-  margin: 0;
-  font-size: 12px;
-  color: var(--shell-text-muted);
-  white-space: nowrap;
+  border-radius: 999px;
+  padding: 8px 14px;
+  font-size: clamp(1rem, 2.4vw, 1.05rem);
+  background: rgba(255, 255, 255, 0.14);
+  color: #eaf4f3;
+  max-width: 100%;
 }
 
 .connection-indicator {
@@ -141,21 +146,32 @@ input:focus-visible {
   height: 10px;
   border-radius: 999px;
   display: inline-block;
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.7);
 }
 
-.connection-indicator--online {
+.connection-pill--online .connection-indicator {
   background: #66f57f;
 }
 
-.connection-indicator--offline {
+.connection-pill--offline .connection-indicator {
   background: #ff847f;
 }
 
-.connection-indicator--unknown {
+.connection-pill--unknown .connection-indicator {
   background: #ffd980;
 }
 
+.icon-button {
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid var(--shell-outline);
+  border-radius: 999px;
+  font-size: 20px;
+  color: var(--shell-text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+}
 
 .backend-log-panel {
   position: fixed;
@@ -806,32 +822,29 @@ input:focus-visible {
 }
 
 @media (max-width: 540px) {
-  .header-actions {
-    grid-template-columns: auto auto;
-    grid-template-areas:
-      "text text"
-      "dot edit";
-    justify-items: end;
-  }
-
-  .connection-text {
-    grid-area: text;
-    text-align: right;
-    white-space: normal;
-    line-height: 1.2;
-  }
-
-  .connection-indicator {
-    grid-area: dot;
-  }
-
-  .icon-button {
-    grid-area: edit;
-  }
-
   .app {
     padding-left: 12px;
     padding-right: 12px;
+  }
+
+  .app__header-shell {
+    border-radius: 22px;
+    min-height: 120px;
+    gap: 12px;
+  }
+
+  .title-row h1 {
+    font-size: clamp(1.55rem, 8vw, 2rem);
+  }
+
+  .header-meta-row {
+    align-items: flex-start;
+  }
+
+  .connection-pill {
+    width: 100%;
+    justify-content: flex-start;
+    margin-left: 0;
   }
 
   .title-edit {

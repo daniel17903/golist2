@@ -188,9 +188,9 @@ const App = () => {
 
   return (
     <div className="app">
-      <div className="header-glass" aria-hidden="true" />
       <AppHeader
         activeListName={activeList?.name ?? ""}
+        openItemsCount={listItems.length}
         isEditingTitle={editingTitle}
         newListName={newListName}
         onListNameChange={setNewListName}
