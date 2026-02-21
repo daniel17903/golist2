@@ -249,6 +249,42 @@ describe("useStore", () => {
     uuidSpy.mockRestore();
   });
 
+  it("does not block item creation on backend sync", async () => {
+    let resolveSync: (() => void) | undefined;
+    upsertItemMock.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveSync = resolve;
+        }),
+    );
+    fetchListMock.mockImplementation(() => new Promise(() => undefined));
+
+    useStore.setState({
+      metadata: {
+        id: "app",
+        deviceId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        appVersion: "test-version",
+        lastOpenedAt: 1,
+      },
+      lists: [{ id: "list-1", name: "Groceries", createdAt: 1, updatedAt: 1 }],
+    });
+
+    let addResolved = false;
+    const addPromise = useStore.getState().addItem("list-1", "Bread").then(() => {
+      addResolved = true;
+    });
+
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(addResolved).toBe(true);
+    expect(useStore.getState().items.some((item) => item.name === "Bread")).toBe(true);
+    expect(upsertItemMock).toHaveBeenCalled();
+
+    resolveSync?.();
+    await addPromise;
+  });
+
   it("toggles an item deleted state", async () => {
     const baseItem: Item = {
       id: "item-1",
