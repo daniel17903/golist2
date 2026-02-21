@@ -26,6 +26,7 @@ export const useAppState = () => {
     syncNotice,
     clearSyncNotice,
     backendLogs,
+    activeBackendRequestCount,
   } = useStore();
 
   const [newListName, setNewListName] = useState("");
@@ -63,7 +64,7 @@ export const useAppState = () => {
       try {
         await joinSharedList(shareTokenFromUrl);
       } catch {
-        window.alert("Geteilter Link konnte nicht geöffnet werden.");
+        // keep flow non-blocking; backend notice/logging is handled in store state
       } finally {
         const cleanedUrl = new URL(window.location.href);
         cleanedUrl.searchParams.delete("shareToken");
@@ -231,6 +232,7 @@ export const useAppState = () => {
     return `${window.location.origin}/?shareToken=${token}`;
   };
 
+
   return {
     lists,
     items,
@@ -275,5 +277,6 @@ export const useAppState = () => {
     syncNotice,
     clearSyncNotice,
     backendLogs,
+    hasActiveBackendRequests: activeBackendRequestCount > 0,
   };
 };

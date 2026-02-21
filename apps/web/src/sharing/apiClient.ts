@@ -15,13 +15,26 @@ type BackendCallLog = {
 };
 
 let backendCallLogger: ((entry: BackendCallLog) => void) | null = null;
+let backendRequestActivityLogger: ((activeRequestCount: number) => void) | null = null;
+let activeRequestCount = 0;
 
 export const setBackendCallLogger = (logger: ((entry: BackendCallLog) => void) | null) => {
   backendCallLogger = logger;
 };
 
+export const setBackendRequestActivityLogger = (
+  logger: ((activeRequestCount: number) => void) | null,
+) => {
+  backendRequestActivityLogger = logger;
+};
+
 const logBackendCall = (entry: BackendCallLog) => {
   backendCallLogger?.(entry);
+};
+
+const updateActiveRequestCount = (delta: number) => {
+  activeRequestCount = Math.max(0, activeRequestCount + delta);
+  backendRequestActivityLogger?.(activeRequestCount);
 };
 
 const readApiBaseUrl = () => {
@@ -99,6 +112,7 @@ const fetchWithTimeout = async (url: string, options: RequestInit, context: stri
   const timeout = globalThis.setTimeout(() => {
     controller.abort();
   }, requestTimeoutMs);
+  updateActiveRequestCount(1);
 
   try {
     const response = await fetch(url, { ...options, signal: controller.signal });
@@ -130,6 +144,7 @@ const fetchWithTimeout = async (url: string, options: RequestInit, context: stri
     throw error;
   } finally {
     globalThis.clearTimeout(timeout);
+    updateActiveRequestCount(-1);
   }
 };
 

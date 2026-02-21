@@ -1,9 +1,10 @@
-import { useRef, useState, type PointerEvent } from "react";
-import type { List } from "@golist/shared/domain/types";
+import { useMemo, useRef, useState, type PointerEvent } from "react";
+import type { Item, List } from "@golist/shared/domain/types";
 
 type ListsDrawerProps = {
   isOpen: boolean;
   lists: List[];
+  items: Item[];
   activeListId: string | null | undefined;
   onClose: () => void;
   onOpen: () => void;
@@ -16,9 +17,18 @@ type DragMode = "opening" | "closing";
 
 const EDGE_SWIPE_WIDTH = 28;
 
+const formatUpdatedAt = (value: number) =>
+  new Intl.DateTimeFormat("de-DE", {
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(value));
+
 const ListsDrawer = ({
   isOpen,
   lists,
+  items,
   activeListId,
   onClose,
   onOpen,
@@ -29,10 +39,26 @@ const ListsDrawer = ({
   const drawerRef = useRef<HTMLElement | null>(null);
   const dragStateRef = useRef<{ pointerId: number; startX: number; mode: DragMode } | null>(null);
   const [dragOffset, setDragOffset] = useState<number | null>(null);
+  const [confirmDeleteListId, setConfirmDeleteListId] = useState<string | null>(null);
+
+  const metadataByListId = useMemo(() => {
+    const entries = new Map<string, { openItemCount: number; lastUpdatedAt: number }>();
+    lists.forEach((list) => {
+      const listItems = items.filter((item) => item.listId === list.id);
+      entries.set(list.id, {
+        openItemCount: listItems.filter((item) => !item.deleted).length,
+        lastUpdatedAt:
+          listItems.reduce((max, item) => Math.max(max, item.updatedAt), list.updatedAt) || list.updatedAt,
+      });
+    });
+    return entries;
+  }, [lists, items]);
 
   const getDrawerWidth = () => {
     const measured = drawerRef.current?.offsetWidth;
-    if (measured && measured > 0) {return measured;}
+    if (measured && measured > 0) {
+      return measured;
+    }
     return Math.min(320, Math.round(window.innerWidth * 0.8));
   };
 
@@ -43,7 +69,9 @@ const ListsDrawer = ({
 
   const handleDragMove = (event: PointerEvent<HTMLElement>) => {
     const dragState = dragStateRef.current;
-    if (!dragState || dragState.pointerId !== event.pointerId) {return;}
+    if (!dragState || dragState.pointerId !== event.pointerId) {
+      return;
+    }
 
     const drawerWidth = getDrawerWidth();
     const deltaX = event.clientX - dragState.startX;
@@ -60,7 +88,9 @@ const ListsDrawer = ({
 
   const handleDragEnd = (event: PointerEvent<HTMLElement>) => {
     const dragState = dragStateRef.current;
-    if (!dragState || dragState.pointerId !== event.pointerId) {return;}
+    if (!dragState || dragState.pointerId !== event.pointerId) {
+      return;
+    }
 
     const drawerWidth = getDrawerWidth();
     const deltaX = event.clientX - dragState.startX;
@@ -81,7 +111,8 @@ const ListsDrawer = ({
     }
   };
 
-  const drawerStyle = dragOffset === null ? undefined : { transform: `translateX(${dragOffset}px)`, transition: "none" };
+  const drawerStyle =
+    dragOffset === null ? undefined : { transform: `translateX(${dragOffset}px)`, transition: "none" };
 
   return (
     <>
@@ -90,7 +121,9 @@ const ListsDrawer = ({
           className="drawer-edge-swipe-zone"
           aria-hidden="true"
           onPointerDown={(event) => {
-            if (event.clientX > EDGE_SWIPE_WIDTH) {return;}
+            if (event.clientX > EDGE_SWIPE_WIDTH) {
+              return;
+            }
             handleDragStart(event, "opening");
           }}
           onPointerMove={handleDragMove}
@@ -126,40 +159,68 @@ const ListsDrawer = ({
           <div className="drawer__section">
             <p className="drawer__title">Meine Listen</p>
             <div className="drawer__list">
-              {lists.map((list) => (
-                <div key={list.id} className="drawer__item">
-                  <button
-                    type="button"
-                    className={`drawer__item-button ${
-                      list.id === activeListId ? "drawer__item-button--active" : ""
-                    }`}
-                    onClick={() => onSelectList(list.id)}
-                  >
-                    <span className="drawer__item-icon" aria-hidden="true">
-                      <svg viewBox="0 0 24 24">
-                        <path
-                          d="M3 5h2v2H3V5zm0 6h2v2H3v-2zm0 6h2v2H3v-2zm4-12h14v2H7V5zm0 6h14v2H7v-2zm0 6h14v2H7v-2z"
-                          fill="currentColor"
-                        />
-                      </svg>
-                    </span>
-                    <span className="drawer__item-label">{list.name}</span>
-                  </button>
-                  <button
-                    type="button"
-                    className="drawer__delete"
-                    aria-label={`Delete ${list.name}`}
-                    onClick={() => onDeleteList(list.id)}
-                  >
-                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                      <path
-                        d="M16 9v10H8V9h8m-1.5-6h-5l-1 1H5v2h14V4h-4.5l-1-1z"
-                        fill="currentColor"
-                      />
-                    </svg>
-                  </button>
-                </div>
-              ))}
+              {lists.map((list) => {
+                const metadata = metadataByListId.get(list.id);
+                return (
+                  <div key={list.id} className="drawer__item">
+                    <button
+                      type="button"
+                      className={`drawer__item-button ${list.id === activeListId ? "drawer__item-button--active" : ""}`}
+                      onClick={() => onSelectList(list.id)}
+                    >
+                      <span className="drawer__item-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24">
+                          <path
+                            d="M3 5h2v2H3V5zm0 6h2v2H3v-2zm0 6h2v2H3v-2zm4-12h14v2H7V5zm0 6h14v2H7v-2zm0 6h14v2H7v-2z"
+                            fill="currentColor"
+                          />
+                        </svg>
+                      </span>
+                      <span className="drawer__item-text">
+                        <span className="drawer__item-label">{list.name}</span>
+                        <span className="drawer__item-meta">
+                          {metadata?.openItemCount ?? 0} offen · {formatUpdatedAt(metadata?.lastUpdatedAt ?? list.updatedAt)}
+                        </span>
+                      </span>
+                    </button>
+                    {confirmDeleteListId === list.id ? (
+                      <div className="drawer__delete-confirm" role="group" aria-label={`Delete ${list.name}`}>
+                        <button
+                          type="button"
+                          className="drawer__delete-confirm-action"
+                          onClick={() => {
+                            onDeleteList(list.id);
+                            setConfirmDeleteListId(null);
+                          }}
+                        >
+                          Löschen
+                        </button>
+                        <button
+                          type="button"
+                          className="drawer__delete-confirm-cancel"
+                          onClick={() => setConfirmDeleteListId(null)}
+                        >
+                          Abbrechen
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        className="drawer__delete"
+                        aria-label={`Delete ${list.name}`}
+                        onClick={() => setConfirmDeleteListId(list.id)}
+                      >
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                          <path
+                            d="M16 9v10H8V9h8m-1.5-6h-5l-1 1H5v2h14V4h-4.5l-1-1z"
+                            fill="currentColor"
+                          />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
               <button type="button" className="drawer__new" onClick={onCreateList}>
                 <span className="drawer__item-icon" aria-hidden="true">
                   <svg viewBox="0 0 24 24">
