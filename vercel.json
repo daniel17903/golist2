@@ -1,6 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "ignoreCommand": "case \"$VERCEL_GIT_COMMIT_REF\" in dependabot/*) echo 'Ignoring Dependabot preview build'; exit 0 ;; *) exit 1 ;; esac",
+  "ignoreCommand": "echo 'Ignoring Vercel Git deployment; use GitHub Actions deployments instead.'; exit 0",
   "installCommand": "npm install",
   "buildCommand": "npm run build",
   "outputDirectory": "apps/web/dist"
