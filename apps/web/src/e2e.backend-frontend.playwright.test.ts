@@ -14,7 +14,17 @@ type RepositoryState = {
 
 const repository = new InMemoryListRepository();
 
-const readRepositoryState = () => repository as unknown as RepositoryState;
+const readRepositoryState = (): RepositoryState => {
+  const lists = Reflect.get(repository, "lists");
+  const items = Reflect.get(repository, "items");
+  const shareTokens = Reflect.get(repository, "shareTokens");
+
+  if (!(lists instanceof Map) || !(items instanceof Map) || !(shareTokens instanceof Map)) {
+    throw new Error("Unexpected in-memory repository state shape");
+  }
+
+  return { lists, items, shareTokens };
+};
 
 let backendUrl = "";
 let frontendUrl = "";
