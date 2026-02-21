@@ -8,6 +8,7 @@ type AppHeaderProps = {
   onCancelEditListName: () => void;
   onSaveListName: () => void;
   backendConnection: "unknown" | "online" | "offline";
+  isBackendBusy: boolean;
 };
 
 const connectionLabelMap = {
@@ -26,6 +27,7 @@ const AppHeader = ({
   onCancelEditListName,
   onSaveListName,
   backendConnection,
+  isBackendBusy,
 }: AppHeaderProps) => {
   const connectionLabel = connectionLabelMap[backendConnection];
 
@@ -52,14 +54,24 @@ const AppHeader = ({
             </div>
             <div className="header-meta-row">
               <p className="header-open-count">{`${openItemsCount} offen`}</p>
-              <div
-                className={`connection-pill connection-pill--${backendConnection}`}
-                aria-label={`Backend Status: ${connectionLabel}`}
-                title={`Backend Status: ${connectionLabel}`}
-              >
-                <span className="connection-indicator" aria-hidden="true" />
-                <span>{connectionLabel}</span>
-              </div>
+              {isBackendBusy ? (
+                <div className="connection-loading" aria-label="Backend Anfrage läuft" title="Backend Anfrage läuft">
+                  <span className="connection-loading__spinner" aria-hidden="true" />
+                </div>
+              ) : (
+                <div
+                  className={`connection-pill connection-pill--${backendConnection}`}
+                  aria-label={`Backend Status: ${connectionLabel}`}
+                  title={`Backend Status: ${connectionLabel}`}
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path
+                      d="M4 15a4 4 0 0 1 1.2-7.82A6 6 0 0 1 16.8 9H17a4 4 0 0 1 0 8H6a2 2 0 0 1-2-2z"
+                      fill="currentColor"
+                    />
+                  </svg>
+                </div>
+              )}
             </div>
           </>
         ) : (

@@ -49,11 +49,11 @@ input:focus-visible {
 
 .app__header {
   color: var(--shell-text);
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 
 .app__header-shell {
-  border-radius: 28px;
+  border-radius: 22px;
   border: 1px solid rgba(255, 255, 255, 0.28);
   background: linear-gradient(
     160deg,
@@ -64,10 +64,10 @@ input:focus-visible {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.34);
   backdrop-filter: blur(18px) saturate(150%);
   -webkit-backdrop-filter: blur(18px) saturate(150%);
-  padding: clamp(16px, 4vw, 28px);
-  min-height: 132px;
+  padding: clamp(12px, 3.2vw, 18px);
+  min-height: 98px;
   display: grid;
-  gap: 14px;
+  gap: 10px;
 }
 
 .ghost-button {
@@ -88,7 +88,7 @@ input:focus-visible {
 
 .title-row h1 {
   margin: 0;
-  font-size: clamp(1.8rem, 5vw, 3rem);
+  font-size: clamp(1.4rem, 4.2vw, 2.2rem);
   font-weight: 600;
   max-width: 100%;
   overflow: hidden;
@@ -107,7 +107,7 @@ input:focus-visible {
 .header-open-count {
   margin: 0;
   color: var(--shell-text-muted);
-  font-size: clamp(1rem, 2.5vw, 1.1rem);
+  font-size: 0.95rem;
 }
 
 .title-edit {
@@ -132,32 +132,56 @@ input:focus-visible {
   margin-left: auto;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
   border-radius: 999px;
-  padding: 8px 14px;
-  font-size: clamp(1rem, 2.4vw, 1.05rem);
+  width: 36px;
+  height: 36px;
+  justify-content: center;
   background: rgba(255, 255, 255, 0.14);
   color: #eaf4f3;
   max-width: 100%;
 }
 
-.connection-indicator {
-  width: 10px;
-  height: 10px;
+.connection-pill svg {
+  width: 18px;
+  height: 18px;
+}
+
+.connection-pill--online {
+  color: #66f57f;
+}
+
+.connection-pill--offline {
+  color: #ff847f;
+}
+
+.connection-pill--unknown {
+  color: #ffd980;
+}
+
+.connection-loading {
+  margin-left: auto;
+  width: 36px;
+  height: 36px;
   border-radius: 999px;
-  display: inline-block;
+  background: rgba(255, 255, 255, 0.14);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.connection-pill--online .connection-indicator {
-  background: #66f57f;
+.connection-loading__spinner {
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #f3f8f6;
+  animation: spin 0.8s linear infinite;
 }
 
-.connection-pill--offline .connection-indicator {
-  background: #ff847f;
-}
-
-.connection-pill--unknown .connection-indicator {
-  background: #ffd980;
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .icon-button {
@@ -550,7 +574,7 @@ input:focus-visible {
 .modal {
   width: min(520px, 100%);
   background: #f7f1f5;
-  border-radius: 28px;
+  border-radius: 22px;
   padding: 28px 26px 24px;
   box-shadow: 0 24px 48px rgba(0, 0, 0, 0.25);
   display: flex;
@@ -828,22 +852,21 @@ input:focus-visible {
   }
 
   .app__header-shell {
-    border-radius: 22px;
-    min-height: 120px;
-    gap: 12px;
+    border-radius: 18px;
+    min-height: 92px;
+    gap: 8px;
   }
 
   .title-row h1 {
-    font-size: clamp(1.55rem, 8vw, 2rem);
+    font-size: clamp(1.25rem, 7vw, 1.7rem);
   }
 
   .header-meta-row {
     align-items: flex-start;
   }
 
-  .connection-pill {
-    width: 100%;
-    justify-content: flex-start;
+  .connection-pill,
+  .connection-loading {
     margin-left: 0;
   }
 

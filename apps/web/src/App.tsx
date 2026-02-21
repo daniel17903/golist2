@@ -56,6 +56,7 @@ const App = () => {
     handleDeleteList,
     handleShareActiveList,
     backendConnection,
+    backendPendingRequests,
     syncNotice,
     clearSyncNotice,
     backendLogs,
@@ -203,6 +204,7 @@ const App = () => {
           void handleRenameList();
         }}
         backendConnection={backendConnection}
+        isBackendBusy={backendPendingRequests > 0}
       />
 
       <ItemGrid
