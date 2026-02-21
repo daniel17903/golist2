@@ -1,11 +1,11 @@
 import { type FastifyInstance } from 'fastify'
 
-import { query } from '../db/client.js'
+import { type ListRepository } from '../repositories/list-repository.js'
 
-export function registerHealthRoutes(app: FastifyInstance) {
+export function registerHealthRoutes(app: FastifyInstance, listRepository: ListRepository) {
   app.get('/health', async (request, reply) => {
     try {
-      await query('SELECT 1')
+      await listRepository.ping()
       return { status: 'ok' as const }
     } catch (error) {
       request.log.error({ error }, 'health check database query failed')

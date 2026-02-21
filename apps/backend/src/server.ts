@@ -2,18 +2,21 @@ import Fastify from 'fastify'
 
 import { registerErrorHandler } from './plugins/error-handler.js'
 import { registerObservability } from './plugins/observability.js'
+import { type ListRepository } from './repositories/list-repository.js'
+import { postgresListRepository } from './repositories/postgres-list-repository.js'
 import { registerHealthRoutes } from './routes/health.js'
 import { registerListRoutes } from './routes/lists.js'
 import { registerShareTokenRoutes } from './routes/share-tokens.js'
 
-export function buildServer() {
+export function buildServer(deps: { listRepository?: ListRepository } = {}) {
   const app = Fastify({ logger: true })
+  const listRepository = deps.listRepository ?? postgresListRepository
 
   registerObservability(app)
   registerErrorHandler(app)
-  registerHealthRoutes(app)
-  registerListRoutes(app)
-  registerShareTokenRoutes(app)
+  registerHealthRoutes(app, listRepository)
+  registerListRoutes(app, listRepository)
+  registerShareTokenRoutes(app, listRepository)
 
   return app
 }

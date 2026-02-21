@@ -1,25 +1,15 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 
-const queryMock = vi.fn()
-
-vi.mock('./db/client.js', () => ({
-  query: queryMock,
-}))
+import { buildServer } from './server.js'
+import { InMemoryListRepository } from './test/in-memory-list-repository.js'
 
 describe('health endpoint', () => {
-  beforeEach(() => {
-    queryMock.mockReset()
-  })
-
   it('returns status ok when database is reachable', async () => {
-    const { buildServer } = await import('./server.js')
-    const app = buildServer()
-
-    queryMock.mockResolvedValue({ rowCount: 1, rows: [{ '?column?': 1 }] })
+    const repository = new InMemoryListRepository()
+    const app = buildServer({ listRepository: repository })
 
     const response = await app.inject({ method: 'GET', url: '/health' })
 
-    expect(queryMock).toHaveBeenCalledWith('SELECT 1')
     expect(response.statusCode).toBe(200)
     expect(response.json()).toEqual({ status: 'ok' })
 
@@ -27,14 +17,12 @@ describe('health endpoint', () => {
   })
 
   it('returns service unavailable when database is unreachable', async () => {
-    const { buildServer } = await import('./server.js')
-    const app = buildServer()
-
-    queryMock.mockRejectedValue(new Error('db unavailable'))
+    const repository = new InMemoryListRepository()
+    repository.setPingError(new Error('db unavailable'))
+    const app = buildServer({ listRepository: repository })
 
     const response = await app.inject({ method: 'GET', url: '/health' })
 
-    expect(queryMock).toHaveBeenCalledWith('SELECT 1')
     expect(response.statusCode).toBe(503)
     expect(response.json()).toEqual({ status: 'error' })
 
