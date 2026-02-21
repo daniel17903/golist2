@@ -5,6 +5,7 @@ import { db } from "../storage/db";
 import {
   extractShareToken,
   setBackendCallLogger,
+  setBackendRequestActivityTracker,
   sharingApiClient,
 } from "../sharing/apiClient";
 
@@ -33,6 +34,7 @@ type StoreState = {
   activeListId?: string;
   listShareTokens: Record<string, string>;
   backendConnection: "unknown" | "online" | "offline";
+  pendingBackendRequests: number;
   syncNotice?: { id: string; message: string };
   backendLogs: Array<{ id: string; message: string; outcome: "success" | "error" | "skipped" }>;
   isLoaded: boolean;
@@ -50,6 +52,7 @@ type StoreState = {
   syncAllLists: () => Promise<void>;
   clearSyncNotice: () => void;
   appendBackendLog: (entry: { message: string; outcome: "success" | "error" | "skipped" }) => void;
+  trackBackendRequest: (isStarting: boolean) => void;
 };
 
 const triggerSyncInBackground = (listId: string) => {
@@ -152,6 +155,7 @@ export const useStore = create<StoreState>((set, get) => ({
   activeListId: undefined,
   listShareTokens: {},
   backendConnection: "unknown",
+  pendingBackendRequests: 0,
   syncNotice: undefined,
   backendLogs: [],
   load: async () => {
@@ -496,6 +500,10 @@ export const useStore = create<StoreState>((set, get) => ({
         { id: crypto.randomUUID(), message: entry.message, outcome: entry.outcome },
       ],
     })),
+  trackBackendRequest: (isStarting) =>
+    set((state) => ({
+      pendingBackendRequests: Math.max(0, state.pendingBackendRequests + (isStarting ? 1 : -1)),
+    })),
 }));
 
 setBackendCallLogger((entry) => {
@@ -503,4 +511,9 @@ setBackendCallLogger((entry) => {
     message: `${entry.endpoint}: ${entry.message}`,
     outcome: entry.outcome,
   });
+});
+
+
+setBackendRequestActivityTracker((isActive) => {
+  useStore.getState().trackBackendRequest(isActive);
 });

@@ -23,6 +23,7 @@ export const useAppState = () => {
     joinSharedList,
     syncAllLists,
     backendConnection,
+    pendingBackendRequests,
     syncNotice,
     clearSyncNotice,
     backendLogs,
@@ -38,7 +39,6 @@ export const useAppState = () => {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isCreateListModalOpen, setIsCreateListModalOpen] = useState(false);
   const [createListName, setCreateListName] = useState("");
-
   useEffect(() => {
     void load();
   }, [load]);
@@ -63,7 +63,7 @@ export const useAppState = () => {
       try {
         await joinSharedList(shareTokenFromUrl);
       } catch {
-        window.alert("Geteilter Link konnte nicht geöffnet werden.");
+        // Fehler wird durch Backend-Sync-Hinweis behandelt.
       } finally {
         const cleanedUrl = new URL(window.location.href);
         cleanedUrl.searchParams.delete("shareToken");
@@ -272,6 +272,7 @@ export const useAppState = () => {
     handleShareActiveList,
     joinSharedList,
     backendConnection,
+    pendingBackendRequests,
     syncNotice,
     clearSyncNotice,
     backendLogs,

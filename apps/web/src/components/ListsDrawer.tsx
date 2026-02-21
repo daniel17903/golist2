@@ -4,6 +4,7 @@ import type { List } from "@golist/shared/domain/types";
 type ListsDrawerProps = {
   isOpen: boolean;
   lists: List[];
+  listMetaById: Record<string, { openItems: number; lastUpdatedLabel: string }>;
   activeListId: string | null | undefined;
   onClose: () => void;
   onOpen: () => void;
@@ -25,10 +26,12 @@ const ListsDrawer = ({
   onSelectList,
   onDeleteList,
   onCreateList,
+  listMetaById,
 }: ListsDrawerProps) => {
   const drawerRef = useRef<HTMLElement | null>(null);
   const dragStateRef = useRef<{ pointerId: number; startX: number; mode: DragMode } | null>(null);
   const [dragOffset, setDragOffset] = useState<number | null>(null);
+  const [pendingDeleteListId, setPendingDeleteListId] = useState<string | null>(null);
 
   const getDrawerWidth = () => {
     const measured = drawerRef.current?.offsetWidth;
@@ -143,21 +146,50 @@ const ListsDrawer = ({
                         />
                       </svg>
                     </span>
-                    <span className="drawer__item-label">{list.name}</span>
+                    <span className="drawer__item-text">
+                      <span className="drawer__item-label">{list.name}</span>
+                      <span className="drawer__item-meta">
+                        {listMetaById[list.id]?.openItems ?? 0} offen · {listMetaById[list.id]?.lastUpdatedLabel ?? "Aktualisiert"}
+                      </span>
+                    </span>
                   </button>
-                  <button
-                    type="button"
-                    className="drawer__delete"
-                    aria-label={`Delete ${list.name}`}
-                    onClick={() => onDeleteList(list.id)}
-                  >
-                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                      <path
-                        d="M16 9v10H8V9h8m-1.5-6h-5l-1 1H5v2h14V4h-4.5l-1-1z"
-                        fill="currentColor"
-                      />
-                    </svg>
-                  </button>
+                  {pendingDeleteListId === list.id ? (
+                    <div className="drawer__delete-confirm" role="group" aria-label={`Löschen von ${list.name} bestätigen`}>
+                      <button
+                        type="button"
+                        className="drawer__delete drawer__delete--confirm"
+                        aria-label={`Delete ${list.name} now`}
+                        onClick={() => {
+                          setPendingDeleteListId(null);
+                          onDeleteList(list.id);
+                        }}
+                      >
+                        OK
+                      </button>
+                      <button
+                        type="button"
+                        className="drawer__delete"
+                        aria-label={`Cancel deleting ${list.name}`}
+                        onClick={() => setPendingDeleteListId(null)}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      className="drawer__delete"
+                      aria-label={`Delete ${list.name}`}
+                      onClick={() => setPendingDeleteListId(list.id)}
+                    >
+                      <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path
+                          d="M16 9v10H8V9h8m-1.5-6h-5l-1 1H5v2h14V4h-4.5l-1-1z"
+                          fill="currentColor"
+                        />
+                      </svg>
+                    </button>
+                  )}
                 </div>
               ))}
               <button type="button" className="drawer__new" onClick={onCreateList}>

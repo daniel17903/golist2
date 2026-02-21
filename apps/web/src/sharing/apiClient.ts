@@ -15,15 +15,25 @@ type BackendCallLog = {
 };
 
 let backendCallLogger: ((entry: BackendCallLog) => void) | null = null;
+let backendRequestActivityTracker: ((isActive: boolean) => void) | null = null;
 
 export const setBackendCallLogger = (logger: ((entry: BackendCallLog) => void) | null) => {
   backendCallLogger = logger;
 };
 
+export const setBackendRequestActivityTracker = (
+  tracker: ((isActive: boolean) => void) | null,
+) => {
+  backendRequestActivityTracker = tracker;
+};
+
+const setRequestActivity = (isActive: boolean) => {
+  backendRequestActivityTracker?.(isActive);
+};
+
 const logBackendCall = (entry: BackendCallLog) => {
   backendCallLogger?.(entry);
 };
-
 const readApiBaseUrl = () => {
   if (typeof __API_BASE_URL__ === "string" && __API_BASE_URL__.trim().length > 0) {
     return __API_BASE_URL__.trim();
@@ -95,6 +105,7 @@ const readBoolean = (payload: unknown, key: string): boolean | null => {
 
 const fetchWithTimeout = async (url: string, options: RequestInit, context: string) => {
   const startedAt = Date.now();
+  setRequestActivity(true);
   const controller = new AbortController();
   const timeout = globalThis.setTimeout(() => {
     controller.abort();
@@ -130,6 +141,7 @@ const fetchWithTimeout = async (url: string, options: RequestInit, context: stri
     throw error;
   } finally {
     globalThis.clearTimeout(timeout);
+    setRequestActivity(false);
   }
 };
 

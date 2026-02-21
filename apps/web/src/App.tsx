@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Item } from "@golist/shared/domain/types";
 import AppHeader from "./components/AppHeader";
 import BottomBar from "./components/BottomBar";
@@ -6,7 +6,6 @@ import AddItemDialog from "./components/AddItemDialog";
 import EditItemModal from "./components/EditItemModal";
 import ItemGrid from "./components/ItemGrid";
 import ListsDrawer from "./components/ListsDrawer";
-import RenameListModal from "./components/RenameListModal";
 import CreateListModal from "./components/CreateListModal";
 import { useAppState } from "./hooks/useAppState";
 import { useLongPressItem } from "./hooks/useLongPressItem";
@@ -14,6 +13,12 @@ import { useLongPressItem } from "./hooks/useLongPressItem";
 type UndoToast = {
   id: string;
   item: Item;
+};
+
+type AppToast = {
+  id: string;
+  message: string;
+  tone: "success" | "error";
 };
 
 const App = () => {
@@ -57,6 +62,7 @@ const App = () => {
     handleDeleteList,
     handleShareActiveList,
     backendConnection,
+    pendingBackendRequests,
     syncNotice,
     clearSyncNotice,
     backendLogs,
@@ -65,6 +71,7 @@ const App = () => {
   const undoTimeoutsRef = useRef<Map<string, number>>(new Map());
   const [exitingItemIds, setExitingItemIds] = useState<Set<string>>(new Set());
   const [undoToasts, setUndoToasts] = useState<UndoToast[]>([]);
+  const [appToasts, setAppToasts] = useState<AppToast[]>([]);
 
   const clearUndoTimeout = (toastId: string) => {
     const timeout = undoTimeoutsRef.current.get(toastId);
@@ -77,6 +84,14 @@ const App = () => {
   const removeUndoToast = (toastId: string) => {
     clearUndoTimeout(toastId);
     setUndoToasts((current) => current.filter((toast) => toast.id !== toastId));
+  };
+
+  const showAppToast = (message: string, tone: "success" | "error") => {
+    const toastId = crypto.randomUUID();
+    setAppToasts((current) => [...current, { id: toastId, message, tone }]);
+    window.setTimeout(() => {
+      setAppToasts((current) => current.filter((toast) => toast.id !== toastId));
+    }, 4500);
   };
 
   const showUndo = (item: Item) => {
@@ -148,15 +163,40 @@ const App = () => {
     };
   }, [syncNotice, clearSyncNotice]);
 
+  const activeOpenItemCount = listItems.filter((item) => !item.deleted).length;
+  const listMetaById = useMemo(() => {
+    const formatter = new Intl.DateTimeFormat("de-DE", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+    return Object.fromEntries(
+      lists.map((list) => {
+        const listItemsForMeta = items.filter((item) => item.listId === list.id);
+        const openItems = listItemsForMeta.filter((item) => !item.deleted).length;
+        const latestItemUpdate = listItemsForMeta.reduce((latest, item) => Math.max(latest, item.updatedAt), list.updatedAt);
+        return [list.id, { openItems, lastUpdatedLabel: `Aktualisiert ${formatter.format(new Date(latestItemUpdate))}` }];
+      }),
+    );
+  }, [lists, items]);
+
   return (
     <div className="app">
       <AppHeader
         activeListName={activeList?.name ?? ""}
-        onEditListName={() => {
+        pendingName={newListName}
+        isEditingName={editingTitle}
+        openItemCount={activeOpenItemCount}
+        lastUpdatedLabel={
+          activeList ? listMetaById[activeList.id]?.lastUpdatedLabel ?? "Aktualisiert" : "Keine Liste aktiv"
+        }
+        backendConnection={backendConnection}
+        isBackendBusy={pendingBackendRequests > 0}
+        onStartRename={() => {
           setNewListName(activeList?.name ?? "");
           setEditingTitle(true);
         }}
-        backendConnection={backendConnection}
+        onNameChange={setNewListName}
+        onSaveRename={() => {
+          void handleRenameList();
+        }}
+        onCancelRename={() => setEditingTitle(false)}
       />
 
       <ItemGrid
@@ -177,13 +217,21 @@ const App = () => {
             try {
               const shareLink = await handleShareActiveList();
               await navigator.clipboard.writeText(shareLink);
-              window.alert("Teilen-Link wurde in die Zwischenablage kopiert.");
+              showAppToast("Teilen-Link wurde in die Zwischenablage kopiert.", "success");
             } catch {
-              window.alert("Teilen ist derzeit nicht verfügbar.");
+              showAppToast("Teilen ist derzeit nicht verfügbar.", "error");
             }
           })();
         }}
       />
+
+      <div className="app-toast-stack" aria-live="polite" aria-atomic="false">
+        {appToasts.map((toast) => (
+          <div key={toast.id} className={`app-toast app-toast--${toast.tone}`} role="status">
+            <span>{toast.message}</span>
+          </div>
+        ))}
+      </div>
 
       {__IS_VERCEL_NON_PRODUCTION__ && syncNotice ? (
         <div className="sync-toast" role="status" aria-live="polite">
@@ -234,6 +282,7 @@ const App = () => {
       <ListsDrawer
         isOpen={isDrawerOpen}
         lists={lists}
+        listMetaById={listMetaById}
         activeListId={activeListId}
         onClose={() => setIsDrawerOpen(false)}
         onOpen={() => setIsDrawerOpen(true)}
@@ -269,13 +318,7 @@ const App = () => {
         }}
       />
 
-      <RenameListModal
-        isOpen={editingTitle}
-        value={newListName}
-        onChange={setNewListName}
-        onCancel={() => setEditingTitle(false)}
-        onSave={handleRenameList}
-      />
+
 
       <EditItemModal
         isOpen={Boolean(editingItemId)}
