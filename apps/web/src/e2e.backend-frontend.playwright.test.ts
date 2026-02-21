@@ -165,7 +165,7 @@ describe("frontend/backend integration via playwright", () => {
     expect(createdItem ? isUuid(createdItem.listId) : false).toBe(true);
   });
 
-  runE2E("calls the share token endpoint when the share button is clicked", async () => {
+  runE2E("clicking share calls the endpoint and creates a share token", async () => {
     const [defaultList] = [...readRepositoryState().lists.values()];
     expect(defaultList).toBeDefined();
 
@@ -178,5 +178,11 @@ describe("frontend/backend integration via playwright", () => {
     const shareTokenRequest = await shareTokenRequestPromise;
     expect(shareTokenRequest.method()).toBe("POST");
     expect(shareTokenRequest.url()).toContain(`/v1/lists/${defaultList?.data.id}/share-tokens`);
+
+    await expect.poll(() => readRepositoryState().shareTokens.size).toBe(1);
+    const [shareToken] = [...readRepositoryState().shareTokens.values()];
+    expect(shareToken ? isUuid(shareToken.id) : false).toBe(true);
+    expect(shareToken?.listId).toBe(defaultList?.data.id);
+    expect(shareToken?.createdByDeviceId).toBe(defaultList?.createdByDeviceId);
   });
 });
