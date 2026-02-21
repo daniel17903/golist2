@@ -33,7 +33,7 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e -w apps/web
 
-  deploy-preview:
+  deploy-preview-frontend:
     if: github.event_name == 'pull_request' && github.event.pull_request.user.login != 'dependabot[bot]'
     needs:
       - validate
@@ -43,8 +43,8 @@ jobs:
       contents: read
       pull-requests: write
     env:
-      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID_FRONTEND }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID_FRONTEND }}
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
@@ -53,24 +53,24 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm install --global vercel@44.7.3
-      - name: Pull Vercel environment information
-        run: vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
+      - name: Pull Vercel environment information (frontend)
+        run: vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN_FRONTEND }}
         working-directory: apps/web
-      - name: Build Vercel preview artifacts
-        run: vercel build --token=${{ secrets.VERCEL_TOKEN }}
+      - name: Build Vercel preview artifacts (frontend)
+        run: vercel build --token=${{ secrets.VERCEL_TOKEN_FRONTEND }}
         working-directory: apps/web
-      - name: Deploy Vercel preview
-        id: vercel-preview-deploy
+      - name: Deploy Vercel preview (frontend)
+        id: vercel-preview-deploy-frontend
         run: |
-          DEPLOY_URL="$(vercel deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }})"
+          DEPLOY_URL="$(vercel deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN_FRONTEND }})"
           echo "deploy_url=${DEPLOY_URL}" >> "$GITHUB_OUTPUT"
         working-directory: apps/web
-      - name: Comment preview deployment URL
+      - name: Comment preview deployment URL (frontend)
         uses: actions/github-script@v8
         with:
           script: |
-            const deployUrl = `${{ steps.vercel-preview-deploy.outputs.deploy_url }}`;
-            const body = `✅ Vercel preview deployment is ready: ${deployUrl}`;
+            const deployUrl = `${{ steps.vercel-preview-deploy-frontend.outputs.deploy_url }}`;
+            const body = `✅ Frontend Vercel preview deployment is ready: ${deployUrl}`;
             github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -78,15 +78,18 @@ jobs:
               body,
             });
 
-  deploy-production:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+  deploy-preview-backend:
+    if: github.event_name == 'pull_request' && github.event.pull_request.user.login != 'dependabot[bot]'
     needs:
       - validate
       - web-e2e-playwright
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
     env:
-      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID_BACKEND }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID_BACKEND }}
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
@@ -95,12 +98,81 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm install --global vercel@44.7.3
-      - name: Pull Vercel environment information
-        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+      - name: Pull Vercel environment information (backend)
+        run: vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN_BACKEND }}
+        working-directory: apps/backend
+      - name: Build Vercel preview artifacts (backend)
+        run: vercel build --token=${{ secrets.VERCEL_TOKEN_BACKEND }}
+        working-directory: apps/backend
+      - name: Deploy Vercel preview (backend)
+        id: vercel-preview-deploy-backend
+        run: |
+          DEPLOY_URL="$(vercel deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN_BACKEND }})"
+          echo "deploy_url=${DEPLOY_URL}" >> "$GITHUB_OUTPUT"
+        working-directory: apps/backend
+      - name: Comment preview deployment URL (backend)
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const deployUrl = `${{ steps.vercel-preview-deploy-backend.outputs.deploy_url }}`;
+            const body = `✅ Backend Vercel preview deployment is ready: ${deployUrl}`;
+            github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body,
+            });
+
+  deploy-production-frontend:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs:
+      - validate
+      - web-e2e-playwright
+    runs-on: ubuntu-latest
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID_FRONTEND }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID_FRONTEND }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm install --global vercel@44.7.3
+      - name: Pull Vercel environment information (frontend)
+        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN_FRONTEND }}
         working-directory: apps/web
-      - name: Build Vercel production artifacts
-        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+      - name: Build Vercel production artifacts (frontend)
+        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN_FRONTEND }}
         working-directory: apps/web
-      - name: Deploy Vercel production
-        run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
+      - name: Deploy Vercel production (frontend)
+        run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN_FRONTEND }}
         working-directory: apps/web
+
+  deploy-production-backend:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs:
+      - validate
+      - web-e2e-playwright
+    runs-on: ubuntu-latest
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID_BACKEND }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID_BACKEND }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm install --global vercel@44.7.3
+      - name: Pull Vercel environment information (backend)
+        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN_BACKEND }}
+        working-directory: apps/backend
+      - name: Build Vercel production artifacts (backend)
+        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN_BACKEND }}
+        working-directory: apps/backend
+      - name: Deploy Vercel production (backend)
+        run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN_BACKEND }}
+        working-directory: apps/backend
