@@ -68,6 +68,7 @@
   Run `npx playwright install chromium` and `npx playwright install-deps chromium`
   before running `RUN_PLAYWRIGHT_E2E=1 npm run test -w apps/web -- src/e2e.backend-frontend.playwright.test.ts`.
   For E2E-related changes, do this setup and run the Playwright E2E command before committing.
+  Do **not** treat a skipped run as sufficient validation: for E2E-related changes you must execute with `RUN_PLAYWRIGHT_E2E=1` so tests actually run.
 
 
 ## Documentation maintenance
