@@ -16,6 +16,17 @@ type BackendCallLog = {
 
 let backendCallLogger: ((entry: BackendCallLog) => void) | null = null;
 
+type RequestLifecycle = {
+  onStart?: () => void;
+  onFinish?: () => void;
+};
+
+let requestLifecycle: RequestLifecycle = {};
+
+export const setRequestLifecycle = (lifecycle: RequestLifecycle) => {
+  requestLifecycle = lifecycle;
+};
+
 export const setBackendCallLogger = (logger: ((entry: BackendCallLog) => void) | null) => {
   backendCallLogger = logger;
 };
@@ -99,6 +110,7 @@ const fetchWithTimeout = async (url: string, options: RequestInit, context: stri
   const timeout = globalThis.setTimeout(() => {
     controller.abort();
   }, requestTimeoutMs);
+  requestLifecycle.onStart?.();
 
   try {
     const response = await fetch(url, { ...options, signal: controller.signal });
@@ -130,6 +142,7 @@ const fetchWithTimeout = async (url: string, options: RequestInit, context: stri
     throw error;
   } finally {
     globalThis.clearTimeout(timeout);
+    requestLifecycle.onFinish?.();
   }
 };
 

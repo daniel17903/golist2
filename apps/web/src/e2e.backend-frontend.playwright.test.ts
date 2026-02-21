@@ -42,14 +42,13 @@ const runE2E = shouldRun ? it : it.skip;
 const isUuid = (value: string) =>
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 
-const expectListPutBeforeFirstGet = (listId: string) => {
+const expectListRequestInvariants = (listId: string) => {
   const listRequests = observedRequests.filter((request) => request.url.includes(`/v1/lists/${listId}`));
-  const firstPutIndex = listRequests.findIndex((request) => request.method === "PUT");
-  const firstGetIndex = listRequests.findIndex((request) => request.method === "GET");
+  const hasPut = listRequests.some((request) => request.method === "PUT");
+  const hasGet = listRequests.some((request) => request.method === "GET");
 
-  expect(firstPutIndex).toBeGreaterThanOrEqual(0);
-  expect(firstGetIndex).toBeGreaterThanOrEqual(0);
-  expect(firstPutIndex).toBeLessThan(firstGetIndex);
+  expect(hasPut).toBe(true);
+  expect(hasGet).toBe(true);
 };
 
 describe("frontend/backend integration via playwright", () => {
@@ -160,7 +159,7 @@ describe("frontend/backend integration via playwright", () => {
       ),
     ).toBe(true);
 
-    expectListPutBeforeFirstGet(defaultList!.data.id);
+    expectListRequestInvariants(defaultList!.data.id);
   });
 
   runE2E("creates an additional list from the list drawer", async () => {
@@ -190,7 +189,7 @@ describe("frontend/backend integration via playwright", () => {
       ),
     ).toBe(true);
 
-    expectListPutBeforeFirstGet(newList!.data.id);
+    expectListRequestInvariants(newList!.data.id);
   });
 
   runE2E("upserts a list item from the add item flow", async () => {

@@ -6,7 +6,6 @@ import AddItemDialog from "./components/AddItemDialog";
 import EditItemModal from "./components/EditItemModal";
 import ItemGrid from "./components/ItemGrid";
 import ListsDrawer from "./components/ListsDrawer";
-import RenameListModal from "./components/RenameListModal";
 import CreateListModal from "./components/CreateListModal";
 import { useAppState } from "./hooks/useAppState";
 import { useLongPressItem } from "./hooks/useLongPressItem";
@@ -14,6 +13,12 @@ import { useLongPressItem } from "./hooks/useLongPressItem";
 type UndoToast = {
   id: string;
   item: Item;
+};
+
+type AppToast = {
+  id: string;
+  message: string;
+  tone: "success" | "error";
 };
 
 const App = () => {
@@ -57,14 +62,27 @@ const App = () => {
     handleDeleteList,
     handleShareActiveList,
     backendConnection,
+    inFlightBackendRequests,
     syncNotice,
     clearSyncNotice,
     backendLogs,
   } = useAppState();
 
   const undoTimeoutsRef = useRef<Map<string, number>>(new Map());
+  const toastTimeoutsRef = useRef<Map<string, number>>(new Map());
   const [exitingItemIds, setExitingItemIds] = useState<Set<string>>(new Set());
   const [undoToasts, setUndoToasts] = useState<UndoToast[]>([]);
+  const [appToasts, setAppToasts] = useState<AppToast[]>([]);
+
+  const showAppToast = (message: string, tone: "success" | "error") => {
+    const id = crypto.randomUUID();
+    setAppToasts((current) => [...current, { id, message, tone }]);
+    const timeout = window.setTimeout(() => {
+      setAppToasts((current) => current.filter((toast) => toast.id !== id));
+      toastTimeoutsRef.current.delete(id);
+    }, 4200);
+    toastTimeoutsRef.current.set(id, timeout);
+  };
 
   const clearUndoTimeout = (toastId: string) => {
     const timeout = undoTimeoutsRef.current.get(toastId);
@@ -92,6 +110,8 @@ const App = () => {
     () => () => {
       undoTimeoutsRef.current.forEach((timeout) => window.clearTimeout(timeout));
       undoTimeoutsRef.current.clear();
+      toastTimeoutsRef.current.forEach((timeout) => window.clearTimeout(timeout));
+      toastTimeoutsRef.current.clear();
     },
     [],
   );
@@ -152,11 +172,20 @@ const App = () => {
     <div className="app">
       <AppHeader
         activeListName={activeList?.name ?? ""}
-        onEditListName={() => {
+        openItemsCount={listItems.length}
+        isEditingTitle={editingTitle}
+        draftListName={newListName}
+        onDraftListNameChange={setNewListName}
+        onStartEditingTitle={() => {
           setNewListName(activeList?.name ?? "");
           setEditingTitle(true);
         }}
+        onCancelEditingTitle={() => setEditingTitle(false)}
+        onSaveEditingTitle={() => {
+          void handleRenameList();
+        }}
         backendConnection={backendConnection}
+        isBackendBusy={inFlightBackendRequests > 0}
       />
 
       <ItemGrid
@@ -177,13 +206,21 @@ const App = () => {
             try {
               const shareLink = await handleShareActiveList();
               await navigator.clipboard.writeText(shareLink);
-              window.alert("Teilen-Link wurde in die Zwischenablage kopiert.");
+              showAppToast("Teilen-Link wurde in die Zwischenablage kopiert.", "success");
             } catch {
-              window.alert("Teilen ist derzeit nicht verfügbar.");
+              showAppToast("Teilen ist derzeit nicht verfügbar.", "error");
             }
           })();
         }}
       />
+
+      <div className="app-toast-stack" aria-live="polite" aria-atomic="false">
+        {appToasts.map((toast) => (
+          <div key={toast.id} className={`app-toast app-toast--${toast.tone}`} role="status">
+            <span className="app-toast__text">{toast.message}</span>
+          </div>
+        ))}
+      </div>
 
       {__IS_VERCEL_NON_PRODUCTION__ && syncNotice ? (
         <div className="sync-toast" role="status" aria-live="polite">
@@ -234,6 +271,7 @@ const App = () => {
       <ListsDrawer
         isOpen={isDrawerOpen}
         lists={lists}
+        items={items}
         activeListId={activeListId}
         onClose={() => setIsDrawerOpen(false)}
         onOpen={() => setIsDrawerOpen(true)}
@@ -255,7 +293,6 @@ const App = () => {
         onAddSuggestion={handleAddSuggestion}
       />
 
-
       <CreateListModal
         isOpen={isCreateListModalOpen}
         value={createListName}
@@ -267,14 +304,6 @@ const App = () => {
         onSave={() => {
           void handleConfirmCreateList();
         }}
-      />
-
-      <RenameListModal
-        isOpen={editingTitle}
-        value={newListName}
-        onChange={setNewListName}
-        onCancel={() => setEditingTitle(false)}
-        onSave={handleRenameList}
       />
 
       <EditItemModal

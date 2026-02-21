@@ -23,6 +23,7 @@ export const useAppState = () => {
     joinSharedList,
     syncAllLists,
     backendConnection,
+    inFlightBackendRequests,
     syncNotice,
     clearSyncNotice,
     backendLogs,
@@ -62,8 +63,8 @@ export const useAppState = () => {
     void (async () => {
       try {
         await joinSharedList(shareTokenFromUrl);
-      } catch {
-        window.alert("Geteilter Link konnte nicht geöffnet werden.");
+      } catch (error) {
+        console.warn("Geteilter Link konnte nicht geöffnet werden.", error);
       } finally {
         const cleanedUrl = new URL(window.location.href);
         cleanedUrl.searchParams.delete("shareToken");
@@ -272,6 +273,7 @@ export const useAppState = () => {
     handleShareActiveList,
     joinSharedList,
     backendConnection,
+    inFlightBackendRequests,
     syncNotice,
     clearSyncNotice,
     backendLogs,

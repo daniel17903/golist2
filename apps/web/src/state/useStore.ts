@@ -5,6 +5,7 @@ import { db } from "../storage/db";
 import {
   extractShareToken,
   setBackendCallLogger,
+  setRequestLifecycle,
   sharingApiClient,
 } from "../sharing/apiClient";
 
@@ -33,6 +34,7 @@ type StoreState = {
   activeListId?: string;
   listShareTokens: Record<string, string>;
   backendConnection: "unknown" | "online" | "offline";
+  inFlightBackendRequests: number;
   syncNotice?: { id: string; message: string };
   backendLogs: Array<{ id: string; message: string; outcome: "success" | "error" | "skipped" }>;
   isLoaded: boolean;
@@ -152,6 +154,7 @@ export const useStore = create<StoreState>((set, get) => ({
   activeListId: undefined,
   listShareTokens: {},
   backendConnection: "unknown",
+  inFlightBackendRequests: 0,
   syncNotice: undefined,
   backendLogs: [],
   load: async () => {
@@ -497,6 +500,17 @@ export const useStore = create<StoreState>((set, get) => ({
       ],
     })),
 }));
+
+setRequestLifecycle({
+  onStart: () => {
+    useStore.setState((state) => ({ inFlightBackendRequests: state.inFlightBackendRequests + 1 }));
+  },
+  onFinish: () => {
+    useStore.setState((state) => ({
+      inFlightBackendRequests: Math.max(0, state.inFlightBackendRequests - 1),
+    }));
+  },
+});
 
 setBackendCallLogger((entry) => {
   useStore.getState().appendBackendLog({
