@@ -1,10 +1,16 @@
-import { useRef, useState, type PointerEvent } from "react";
+import { useMemo, useRef, useState, type PointerEvent } from "react";
 import type { List } from "@golist/shared/domain/types";
+
+type ListSummary = {
+  openItemsCount: number;
+  lastUpdatedAt: number;
+};
 
 type ListsDrawerProps = {
   isOpen: boolean;
   lists: List[];
   activeListId: string | null | undefined;
+  listSummaries: Record<string, ListSummary>;
   onClose: () => void;
   onOpen: () => void;
   onSelectList: (listId: string) => void;
@@ -16,10 +22,23 @@ type DragMode = "opening" | "closing";
 
 const EDGE_SWIPE_WIDTH = 28;
 
+const formatUpdatedAt = (timestamp: number) => {
+  if (!timestamp) {
+    return "Noch nicht aktualisiert";
+  }
+  return `Aktualisiert ${new Intl.DateTimeFormat("de-DE", {
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(timestamp)}`;
+};
+
 const ListsDrawer = ({
   isOpen,
   lists,
   activeListId,
+  listSummaries,
   onClose,
   onOpen,
   onSelectList,
@@ -29,6 +48,14 @@ const ListsDrawer = ({
   const drawerRef = useRef<HTMLElement | null>(null);
   const dragStateRef = useRef<{ pointerId: number; startX: number; mode: DragMode } | null>(null);
   const [dragOffset, setDragOffset] = useState<number | null>(null);
+  const [pendingDeleteListId, setPendingDeleteListId] = useState<string | null>(null);
+
+  const canDelete = lists.length > 1;
+
+  const pendingDeleteName = useMemo(
+    () => lists.find((list) => list.id === pendingDeleteListId)?.name ?? "",
+    [lists, pendingDeleteListId],
+  );
 
   const getDrawerWidth = () => {
     const measured = drawerRef.current?.offsetWidth;
@@ -72,6 +99,7 @@ const ListsDrawer = ({
       }
     } else if (-deltaX > threshold) {
       onClose();
+      setPendingDeleteListId(null);
     }
 
     setDragOffset(null);
@@ -81,7 +109,8 @@ const ListsDrawer = ({
     }
   };
 
-  const drawerStyle = dragOffset === null ? undefined : { transform: `translateX(${dragOffset}px)`, transition: "none" };
+  const drawerStyle =
+    dragOffset === null ? undefined : { transform: `translateX(${dragOffset}px)`, transition: "none" };
 
   return (
     <>
@@ -103,10 +132,14 @@ const ListsDrawer = ({
           className="drawer-backdrop"
           role="button"
           tabIndex={-1}
-          onClick={onClose}
+          onClick={() => {
+            onClose();
+            setPendingDeleteListId(null);
+          }}
           onKeyDown={(event) => {
             if (event.key === "Escape") {
               onClose();
+              setPendingDeleteListId(null);
             }
           }}
         />
@@ -126,40 +159,75 @@ const ListsDrawer = ({
           <div className="drawer__section">
             <p className="drawer__title">Meine Listen</p>
             <div className="drawer__list">
-              {lists.map((list) => (
-                <div key={list.id} className="drawer__item">
-                  <button
-                    type="button"
-                    className={`drawer__item-button ${
-                      list.id === activeListId ? "drawer__item-button--active" : ""
-                    }`}
-                    onClick={() => onSelectList(list.id)}
-                  >
-                    <span className="drawer__item-icon" aria-hidden="true">
-                      <svg viewBox="0 0 24 24">
-                        <path
-                          d="M3 5h2v2H3V5zm0 6h2v2H3v-2zm0 6h2v2H3v-2zm4-12h14v2H7V5zm0 6h14v2H7v-2zm0 6h14v2H7v-2z"
-                          fill="currentColor"
-                        />
-                      </svg>
-                    </span>
-                    <span className="drawer__item-label">{list.name}</span>
-                  </button>
-                  <button
-                    type="button"
-                    className="drawer__delete"
-                    aria-label={`Delete ${list.name}`}
-                    onClick={() => onDeleteList(list.id)}
-                  >
-                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                      <path
-                        d="M16 9v10H8V9h8m-1.5-6h-5l-1 1H5v2h14V4h-4.5l-1-1z"
-                        fill="currentColor"
-                      />
-                    </svg>
-                  </button>
-                </div>
-              ))}
+              {lists.map((list) => {
+                const summary = listSummaries[list.id];
+                const isPendingDelete = pendingDeleteListId === list.id;
+                return (
+                  <div key={list.id} className="drawer__item">
+                    <button
+                      type="button"
+                      className={`drawer__item-button ${
+                        list.id === activeListId ? "drawer__item-button--active" : ""
+                      }`}
+                      onClick={() => onSelectList(list.id)}
+                    >
+                      <span className="drawer__item-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24">
+                          <path
+                            d="M3 5h2v2H3V5zm0 6h2v2H3v-2zm0 6h2v2H3v-2zm4-12h14v2H7V5zm0 6h14v2H7v-2zm0 6h14v2H7v-2z"
+                            fill="currentColor"
+                          />
+                        </svg>
+                      </span>
+                      <span className="drawer__item-content">
+                        <span className="drawer__item-label">{list.name}</span>
+                        <span className="drawer__item-meta">
+                          {`${summary?.openItemsCount ?? 0} offen • ${formatUpdatedAt(summary?.lastUpdatedAt ?? list.updatedAt)}`}
+                        </span>
+                      </span>
+                    </button>
+                    {!isPendingDelete ? (
+                      <button
+                        type="button"
+                        className="drawer__delete"
+                        aria-label={`Liste ${list.name} löschen`}
+                        onClick={() => setPendingDeleteListId(list.id)}
+                        disabled={!canDelete}
+                      >
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                          <path
+                            d="M16 9v10H8V9h8m-1.5-6h-5l-1 1H5v2h14V4h-4.5l-1-1z"
+                            fill="currentColor"
+                          />
+                        </svg>
+                      </button>
+                    ) : (
+                      <div className="drawer__confirm-actions">
+                        <button
+                          type="button"
+                          className="drawer__confirm-button"
+                          onClick={() => setPendingDeleteListId(null)}
+                        >
+                          Nein
+                        </button>
+                        <button
+                          type="button"
+                          className="drawer__confirm-button drawer__confirm-button--danger"
+                          onClick={() => {
+                            onDeleteList(list.id);
+                            setPendingDeleteListId(null);
+                          }}
+                        >
+                          Löschen
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+              {pendingDeleteListId ? (
+                <p className="drawer__delete-hint">Möchtest du „{pendingDeleteName}“ wirklich löschen?</p>
+              ) : null}
               <button type="button" className="drawer__new" onClick={onCreateList}>
                 <span className="drawer__item-icon" aria-hidden="true">
                   <svg viewBox="0 0 24 24">
@@ -170,15 +238,6 @@ const ListsDrawer = ({
               </button>
             </div>
           </div>
-          <button type="button" className="drawer__settings">
-            <span>Einstellungen</span>
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path
-                d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7.07 7.07 0 0 0-1.63-.94l-.36-2.54a.5.5 0 0 0-.5-.42h-3.84a.5.5 0 0 0-.5.42l-.36 2.54c-.59.23-1.13.54-1.63.94l-2.39-.96a.5.5 0 0 0-.6.22L2.65 8.84a.5.5 0 0 0 .12.64l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58a.5.5 0 0 0-.12.64l1.92 3.32c.13.22.39.31.6.22l2.39-.96c.5.4 1.04.71 1.63.94l.36 2.54c.04.24.25.42.5.42h3.84c.25 0 .46-.18.5-.42l.36-2.54c.59-.23 1.13-.54 1.63-.94l2.39.96c.22.09.47 0 .6-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.03-1.58zM12 15.5A3.5 3.5 0 1 1 12 8a3.5 3.5 0 0 1 0 7.5z"
-                fill="currentColor"
-              />
-            </svg>
-          </button>
         </aside>
       </div>
     </>

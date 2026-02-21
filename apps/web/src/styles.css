@@ -2,6 +2,13 @@
   font-family: "Inter", system-ui, -apple-system, sans-serif;
   color: #0b1f2a;
   --item-size: 120px;
+  --shell-surface: rgba(7, 47, 72, 0.58);
+  --shell-surface-strong: rgba(7, 36, 57, 0.82);
+  --shell-text: #f3f8f6;
+  --shell-text-muted: rgba(243, 248, 246, 0.82);
+  --shell-outline: rgba(255, 255, 255, 0.24);
+  --accent: #7edbff;
+  --danger: #d75a6a;
   background: radial-gradient(
     circle at bottom,
     #e4b2d2 0%,
@@ -21,41 +28,53 @@ body {
   margin: 0;
 }
 
+button,
+input {
+  font: inherit;
+}
+
+button:focus-visible,
+input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 .app {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  padding: 24px 18px 96px;
+  padding: 20px 16px calc(108px + env(safe-area-inset-bottom));
 }
 
 .app__header {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  color: #f3f8f6;
+  gap: 12px;
+  color: var(--shell-text);
 }
 
 
 .ghost-button {
-  border: 1px solid rgba(255, 255, 255, 0.7);
-  background: transparent;
-  color: #f3f8f6;
+  border: 1px solid var(--shell-outline);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--shell-text);
   border-radius: 999px;
-  padding: 6px 12px;
+  padding: 8px 12px;
   font-size: 14px;
 }
 
 .title-row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
+  gap: 12px;
 }
 
 .title-row h1 {
   margin: 0;
-  font-size: 30px;
-  font-weight: 500;
-  max-width: calc(100% - 44px);
+  font-size: clamp(1.6rem, 5vw, 2rem);
+  font-weight: 600;
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -65,21 +84,34 @@ body {
   display: flex;
   gap: 8px;
   align-items: center;
+  width: 100%;
+  flex-wrap: wrap;
 }
 
 .title-edit input {
-  padding: 8px 12px;
+  flex: 1;
+  min-width: 160px;
+  padding: 10px 12px;
   border-radius: 12px;
-  border: none;
-  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid var(--shell-outline);
+  background: rgba(255, 255, 255, 0.96);
   font-size: 14px;
 }
 
 
 .header-actions {
-  display: inline-flex;
+  display: inline-grid;
+  grid-template-columns: auto auto auto;
   align-items: center;
   gap: 8px;
+  min-width: 0;
+}
+
+.connection-text {
+  margin: 0;
+  font-size: 12px;
+  color: var(--shell-text-muted);
+  white-space: nowrap;
 }
 
 .connection-indicator {
@@ -180,13 +212,16 @@ body {
 }
 
 .icon-button {
-  background: transparent;
-  border: none;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--shell-outline);
+  border-radius: 999px;
   font-size: 20px;
-  color: #f3f8f6;
+  color: var(--shell-text);
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  width: 38px;
+  height: 38px;
 }
 
 .icon-button svg,
@@ -320,10 +355,11 @@ body {
 
 
 
+.app-toast-stack,
 .undo-toast-stack {
   position: fixed;
   left: 50%;
-  bottom: 68px;
+  bottom: calc(72px + env(safe-area-inset-bottom));
   transform: translateX(-50%);
   width: min(420px, calc(100% - 24px));
   display: flex;
@@ -333,9 +369,49 @@ body {
   pointer-events: none;
 }
 
+.app-toast-stack {
+  bottom: calc(144px + env(safe-area-inset-bottom));
+  z-index: 41;
+}
+
+.app-toast {
+  background: var(--shell-surface-strong);
+  color: var(--shell-text);
+  border-radius: 14px;
+  padding: 12px 14px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.25);
+  pointer-events: auto;
+}
+
+.app-toast--success {
+  border-left: 4px solid #66f57f;
+}
+
+.app-toast--error {
+  border-left: 4px solid #ff847f;
+}
+
+.app-toast__text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.app-toast__close {
+  border: none;
+  background: rgba(255, 255, 255, 0.14);
+  color: inherit;
+  border-radius: 999px;
+  width: 28px;
+  height: 28px;
+}
+
 .undo-toast {
-  background: rgba(11, 31, 42, 0.95);
-  color: #f3f8f6;
+  background: var(--shell-surface-strong);
+  color: var(--shell-text);
   border-radius: 14px;
   padding: 12px 14px;
   display: flex;
@@ -368,13 +444,13 @@ body {
   bottom: 0;
   left: 0;
   right: 0;
-  padding: 6px 18px 10px;
+  padding: 6px 18px calc(10px + env(safe-area-inset-bottom));
   background: radial-gradient(circle at 50% 2px, transparent 33px, #005382 34px);
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 16px;
-  height: 56px;
+  height: calc(56px + env(safe-area-inset-bottom));
   overflow: visible;
   z-index: 10;
 }
@@ -406,6 +482,20 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+}
+
+.bottom-icon:active,
+.fab:active,
+.icon-button:active,
+.ghost-button:active,
+.primary-button:active,
+.drawer__item-button:active,
+.drawer__delete:active,
+.drawer__new:active,
+.drawer__confirm-button:active,
+.undo-toast__action:active,
+.app-toast__close:active {
+  transform: translateY(1px);
 }
 
 .modal-backdrop {
@@ -574,12 +664,12 @@ body {
 .drawer__list {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
 }
 
 .drawer__item {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
 }
@@ -612,9 +702,22 @@ body {
 }
 
 .drawer__item-label {
+  display: block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.drawer__item-content {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.drawer__item-meta {
+  font-size: 12px;
+  color: #6c6471;
+  overflow-wrap: anywhere;
 }
 
 .drawer__delete {
@@ -626,6 +729,36 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+}
+
+.drawer__delete:disabled {
+  opacity: 0.4;
+}
+
+.drawer__confirm-actions {
+  display: inline-flex;
+  gap: 6px;
+}
+
+.drawer__confirm-button {
+  border: 1px solid rgba(47, 36, 51, 0.28);
+  border-radius: 999px;
+  background: #fff;
+  color: #3c3342;
+  padding: 6px 10px;
+  font-size: 13px;
+}
+
+.drawer__confirm-button--danger {
+  border-color: rgba(215, 90, 106, 0.5);
+  color: var(--danger);
+}
+
+.drawer__delete-hint {
+  margin: 0;
+  color: #5c5361;
+  font-size: 13px;
+  overflow-wrap: anywhere;
 }
 
 .drawer__new {
@@ -648,6 +781,50 @@ body {
   align-items: center;
   justify-content: space-between;
   font-size: 16px;
+}
+
+@media (max-width: 540px) {
+  .header-actions {
+    grid-template-columns: auto auto;
+    grid-template-areas:
+      "text text"
+      "dot edit";
+    justify-items: end;
+  }
+
+  .connection-text {
+    grid-area: text;
+    text-align: right;
+    white-space: normal;
+    line-height: 1.2;
+  }
+
+  .connection-indicator {
+    grid-area: dot;
+  }
+
+  .icon-button {
+    grid-area: edit;
+  }
+
+  .app {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .title-edit {
+    gap: 6px;
+  }
+
+  .title-edit input {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .ghost-button,
+  .primary-button {
+    flex: 1;
+  }
 }
 
 .add-dialog {
