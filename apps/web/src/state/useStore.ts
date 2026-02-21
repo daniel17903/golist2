@@ -134,6 +134,17 @@ const logSkippedBackendCall = (reason: string) => {
   });
 };
 
+const runBackendSyncInBackground = (action: () => Promise<void>, message: string) => {
+  void action().catch((error) => {
+    const details = describeSyncError(error);
+    reportSyncError(
+      details
+        ? `${message} (${details}). Änderungen bleiben lokal und werden später synchronisiert.`
+        : `${message}. Änderungen bleiben lokal und werden später synchronisiert.`,
+    );
+  });
+};
+
 export const useStore = create<StoreState>((set, get) => ({
   lists: [],
   items: [],
@@ -181,16 +192,10 @@ export const useStore = create<StoreState>((set, get) => ({
       activeListId: list.id,
     }));
 
-    try {
-      await syncListNameImmediately(list.id, list.name);
-    } catch (error) {
-      const details = describeSyncError(error);
-      reportSyncError(
-        details
-          ? `Backend-Verbindung fehlgeschlagen (${details}). Änderungen bleiben lokal und werden später synchronisiert.`
-          : "Backend-Verbindung fehlgeschlagen. Änderungen bleiben lokal und werden später synchronisiert.",
-      );
-    }
+    runBackendSyncInBackground(
+      () => syncListNameImmediately(list.id, list.name),
+      "Backend-Verbindung fehlgeschlagen",
+    );
 
     triggerSyncInBackground(list.id);
   },
@@ -202,16 +207,10 @@ export const useStore = create<StoreState>((set, get) => ({
         list.id === listId ? { ...list, name, updatedAt: now } : list,
       ),
     }));
-    try {
-      await syncListNameImmediately(listId, name);
-    } catch (error) {
-      const details = describeSyncError(error);
-      reportSyncError(
-        details
-          ? `Backend-Verbindung fehlgeschlagen (${details}). Änderungen bleiben lokal und werden später synchronisiert.`
-          : "Backend-Verbindung fehlgeschlagen. Änderungen bleiben lokal und werden später synchronisiert.",
-      );
-    }
+    runBackendSyncInBackground(
+      () => syncListNameImmediately(listId, name),
+      "Backend-Verbindung fehlgeschlagen",
+    );
 
     triggerSyncInBackground(listId);
   },
@@ -248,16 +247,7 @@ export const useStore = create<StoreState>((set, get) => ({
     };
     await db.items.add(item);
     set((state) => ({ items: [...state.items, item] }));
-    try {
-      await syncItemImmediately(item);
-    } catch (error) {
-      const details = describeSyncError(error);
-      reportSyncError(
-        details
-          ? `Backend-Verbindung fehlgeschlagen (${details}). Änderungen bleiben lokal und werden später synchronisiert.`
-          : "Backend-Verbindung fehlgeschlagen. Änderungen bleiben lokal und werden später synchronisiert.",
-      );
-    }
+    runBackendSyncInBackground(() => syncItemImmediately(item), "Backend-Verbindung fehlgeschlagen");
 
     triggerSyncInBackground(listId);
   },
@@ -275,16 +265,10 @@ export const useStore = create<StoreState>((set, get) => ({
       items: state.items.map((entry) => (entry.id === itemId ? updated : entry)),
     }));
 
-    try {
-      await syncItemImmediately(updated);
-    } catch (error) {
-      const details = describeSyncError(error);
-      reportSyncError(
-        details
-          ? `Backend-Verbindung fehlgeschlagen (${details}). Änderungen bleiben lokal und werden später synchronisiert.`
-          : "Backend-Verbindung fehlgeschlagen. Änderungen bleiben lokal und werden später synchronisiert.",
-      );
-    }
+    runBackendSyncInBackground(
+      () => syncItemImmediately(updated),
+      "Backend-Verbindung fehlgeschlagen",
+    );
 
     triggerSyncInBackground(updated.listId);
   },
@@ -304,16 +288,10 @@ export const useStore = create<StoreState>((set, get) => ({
       items: state.items.map((entry) => (entry.id === itemId ? updated : entry)),
     }));
 
-    try {
-      await syncItemImmediately(updated);
-    } catch (error) {
-      const details = describeSyncError(error);
-      reportSyncError(
-        details
-          ? `Backend-Verbindung fehlgeschlagen (${details}). Änderungen bleiben lokal und werden später synchronisiert.`
-          : "Backend-Verbindung fehlgeschlagen. Änderungen bleiben lokal und werden später synchronisiert.",
-      );
-    }
+    runBackendSyncInBackground(
+      () => syncItemImmediately(updated),
+      "Backend-Verbindung fehlgeschlagen",
+    );
 
     triggerSyncInBackground(updated.listId);
   },
