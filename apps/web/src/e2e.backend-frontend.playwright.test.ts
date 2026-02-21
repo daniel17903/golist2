@@ -41,6 +41,28 @@ const runE2E = shouldRun ? it : it.skip;
 const isUuid = (value: string) =>
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 
+
+type ObservedRequest = {
+  method: string;
+  pathname: string;
+};
+
+const listRequestHistory: ObservedRequest[] = [];
+
+const expectListPutBeforeFirstGet = (requests: ObservedRequest[]) => {
+  const listRequests = requests.filter((request) =>
+    /^\/v1\/lists\/[0-9a-f-]+$/i.test(request.pathname),
+  );
+
+  const firstPutIndex = listRequests.findIndex((request) => request.method === "PUT");
+  const firstGetIndex = listRequests.findIndex((request) => request.method === "GET");
+
+  expect(firstPutIndex).toBeGreaterThanOrEqual(0);
+  if (firstGetIndex >= 0) {
+    expect(firstPutIndex).toBeLessThan(firstGetIndex);
+  }
+};
+
 describe("frontend/backend integration via playwright", () => {
   beforeAll(async () => {
     const { buildServer } = await import("../../backend/src/server.js");
@@ -94,6 +116,7 @@ describe("frontend/backend integration via playwright", () => {
     state.lists.clear();
     state.items.clear();
     state.shareTokens.clear();
+    listRequestHistory.length = 0;
 
     const { chromium } = await import("playwright");
     const launchedBrowser = await chromium.launch();
@@ -104,6 +127,14 @@ describe("frontend/backend integration via playwright", () => {
 
     page.on("dialog", async (dialog: { accept: () => Promise<void> }) => {
       await dialog.accept();
+    });
+
+    page.on("request", (request) => {
+      const url = new URL(request.url());
+      listRequestHistory.push({
+        method: request.method(),
+        pathname: url.pathname,
+      });
     });
 
     await page.addInitScript(() => {
@@ -137,6 +168,9 @@ describe("frontend/backend integration via playwright", () => {
     expect(defaultList?.data.name).toBe("Einkaufsliste");
     expect(defaultList ? isUuid(defaultList.data.id) : false).toBe(true);
     expect(defaultList ? isUuid(defaultList.createdByDeviceId) : false).toBe(true);
+
+    await expect.poll(() => listRequestHistory.some((request) => request.method === "PUT")).toBe(true);
+    expectListPutBeforeFirstGet(listRequestHistory);
   });
 
   runE2E("creates an additional list from the list drawer", async () => {
