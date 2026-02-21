@@ -199,7 +199,17 @@ export const useAppState = () => {
   };
 
   const handleCreateList = () => {
-    void addList(`Liste ${lists.length + 1}`);
+    const enteredName = window.prompt("Name für die neue Liste:");
+    if (enteredName === null) {
+      return;
+    }
+
+    const trimmedName = enteredName.trim();
+    if (!trimmedName) {
+      return;
+    }
+
+    void addList(trimmedName);
     setIsDrawerOpen(false);
   };
 
