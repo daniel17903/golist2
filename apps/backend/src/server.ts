@@ -1,4 +1,5 @@
 import Fastify from 'fastify'
+import cors from '@fastify/cors'
 
 import { registerErrorHandler } from './plugins/error-handler.js'
 import { registerObservability } from './plugins/observability.js'
@@ -11,6 +12,12 @@ import { registerShareTokenRoutes } from './routes/share-tokens.js'
 export function buildServer(deps: { listRepository?: ListRepository } = {}) {
   const app = Fastify({ logger: true })
   const listRepository = deps.listRepository ?? postgresListRepository
+
+  void app.register(cors, {
+    origin: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'X-Device-Id'],
+  })
 
   registerObservability(app)
   registerErrorHandler(app)
