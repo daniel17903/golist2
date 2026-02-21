@@ -47,7 +47,7 @@
 
 ## Testing expectations
 - Always run `npm run typecheck` before commit (`-w apps/web` or `-w apps/backend` as appropriate).
-- Run `npm run lint` before commit when possible (`-w apps/web` or `-w apps/backend` as appropriate).
+- Always run `npm run lint` before commit (`-w apps/web` or `-w apps/backend` as appropriate).
 - Run `npm run test` for changes to `apps/web/src/domain/`, `apps/web/src/state/`, or `apps/web/src/storage/`.
 - Run `npm run test -w apps/backend` for backend endpoint/config changes.
 - Run `npm run db:migrate -w apps/backend` for backend schema/migration changes.
@@ -63,6 +63,11 @@
 ## Common pitfalls
 - The PWA service worker can cache aggressively; use hard refresh or clear site data
   when debugging PWA changes.
+
+- Playwright E2E in fresh containers may require both browser binaries and OS deps.
+  Run `npx playwright install chromium` and `npx playwright install-deps chromium`
+  before running `RUN_PLAYWRIGHT_E2E=1 npm run test -w apps/web -- src/e2e.backend-frontend.playwright.test.ts`.
+  For E2E-related changes, do this setup and run the Playwright E2E command before committing.
 
 
 ## Documentation maintenance

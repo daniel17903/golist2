@@ -50,12 +50,14 @@ const readRequestTimeoutMs = () => {
 const apiBaseUrl = readApiBaseUrl();
 const requestTimeoutMs = readRequestTimeoutMs();
 
-const createHeaders = (deviceId: string) => {
+const createHeaders = (deviceId: string, options: { includeJsonContentType?: boolean } = {}) => {
   const headers: HeadersInit = {
-    "content-type": "application/json",
     "x-device-id": deviceId,
   };
 
+  if (options.includeJsonContentType) {
+    headers["content-type"] = "application/json";
+  }
 
   return headers;
 };
@@ -207,7 +209,7 @@ export const sharingApiClient = {
       `${apiBaseUrl}/v1/lists/${params.listId}`,
       {
         method: "PUT",
-        headers: createHeaders(params.deviceId),
+        headers: createHeaders(params.deviceId, { includeJsonContentType: true }),
         body: JSON.stringify(params.body),
       },
       "list upsert",
@@ -271,7 +273,7 @@ export const sharingApiClient = {
       `${apiBaseUrl}/v1/lists/${params.listId}/items/${params.itemId}`,
       {
         method: "PUT",
-        headers: createHeaders(params.deviceId),
+        headers: createHeaders(params.deviceId, { includeJsonContentType: true }),
         body: JSON.stringify(params.body),
       },
       "item upsert",
