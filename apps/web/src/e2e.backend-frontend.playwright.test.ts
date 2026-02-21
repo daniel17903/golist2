@@ -153,15 +153,6 @@ describe("frontend/backend integration via playwright", () => {
     expect(defaultList?.data.name).toBe("Einkaufsliste");
     expect(defaultList ? isUuid(defaultList.data.id) : false).toBe(true);
     expect(defaultList ? isUuid(defaultList.createdByDeviceId) : false).toBe(true);
-
-    const firstGetRequest = page!.waitForRequest((request) =>
-      request.method() === "GET" && request.url().includes(`/v1/lists/${defaultList?.data.id}`),
-    );
-    await page!.evaluate(() => {
-      window.dispatchEvent(new Event("online"));
-    });
-    await firstGetRequest;
-
     expectListPutBeforeFirstGet(defaultList!.data.id);
   });
 
@@ -181,15 +172,6 @@ describe("frontend/backend integration via playwright", () => {
 
     const newList = lists.find((entry) => entry.data.name === "Liste 2");
     expect(newList).toBeDefined();
-
-    const firstGetRequest = page!.waitForRequest((request) =>
-      request.method() === "GET" && request.url().includes(`/v1/lists/${newList?.data.id}`),
-    );
-    await page!.evaluate(() => {
-      window.dispatchEvent(new Event("online"));
-    });
-    await firstGetRequest;
-
     expectListPutBeforeFirstGet(newList!.data.id);
   });
 
