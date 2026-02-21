@@ -55,7 +55,7 @@ const readRequestTimeoutMs = () => {
       return parsed;
     }
   }
-  return 4000;
+  return 15000;
 };
 
 const apiBaseUrl = readApiBaseUrl();

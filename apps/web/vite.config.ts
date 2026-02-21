@@ -12,7 +12,7 @@ export default defineConfig({
   define: {
     __APP_VERSION__: JSON.stringify(process.env.npm_package_version ?? "dev"),
     __API_BASE_URL__: JSON.stringify(apiBaseUrl),
-    __API_TIMEOUT_MS__: JSON.stringify(process.env.API_TIMEOUT_MS ?? "4000"),
+    __API_TIMEOUT_MS__: JSON.stringify(process.env.API_TIMEOUT_MS ?? "15000"),
     __IS_VERCEL_PRODUCTION__: JSON.stringify(process.env.VERCEL === "1" && process.env.VERCEL_ENV === "production"),
     __IS_VERCEL_NON_PRODUCTION__: JSON.stringify(process.env.VERCEL === "1" && process.env.VERCEL_ENV !== "production"),
   },

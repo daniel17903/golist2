@@ -14,7 +14,7 @@ This document explains how the web app (`apps/web`) syncs shared lists with the 
 The frontend reads backend sync configuration at build time (in `apps/web/vite.config.ts`):
 
 - `API_BASE_URL`: backend base URL used by sharing API client.
-- `API_TIMEOUT_MS`: per-request timeout in milliseconds (defaults to `4000`).
+- `API_TIMEOUT_MS`: per-request timeout in milliseconds (defaults to `15000`).
 
 These values are compiled into frontend constants:
 
