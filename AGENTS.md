@@ -43,7 +43,7 @@
 ## CI/CD
 - GitHub Actions `ci.yml` workflow validates `lint`, `typecheck`, `test` and `build` for the web workspace on PRs.
 - GitHub Actions `backend-bootstrap.yml` runs backend `lint` + `typecheck` + `db:migrate` + `test` (against ephemeral Postgres) on PRs that touch `apps/backend/**`.
-- GitHub Actions `ci.yml` now also triggers Vercel preview (PR) and production (push to `main`) deployments for both frontend and backend after CI checks pass; preview deploys are skipped for Dependabot PRs.
+- GitHub Actions `ci.yml` now also triggers Vercel preview (PR) and production (push to `main`) deployments for frontend, backend, and API spec projects after CI checks pass; preview deploys are skipped for Dependabot PRs, and each project deploy only runs when files in that project folder changed.
 
 ## Testing expectations
 - Always run `npm run typecheck` before commit (`-w apps/web` or `-w apps/backend` as appropriate).

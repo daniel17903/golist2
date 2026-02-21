@@ -7,6 +7,25 @@ on:
     branches: ["main"]
 
 jobs:
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      web: ${{ steps.filter.outputs.web }}
+      backend: ${{ steps.filter.outputs.backend }}
+      api_spec: ${{ steps.filter.outputs.api_spec }}
+    steps:
+      - uses: actions/checkout@v6
+      - id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            web:
+              - 'apps/web/**'
+            backend:
+              - 'apps/backend/**'
+            api_spec:
+              - 'apps/api-spec/**'
+
   validate:
     runs-on: ubuntu-latest
     steps:
@@ -34,8 +53,9 @@ jobs:
       - run: npm run test:e2e -w apps/web
 
   deploy-preview-frontend:
-    if: github.event_name == 'pull_request' && github.event.pull_request.user.login != 'dependabot[bot]'
+    if: github.event_name == 'pull_request' && github.event.pull_request.user.login != 'dependabot[bot]' && needs.detect-changes.outputs.web == 'true'
     needs:
+      - detect-changes
       - validate
       - web-e2e-playwright
     runs-on: ubuntu-latest
@@ -79,8 +99,9 @@ jobs:
             });
 
   deploy-preview-backend:
-    if: github.event_name == 'pull_request' && github.event.pull_request.user.login != 'dependabot[bot]'
+    if: github.event_name == 'pull_request' && github.event.pull_request.user.login != 'dependabot[bot]' && needs.detect-changes.outputs.backend == 'true'
     needs:
+      - detect-changes
       - validate
       - web-e2e-playwright
     runs-on: ubuntu-latest
@@ -123,9 +144,56 @@ jobs:
               body,
             });
 
-  deploy-production-frontend:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+  deploy-preview-api-spec:
+    if: github.event_name == 'pull_request' && github.event.pull_request.user.login != 'dependabot[bot]' && needs.detect-changes.outputs.api_spec == 'true'
     needs:
+      - detect-changes
+      - validate
+      - web-e2e-playwright
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID_API_SPEC }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID_API_SPEC }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm install --global vercel@44.7.3
+      - name: Pull Vercel environment information (api spec)
+        run: vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN_API_SPEC }}
+        working-directory: apps/api-spec
+      - name: Build Vercel preview artifacts (api spec)
+        run: vercel build --token=${{ secrets.VERCEL_TOKEN_API_SPEC }}
+        working-directory: apps/api-spec
+      - name: Deploy Vercel preview (api spec)
+        id: vercel-preview-deploy-api-spec
+        run: |
+          DEPLOY_URL="$(vercel deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN_API_SPEC }})"
+          echo "deploy_url=${DEPLOY_URL}" >> "$GITHUB_OUTPUT"
+        working-directory: apps/api-spec
+      - name: Comment preview deployment URL (api spec)
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const deployUrl = `${{ steps.vercel-preview-deploy-api-spec.outputs.deploy_url }}`;
+            const body = `✅ API spec Vercel preview deployment is ready: ${deployUrl}`;
+            github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body,
+            });
+
+  deploy-production-frontend:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.detect-changes.outputs.web == 'true'
+    needs:
+      - detect-changes
       - validate
       - web-e2e-playwright
     runs-on: ubuntu-latest
@@ -151,8 +219,9 @@ jobs:
         working-directory: apps/web
 
   deploy-production-backend:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.detect-changes.outputs.backend == 'true'
     needs:
+      - detect-changes
       - validate
       - web-e2e-playwright
     runs-on: ubuntu-latest
@@ -176,3 +245,31 @@ jobs:
       - name: Deploy Vercel production (backend)
         run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN_BACKEND }}
         working-directory: apps/backend
+
+  deploy-production-api-spec:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.detect-changes.outputs.api_spec == 'true'
+    needs:
+      - detect-changes
+      - validate
+      - web-e2e-playwright
+    runs-on: ubuntu-latest
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID_API_SPEC }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID_API_SPEC }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm install --global vercel@44.7.3
+      - name: Pull Vercel environment information (api spec)
+        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN_API_SPEC }}
+        working-directory: apps/api-spec
+      - name: Build Vercel production artifacts (api spec)
+        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN_API_SPEC }}
+        working-directory: apps/api-spec
+      - name: Deploy Vercel production (api spec)
+        run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN_API_SPEC }}
+        working-directory: apps/api-spec
