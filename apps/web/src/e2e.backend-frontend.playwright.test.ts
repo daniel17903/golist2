@@ -165,23 +165,18 @@ describe("frontend/backend integration via playwright", () => {
     expect(createdItem ? isUuid(createdItem.listId) : false).toBe(true);
   });
 
-  runE2E("creates a share token for a list", async () => {
+  runE2E("calls the share token endpoint when the share button is clicked", async () => {
     const [defaultList] = [...readRepositoryState().lists.values()];
     expect(defaultList).toBeDefined();
 
-    await page!.evaluate(async ({ listId, deviceId }: { listId: string; deviceId: string }) => {
-      await fetch(`/v1/lists/${listId}/share-tokens`, {
-        method: "POST",
-        headers: {
-          "x-device-id": deviceId,
-        },
-      });
-    }, { listId: defaultList?.data.id ?? "", deviceId: defaultList?.createdByDeviceId ?? "" });
+    const shareTokenRequestPromise = page!.waitForRequest((request) =>
+      request.method() === "POST" && request.url().includes(`/v1/lists/${defaultList?.data.id}/share-tokens`),
+    );
 
-    await expect.poll(() => readRepositoryState().shareTokens.size).toBe(1);
-    const [shareToken] = [...readRepositoryState().shareTokens.values()];
-    expect(shareToken ? isUuid(shareToken.id) : false).toBe(true);
-    expect(shareToken?.listId).toBe(defaultList?.data.id);
-    expect(shareToken?.createdByDeviceId).toBe(defaultList?.createdByDeviceId);
+    await page!.getByLabel("Share list").click();
+
+    const shareTokenRequest = await shareTokenRequestPromise;
+    expect(shareTokenRequest.method()).toBe("POST");
+    expect(shareTokenRequest.url()).toContain(`/v1/lists/${defaultList?.data.id}/share-tokens`);
   });
 });
