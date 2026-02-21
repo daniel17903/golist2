@@ -6,7 +6,7 @@ type BottomBarProps = {
 
 const BottomBar = ({ onOpenDrawer, onAddItem, onShareList }: BottomBarProps) => {
   return (
-    <footer className="bottom-bar" aria-label="Main actions">
+    <footer className="bottom-bar">
       <button
         className="bottom-icon"
         type="button"
@@ -19,7 +19,6 @@ const BottomBar = ({ onOpenDrawer, onAddItem, onShareList }: BottomBarProps) => 
             fill="currentColor"
           />
         </svg>
-        <span className="bottom-icon__label">Listen</span>
       </button>
       <button className="fab" type="button" onClick={onAddItem} aria-label="Add item">
         <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -33,7 +32,6 @@ const BottomBar = ({ onOpenDrawer, onAddItem, onShareList }: BottomBarProps) => 
             fill="currentColor"
           />
         </svg>
-        <span className="bottom-icon__label">Teilen</span>
       </button>
     </footer>
   );
