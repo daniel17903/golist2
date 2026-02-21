@@ -16,6 +16,14 @@ type UndoToast = {
   item: Item;
 };
 
+const isAbortError = (error: unknown): boolean => {
+  if (error instanceof DOMException) {
+    return error.name === "AbortError";
+  }
+
+  return typeof error === "object" && error !== null && "name" in error && error.name === "AbortError";
+};
+
 const App = () => {
   const {
     lists,
@@ -123,6 +131,25 @@ const App = () => {
     });
   };
 
+  const shareWithSystemSheet = async (shareLink: string): Promise<boolean> => {
+    if (typeof navigator.share !== "function") {
+      return false;
+    }
+
+    const sharePayload: ShareData = {
+      title: activeList?.name ?? "GoList",
+      text: "Teile diese Einkaufsliste",
+      url: shareLink,
+    };
+
+    if (typeof navigator.canShare === "function" && !navigator.canShare(sharePayload)) {
+      return false;
+    }
+
+    await navigator.share(sharePayload);
+    return true;
+  };
+
   const handleUndoDelete = async (toastId: string, itemId: string) => {
     removeUndoToast(toastId);
     await toggleItem(itemId);
@@ -176,6 +203,17 @@ const App = () => {
           void (async () => {
             try {
               const shareLink = await handleShareActiveList();
+              try {
+                const shared = await shareWithSystemSheet(shareLink);
+                if (shared) {
+                  return;
+                }
+              } catch (error) {
+                if (isAbortError(error)) {
+                  return;
+                }
+              }
+
               await navigator.clipboard.writeText(shareLink);
               window.alert("Teilen-Link wurde in die Zwischenablage kopiert.");
             } catch {
