@@ -34,12 +34,23 @@ let viteServer: ViteDevServer | null = null;
 let browser: Browser | null = null;
 let context: BrowserContext | null = null;
 let page: Page | null = null;
+let observedRequests: { method: string; url: string }[] = [];
 
 const shouldRun = process.env.RUN_PLAYWRIGHT_E2E === "1";
 const runE2E = shouldRun ? it : it.skip;
 
 const isUuid = (value: string) =>
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+
+const expectListPutBeforeFirstGet = (listId: string) => {
+  const listRequests = observedRequests.filter((request) => request.url.includes(`/v1/lists/${listId}`));
+  const firstPutIndex = listRequests.findIndex((request) => request.method === "PUT");
+  const firstGetIndex = listRequests.findIndex((request) => request.method === "GET");
+
+  expect(firstPutIndex).toBeGreaterThanOrEqual(0);
+  expect(firstGetIndex).toBeGreaterThanOrEqual(0);
+  expect(firstPutIndex).toBeLessThan(firstGetIndex);
+};
 
 describe("frontend/backend integration via playwright", () => {
   beforeAll(async () => {
@@ -101,6 +112,11 @@ describe("frontend/backend integration via playwright", () => {
     const launchedContext = await launchedBrowser.newContext({ permissions: ["clipboard-write"] });
     context = launchedContext;
     page = await launchedContext.newPage();
+    observedRequests = [];
+
+    page.on("request", (request) => {
+      observedRequests.push({ method: request.method(), url: request.url() });
+    });
 
     page.on("dialog", async (dialog: { accept: () => Promise<void> }) => {
       await dialog.accept();
@@ -137,6 +153,7 @@ describe("frontend/backend integration via playwright", () => {
     expect(defaultList?.data.name).toBe("Einkaufsliste");
     expect(defaultList ? isUuid(defaultList.data.id) : false).toBe(true);
     expect(defaultList ? isUuid(defaultList.createdByDeviceId) : false).toBe(true);
+    expectListPutBeforeFirstGet(defaultList!.data.id);
   });
 
   runE2E("creates an additional list from the list drawer", async () => {
@@ -149,8 +166,13 @@ describe("frontend/backend integration via playwright", () => {
     });
 
     await expect.poll(() => readRepositoryState().lists.size).toBe(2);
-    const names = [...readRepositoryState().lists.values()].map((entry) => entry.data.name);
+    const lists = [...readRepositoryState().lists.values()];
+    const names = lists.map((entry) => entry.data.name);
     expect(names).toEqual(expect.arrayContaining(["Einkaufsliste", "Liste 2"]));
+
+    const newList = lists.find((entry) => entry.data.name === "Liste 2");
+    expect(newList).toBeDefined();
+    expectListPutBeforeFirstGet(newList!.data.id);
   });
 
   runE2E("upserts a list item from the add item flow", async () => {
