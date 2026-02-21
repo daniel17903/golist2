@@ -23,6 +23,7 @@ export const useAppState = () => {
     joinSharedList,
     syncAllLists,
     backendConnection,
+    pendingBackendRequests,
     syncNotice,
     clearSyncNotice,
     backendLogs,
@@ -63,7 +64,7 @@ export const useAppState = () => {
       try {
         await joinSharedList(shareTokenFromUrl);
       } catch {
-        window.alert("Geteilter Link konnte nicht geöffnet werden.");
+        // invalid or unavailable shared link; keep app usable without blocking dialogs
       } finally {
         const cleanedUrl = new URL(window.location.href);
         cleanedUrl.searchParams.delete("shareToken");
@@ -98,6 +99,16 @@ export const useAppState = () => {
   }, [isLoaded, syncAllLists]);
 
   const activeList = lists.find((list) => list.id === activeListId) ?? null;
+
+  const listOpenItemCountById = useMemo(() => {
+    const counts = new Map<string, number>();
+    items.forEach((item) => {
+      if (item.deleted) {return;}
+      counts.set(item.listId, (counts.get(item.listId) ?? 0) + 1);
+    });
+    return counts;
+  }, [items]);
+
   const listItems = useMemo(() => {
     const filtered = items.filter((item) => item.listId === activeListId && !item.deleted);
     return sortItemsForList(filtered);
@@ -272,6 +283,8 @@ export const useAppState = () => {
     handleShareActiveList,
     joinSharedList,
     backendConnection,
+    listOpenItemCountById,
+    pendingBackendRequests,
     syncNotice,
     clearSyncNotice,
     backendLogs,

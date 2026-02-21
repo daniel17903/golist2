@@ -25,16 +25,24 @@ body {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  padding: 24px 18px 96px;
+  padding: 16px 14px calc(96px + env(safe-area-inset-bottom));
 }
 
 .app__header {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
   color: #f3f8f6;
 }
 
+.app__header-glass {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-radius: 18px;
+  padding: 12px 14px;
+  background: rgba(4, 38, 58, 0.32);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 8px 24px rgba(0, 0, 0, 0.2);
+  backdrop-filter: blur(10px);
+}
 
 .ghost-button {
   border: 1px solid rgba(255, 255, 255, 0.7);
@@ -49,11 +57,12 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
 }
 
 .title-row h1 {
   margin: 0;
-  font-size: 30px;
+  font-size: clamp(24px, 6.5vw, 30px);
   font-weight: 500;
   max-width: calc(100% - 44px);
   overflow: hidden;
@@ -63,43 +72,68 @@ body {
 
 .title-edit {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   align-items: center;
+  width: 100%;
 }
 
 .title-edit input {
-  padding: 8px 12px;
+  padding: 8px 10px;
   border-radius: 12px;
   border: none;
   background: rgba(255, 255, 255, 0.9);
   font-size: 14px;
+  flex: 1;
+  min-width: 0;
 }
 
+
+
+.header-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: rgba(243, 248, 246, 0.9);
+  min-width: 0;
+}
+
+.header-meta-row__divider {
+  opacity: 0.75;
+}
+
+.backend-status {
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #f3f8f6;
+  flex-shrink: 0;
+}
+
+.backend-status svg {
+  width: 18px;
+  height: 18px;
+}
+
+.backend-spinner {
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  border: 2px solid rgba(243, 248, 246, 0.35);
+  border-top-color: #f3f8f6;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
 
 .header-actions {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-}
-
-.connection-indicator {
-  width: 10px;
-  height: 10px;
-  border-radius: 999px;
-  display: inline-block;
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.7);
-}
-
-.connection-indicator--online {
-  background: #66f57f;
-}
-
-.connection-indicator--offline {
-  background: #ff847f;
-}
-
-.connection-indicator--unknown {
-  background: #ffd980;
 }
 
 
@@ -188,6 +222,14 @@ body {
   align-items: center;
   justify-content: center;
 }
+
+.drawer__delete--confirm {
+  background: #c33;
+  color: #fff;
+  border-radius: 999px;
+  font-weight: 700;
+}
+
 
 .icon-button svg,
 .bottom-icon svg,
@@ -323,14 +365,37 @@ body {
 .undo-toast-stack {
   position: fixed;
   left: 50%;
-  bottom: 68px;
+  bottom: calc(64px + env(safe-area-inset-bottom));
   transform: translateX(-50%);
   width: min(420px, calc(100% - 24px));
   display: flex;
   flex-direction: column;
   gap: 8px;
-  z-index: 40;
+  z-index: 42;
   pointer-events: none;
+}
+
+
+.toast-stack {
+  position: fixed;
+  left: 50%;
+  bottom: calc(148px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  width: min(420px, calc(100% - 24px));
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 43;
+  pointer-events: none;
+}
+
+.app-toast {
+  background: rgba(11, 31, 42, 0.95);
+  color: #f3f8f6;
+  border-radius: 14px;
+  padding: 11px 14px;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.25);
+  overflow-wrap: anywhere;
 }
 
 .undo-toast {
@@ -368,7 +433,7 @@ body {
   bottom: 0;
   left: 0;
   right: 0;
-  padding: 6px 18px 10px;
+  padding: 6px 18px calc(10px + env(safe-area-inset-bottom));
   background: radial-gradient(circle at 50% 2px, transparent 33px, #005382 34px);
   display: flex;
   justify-content: space-between;
@@ -611,7 +676,22 @@ body {
   justify-content: center;
 }
 
+.drawer__item-content {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
 .drawer__item-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.drawer__item-meta {
+  font-size: 12px;
+  color: #666;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -697,4 +777,9 @@ body {
   max-height: 420px;
   overflow-y: auto;
   padding-bottom: 4px;
+}
+
+button:focus-visible, input:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
 }

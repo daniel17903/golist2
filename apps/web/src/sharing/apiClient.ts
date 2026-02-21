@@ -15,13 +15,24 @@ type BackendCallLog = {
 };
 
 let backendCallLogger: ((entry: BackendCallLog) => void) | null = null;
+let pendingRequestObserver: ((pendingCount: number) => void) | null = null;
+let pendingRequests = 0;
 
 export const setBackendCallLogger = (logger: ((entry: BackendCallLog) => void) | null) => {
   backendCallLogger = logger;
 };
 
+export const setPendingRequestObserver = (observer: ((pendingCount: number) => void) | null) => {
+  pendingRequestObserver = observer;
+};
+
 const logBackendCall = (entry: BackendCallLog) => {
   backendCallLogger?.(entry);
+};
+
+const changePendingRequestCount = (delta: number) => {
+  pendingRequests = Math.max(0, pendingRequests + delta);
+  pendingRequestObserver?.(pendingRequests);
 };
 
 const readApiBaseUrl = () => {
@@ -94,6 +105,7 @@ const readBoolean = (payload: unknown, key: string): boolean | null => {
 };
 
 const fetchWithTimeout = async (url: string, options: RequestInit, context: string) => {
+  changePendingRequestCount(1);
   const startedAt = Date.now();
   const controller = new AbortController();
   const timeout = globalThis.setTimeout(() => {
@@ -129,6 +141,7 @@ const fetchWithTimeout = async (url: string, options: RequestInit, context: stri
     logBackendCall({ endpoint: url, outcome: "error", message });
     throw error;
   } finally {
+    changePendingRequestCount(-1);
     globalThis.clearTimeout(timeout);
   }
 };
