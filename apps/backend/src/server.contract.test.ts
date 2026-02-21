@@ -1,29 +1,12 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
 
-const queryMock = vi.fn()
-const withTransactionMock = vi.fn()
-
-vi.mock('./db/client.js', () => ({
-  query: queryMock,
-  withTransaction: withTransactionMock,
-}))
+import { buildServer } from './server.js'
+import { InMemoryListRepository } from './test/in-memory-list-repository.js'
 
 describe('sharing API contract basics', () => {
-  beforeEach(() => {
-    queryMock.mockReset()
-    withTransactionMock.mockReset()
-    withTransactionMock.mockImplementation(async (work: (client: { query: typeof queryMock }) => Promise<unknown>) => {
-      return await work({ query: queryMock })
-    })
-    queryMock.mockResolvedValue({ rowCount: 1, rows: [] })
-  })
-
   it('creates a list and returns listId', async () => {
-    const { buildServer } = await import('./server.js')
-    const app = buildServer()
-
-    queryMock.mockResolvedValueOnce({ rowCount: 0, rows: [] })
+    const app = buildServer({ listRepository: new InMemoryListRepository() })
 
     const response = await app.inject({
       method: 'PUT',
@@ -33,27 +16,20 @@ describe('sharing API contract basics', () => {
     })
 
     expect(response.statusCode).toBe(201)
-    expect(response.json()).toEqual(
-      expect.objectContaining({
-        listId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
-      }),
-    )
+    expect(response.json()).toEqual(expect.objectContaining({ listId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' }))
 
     await app.close()
   })
 
-
-
   it('rejects putting an existing list without required X-Device-Id header', async () => {
-    const { buildServer } = await import('./server.js')
-    const app = buildServer()
+    const app = buildServer({ listRepository: new InMemoryListRepository() })
 
-    queryMock.mockResolvedValueOnce({
-      rowCount: 1,
-      rows: [{ id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', created_by_device_id: '11111111-1111-4111-8111-111111111111' }],
+    await app.inject({
+      method: 'PUT',
+      url: '/v1/lists/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      headers: { 'x-device-id': '11111111-1111-4111-8111-111111111111' },
+      payload: { name: 'Groceries' },
     })
-
-    queryMock.mockResolvedValueOnce({ rowCount: 0, rows: [] })
 
     const response = await app.inject({
       method: 'PUT',
@@ -67,8 +43,7 @@ describe('sharing API contract basics', () => {
   })
 
   it('requires X-Device-Id header for protected routes', async () => {
-    const { buildServer } = await import('./server.js')
-    const app = buildServer()
+    const app = buildServer({ listRepository: new InMemoryListRepository() })
 
     const response = await app.inject({ method: 'GET', url: '/v1/lists/11111111-1111-4111-8111-111111111111' })
 
@@ -78,31 +53,15 @@ describe('sharing API contract basics', () => {
   })
 
   it('forbids devices without list access on protected routes', async () => {
-    const { buildServer } = await import('./server.js')
-    const app = buildServer()
+    const repository = new InMemoryListRepository()
+    const app = buildServer({ listRepository: repository })
 
-    queryMock.mockResolvedValueOnce({ rowCount: 1, rows: [{ has_access: false }] })
-
-    const response = await app.inject({
-      method: 'GET',
+    await app.inject({
+      method: 'PUT',
       url: '/v1/lists/11111111-1111-4111-8111-111111111111',
-      headers: { 'x-device-id': '22222222-2222-4222-8222-222222222222' },
+      headers: { 'x-device-id': '11111111-1111-4111-8111-111111111111' },
+      payload: { name: 'Private List' },
     })
-
-    expect(response.statusCode).toBe(403)
-
-    await app.close()
-  })
-
-  it('forbids non-redeemed devices on authenticated list routes', async () => {
-    const { buildServer } = await import('./server.js')
-    const app = buildServer()
-
-    queryMock
-      .mockResolvedValueOnce({
-        rowCount: 1,
-        rows: [{ has_access: false }],
-      })
 
     const response = await app.inject({
       method: 'GET',
@@ -116,18 +75,15 @@ describe('sharing API contract basics', () => {
   })
 
   it('allows list item updates for the list creator without a redemption record', async () => {
-    const { buildServer } = await import('./server.js')
-    const app = buildServer()
+    const repository = new InMemoryListRepository()
+    const app = buildServer({ listRepository: repository })
 
-    queryMock
-      .mockResolvedValueOnce({
-        rowCount: 1,
-        rows: [{ has_access: true }],
-      })
-      .mockResolvedValueOnce({ rowCount: 1, rows: [{ id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' }] })
-      .mockResolvedValueOnce({ rowCount: 0, rows: [] })
-      .mockResolvedValueOnce({ rowCount: 1, rows: [] })
-      .mockResolvedValueOnce({ rowCount: 1, rows: [] })
+    await app.inject({
+      method: 'PUT',
+      url: '/v1/lists/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      headers: { 'x-device-id': '11111111-1111-4111-8111-111111111111' },
+      payload: { name: 'Groceries' },
+    })
 
     const response = await app.inject({
       method: 'PUT',
@@ -148,21 +104,28 @@ describe('sharing API contract basics', () => {
     await app.close()
   })
 
-
   it('allows redeem route before token redemption and records redemption', async () => {
-    const { buildServer } = await import('./server.js')
-    const app = buildServer()
+    const repository = new InMemoryListRepository()
+    const app = buildServer({ listRepository: repository })
 
-    queryMock
-      .mockResolvedValueOnce({
-        rowCount: 1,
-        rows: [{ token_id: '11111111-1111-4111-8111-111111111111', list_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' }],
-      })
-      .mockResolvedValueOnce({ rowCount: 1, rows: [] })
+    await app.inject({
+      method: 'PUT',
+      url: '/v1/lists/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      headers: { 'x-device-id': '11111111-1111-4111-8111-111111111111' },
+      payload: { name: 'Groceries' },
+    })
+
+    const tokenResponse = await app.inject({
+      method: 'POST',
+      url: '/v1/lists/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/share-tokens',
+      headers: { 'x-device-id': '11111111-1111-4111-8111-111111111111' },
+    })
+
+    const token = z.object({ shareToken: z.uuid() }).parse(tokenResponse.json())
 
     const response = await app.inject({
       method: 'POST',
-      url: '/v1/share-tokens/11111111-1111-4111-8111-111111111111/redeem',
+      url: `/v1/share-tokens/${token.shareToken}/redeem`,
       headers: { 'x-device-id': '22222222-2222-4222-8222-222222222222' },
     })
 
@@ -170,17 +133,31 @@ describe('sharing API contract basics', () => {
 
     await app.close()
   })
-  it('creates a secondary share token only for redeemed devices', async () => {
-    const { buildServer } = await import('./server.js')
-    const app = buildServer()
 
-    queryMock
-      .mockResolvedValueOnce({
-        rowCount: 1,
-        rows: [{ has_access: true }],
-      })
-      .mockResolvedValueOnce({ rowCount: 1, rows: [{ created_at: '2026-01-01T00:00:00.000Z' }] })
-      .mockResolvedValueOnce({ rowCount: 1, rows: [] })
+  it('creates a secondary share token only for redeemed devices', async () => {
+    const repository = new InMemoryListRepository()
+    const app = buildServer({ listRepository: repository })
+
+    await app.inject({
+      method: 'PUT',
+      url: '/v1/lists/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      headers: { 'x-device-id': '11111111-1111-4111-8111-111111111111' },
+      payload: { name: 'Groceries' },
+    })
+
+    const ownerTokenResponse = await app.inject({
+      method: 'POST',
+      url: '/v1/lists/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/share-tokens',
+      headers: { 'x-device-id': '11111111-1111-4111-8111-111111111111' },
+    })
+
+    const ownerToken = z.object({ shareToken: z.string().uuid() }).parse(ownerTokenResponse.json())
+
+    await app.inject({
+      method: 'POST',
+      url: `/v1/share-tokens/${ownerToken.shareToken}/redeem`,
+      headers: { 'x-device-id': '22222222-2222-4222-8222-222222222222' },
+    })
 
     const response = await app.inject({
       method: 'POST',
@@ -197,23 +174,22 @@ describe('sharing API contract basics', () => {
       }),
     )
 
-    const tokenPayload = z
-      .object({ tokenId: z.string().uuid(), shareToken: z.string().uuid() })
-      .parse(response.json())
+    const tokenPayload = z.object({ tokenId: z.string().uuid(), shareToken: z.string().uuid() }).parse(response.json())
     expect(tokenPayload.shareToken).toBe(tokenPayload.tokenId)
 
     await app.close()
   })
 
   it('forbids creating a secondary share token for non-redeemed devices', async () => {
-    const { buildServer } = await import('./server.js')
-    const app = buildServer()
+    const repository = new InMemoryListRepository()
+    const app = buildServer({ listRepository: repository })
 
-    queryMock
-      .mockResolvedValueOnce({
-        rowCount: 1,
-        rows: [{ has_access: false }],
-      })
+    await app.inject({
+      method: 'PUT',
+      url: '/v1/lists/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      headers: { 'x-device-id': '11111111-1111-4111-8111-111111111111' },
+      payload: { name: 'Groceries' },
+    })
 
     const response = await app.inject({
       method: 'POST',
@@ -227,32 +203,35 @@ describe('sharing API contract basics', () => {
   })
 
   it('accepts repeated redemption calls for the same device and token', async () => {
-    const { buildServer } = await import('./server.js')
-    const app = buildServer()
+    const repository = new InMemoryListRepository()
+    const app = buildServer({ listRepository: repository })
 
-    queryMock
-      .mockResolvedValueOnce({
-        rowCount: 1,
-        rows: [{ token_id: '11111111-1111-4111-8111-111111111111', list_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' }],
-      })
-      .mockResolvedValueOnce({ rowCount: 1, rows: [] })
-      .mockResolvedValueOnce({
-        rowCount: 1,
-        rows: [{ token_id: '11111111-1111-4111-8111-111111111111', list_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' }],
-      })
-      .mockResolvedValueOnce({ rowCount: 1, rows: [] })
+    await app.inject({
+      method: 'PUT',
+      url: '/v1/lists/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      headers: { 'x-device-id': '11111111-1111-4111-8111-111111111111' },
+      payload: { name: 'Groceries' },
+    })
+
+    const tokenResponse = await app.inject({
+      method: 'POST',
+      url: '/v1/lists/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/share-tokens',
+      headers: { 'x-device-id': '11111111-1111-4111-8111-111111111111' },
+    })
+
+    const token = z.object({ shareToken: z.string().uuid() }).parse(tokenResponse.json())
 
     const headers = { 'x-device-id': '22222222-2222-4222-8222-222222222222' }
 
     const firstResponse = await app.inject({
       method: 'POST',
-      url: '/v1/share-tokens/11111111-1111-4111-8111-111111111111/redeem',
+      url: `/v1/share-tokens/${token.shareToken}/redeem`,
       headers,
     })
 
     const secondResponse = await app.inject({
       method: 'POST',
-      url: '/v1/share-tokens/11111111-1111-4111-8111-111111111111/redeem',
+      url: `/v1/share-tokens/${token.shareToken}/redeem`,
       headers,
     })
 
@@ -261,5 +240,4 @@ describe('sharing API contract basics', () => {
 
     await app.close()
   })
-
 })

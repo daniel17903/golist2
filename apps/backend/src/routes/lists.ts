@@ -1,9 +1,8 @@
 import { type FastifyInstance } from 'fastify'
 import { z } from 'zod'
 
-import { requireListAccess } from '../auth.js'
-import { query, withTransaction } from '../db/client.js'
-import { hasListAccessWithClient } from '../access.js'
+import { createAuthGuards } from '../auth.js'
+import { type ListRepository } from '../repositories/list-repository.js'
 
 const listIdParamsSchema = z.object({ listId: z.uuid() })
 const listPutBodySchema = z.object({ name: z.string().min(1) })
@@ -17,76 +16,15 @@ const itemUpsertSchema = z.object({
   updatedAt: z.iso.datetime(),
 })
 
-const itemUpdateTieBreakDelimiter = '\u0001'
+export function registerListRoutes(app: FastifyInstance, listRepository: ListRepository) {
+  const { requireListAccess } = createAuthGuards(listRepository)
 
-type ListItemRow = {
-  id: string
-  name: string
-  quantity_or_unit: string | null
-  category: string
-  deleted: boolean
-  created_at: string
-  updated_at: string
-}
-
-function serializeListItem(item: ListItemRow) {
-  return {
-    id: item.id,
-    name: item.name,
-    quantityOrUnit: item.quantity_or_unit ?? undefined,
-    category: item.category,
-    deleted: item.deleted,
-    createdAt: item.created_at,
-    updatedAt: item.updated_at,
-  }
-}
-
-async function touchListUpdatedAt(
-  client: { query: (text: string, values?: unknown[]) => Promise<unknown> },
-  listId: string,
-  updatedAt: string,
-) {
-  await client.query('UPDATE shared_lists SET updated_at = GREATEST(updated_at, $2::timestamptz) WHERE id = $1', [listId, updatedAt])
-}
-
-function computeItemTieBreakValue(item: {
-  name: string
-  quantityOrUnit?: string
-  category: string
-  deleted: boolean
-}): string {
-  return `${item.name}${itemUpdateTieBreakDelimiter}${item.quantityOrUnit ?? ''}${itemUpdateTieBreakDelimiter}${item.category}${itemUpdateTieBreakDelimiter}${item.deleted}`
-}
-
-export function registerListRoutes(app: FastifyInstance) {
   app.put('/v1/lists/:listId', async (request, reply) => {
     const params = listIdParamsSchema.parse(request.params)
     const body = listPutBodySchema.parse(request.body)
     const headers = listCreateHeadersSchema.parse(request.headers)
-    const createdBy = headers['x-device-id']
 
-    const result = await withTransaction(async (client) => {
-      const existingListResult = await client.query<{
-        id: string
-        created_by_device_id: string
-      }>('SELECT id, created_by_device_id FROM shared_lists WHERE id = $1 FOR UPDATE', [params.listId])
-
-      if (!existingListResult.rowCount) {
-        await client.query(
-          'INSERT INTO shared_lists(id, name, created_by_device_id, created_at, updated_at) VALUES ($1, $2, $3, NOW(), NOW())',
-          [params.listId, body.name, createdBy],
-        )
-        return { statusCode: 201 as const }
-      }
-
-      if (!(await hasListAccessWithClient(client, params.listId, createdBy))) {
-        return { statusCode: 403 as const }
-      }
-
-      await client.query('UPDATE shared_lists SET name = $1, updated_at = NOW() WHERE id = $2', [body.name, params.listId])
-
-      return { statusCode: 200 as const }
-    })
+    const result = await listRepository.putList(params.listId, body.name, headers['x-device-id'])
 
     reply.code(result.statusCode)
     if (result.statusCode === 403) {
@@ -97,48 +35,27 @@ export function registerListRoutes(app: FastifyInstance) {
   })
 
   app.get('/v1/lists/:listId', { preHandler: requireListAccess }, async (request) => {
+    const list = await listRepository.getList(request.auth!.listId)
 
-    const listResult = await query<{
-      id: string
-      name: string
-      created_at: string
-      updated_at: string
-    }>('SELECT id, name, created_at, updated_at FROM shared_lists WHERE id = $1 LIMIT 1', [request.auth!.listId])
-
-    if (!listResult.rowCount) {
+    if (!list) {
       return {}
     }
 
-    const itemsResult = await query<ListItemRow>(
-      `SELECT id, name, quantity_or_unit, category, deleted, created_at, updated_at
-         FROM list_items
-        WHERE list_id = $1
-        ORDER BY created_at ASC, id ASC`,
-      [request.auth!.listId],
-    )
-
-    const list = listResult.rows[0]
+    const items = await listRepository.listItems(request.auth!.listId)
 
     return {
       listId: list.id,
       name: list.name,
-      createdAt: list.created_at,
-      updatedAt: list.updated_at,
-      items: itemsResult.rows.map(serializeListItem),
+      createdAt: list.createdAt,
+      updatedAt: list.updatedAt,
+      items,
     }
   })
 
   app.delete('/v1/lists/:listId', { preHandler: requireListAccess }, async (request, reply) => {
-    const result = await withTransaction(async (client) => {
-      await client.query('SELECT id FROM shared_lists WHERE id = $1 FOR UPDATE', [request.auth!.listId])
+    const deleted = await listRepository.deleteList(request.auth!.listId, request.auth!.deviceId)
 
-      return client.query('DELETE FROM shared_lists WHERE id = $1 AND created_by_device_id = $2', [
-        request.auth!.listId,
-        request.auth!.deviceId,
-      ])
-    })
-
-    if (!result.rowCount) {
+    if (!deleted) {
       reply.code(403)
       return { message: 'Forbidden' }
     }
@@ -148,112 +65,28 @@ export function registerListRoutes(app: FastifyInstance) {
 
   app.get('/v1/lists/:listId/items', { preHandler: requireListAccess }, async (request) => {
     const querystring = z.object({ updatedAfter: z.iso.datetime() }).parse(request.query)
+    const items = await listRepository.listItemsUpdatedAfter(request.auth!.listId, querystring.updatedAfter)
 
-    const itemsResult = await query<ListItemRow>(
-      `SELECT id, name, quantity_or_unit, category, deleted, created_at, updated_at
-         FROM list_items
-        WHERE list_id = $1 AND updated_at > $2
-        ORDER BY updated_at ASC, id ASC`,
-      [request.auth!.listId, querystring.updatedAfter],
-    )
-
-    return {
-      items: itemsResult.rows.map(serializeListItem),
-    }
+    return { items }
   })
 
   app.get('/v1/lists/:listId/items/:itemId', { preHandler: requireListAccess }, async (request, reply) => {
     const params = itemParamsSchema.parse(request.params)
-    const itemResult = await query<ListItemRow>(
-      `SELECT id, name, quantity_or_unit, category, deleted, created_at, updated_at
-         FROM list_items
-        WHERE id = $1 AND list_id = $2
-        LIMIT 1`,
-      [params.itemId, request.auth!.listId],
-    )
+    const item = await listRepository.getListItem(request.auth!.listId, params.itemId)
 
-    if (!itemResult.rowCount) {
+    if (!item) {
       reply.code(404)
       return { message: 'Item not found' }
     }
 
-    return serializeListItem(itemResult.rows[0])
+    return item
   })
 
   app.put('/v1/lists/:listId/items/:itemId', { preHandler: requireListAccess }, async (request, reply) => {
     const params = itemParamsSchema.parse(request.params)
     const body = itemUpsertSchema.parse(request.body)
-    const tieBreakValue = computeItemTieBreakValue(body)
 
-    const result = await withTransaction(async (client) => {
-      await client.query('SELECT id FROM shared_lists WHERE id = $1 FOR UPDATE', [request.auth!.listId])
-
-      const existingItemResult = await client.query<{
-        id: string
-        list_id: string
-      }>('SELECT id, list_id FROM list_items WHERE id = $1 FOR UPDATE', [params.itemId])
-
-      if (!existingItemResult.rowCount) {
-        await client.query(
-          `INSERT INTO list_items(id, list_id, name, quantity_or_unit, category, deleted, created_by_device_id, created_at, updated_at, deleted_at)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), $8, CASE WHEN $6 THEN NOW() ELSE NULL END)`,
-          [
-            params.itemId,
-            request.auth!.listId,
-            body.name,
-            body.quantityOrUnit ?? null,
-            body.category,
-            body.deleted,
-            request.auth!.deviceId,
-            body.updatedAt,
-          ],
-        )
-
-        await touchListUpdatedAt(client, request.auth!.listId, body.updatedAt)
-
-        return { statusCode: 201 }
-      }
-
-      if (existingItemResult.rows[0].list_id !== request.auth!.listId) {
-        return { statusCode: 409 }
-      }
-
-      const updateResult = await client.query(
-        `UPDATE list_items
-            SET name = $1,
-                quantity_or_unit = $2,
-                category = $3,
-                deleted = $4,
-                updated_at = $5,
-                deleted_at = CASE WHEN $4 THEN NOW() ELSE NULL END
-          WHERE id = $6
-            AND list_id = $7
-            AND (
-              updated_at < $5
-              OR (
-                updated_at = $5
-                AND CONCAT_WS($9, name, COALESCE(quantity_or_unit, ''), category, deleted::text) < $8
-              )
-            )`,
-        [
-          body.name,
-          body.quantityOrUnit ?? null,
-          body.category,
-          body.deleted,
-          body.updatedAt,
-          params.itemId,
-          request.auth!.listId,
-          tieBreakValue,
-          itemUpdateTieBreakDelimiter,
-        ],
-      )
-
-      if (updateResult.rowCount) {
-        await touchListUpdatedAt(client, request.auth!.listId, body.updatedAt)
-      }
-
-      return { statusCode: 204 }
-    })
+    const result = await listRepository.upsertListItem(request.auth!.listId, params.itemId, request.auth!.deviceId, body)
 
     reply.code(result.statusCode)
     if (result.statusCode === 409) {

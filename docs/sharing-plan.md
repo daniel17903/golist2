@@ -85,6 +85,7 @@ The API contract is maintained in `apps/api-spec/openapi.yaml` (and related file
 4. Creation is idempotent with client-generated IDs: lists use `PUT /v1/lists/{listId}` and items use `PUT /v1/lists/{listId}/items/{itemId}`.
 5. Existing-list `PUT /v1/lists/{listId}` updates are access-controlled: only devices with list access (list creator or devices that redeemed the share token) may update an existing list.
 6. Protected list routes enforce creator-or-redeemed access using `X-Device-Id`: calls are allowed for the list creator or for devices that redeemed at least one valid token for that list.
+7. Backend data access follows a repository pattern: routes/auth logic call repository interfaces, and SQL access is centralized inside `apps/backend/src/repositories/postgres-list-repository.ts`.
 
 ### Phase 4 — Web app integration ✅ Implemented
 1. Sharing API client is implemented in `apps/web/src/sharing/apiClient.ts` for list upsert, explicit share-token creation, token redemption, list fetch, item upsert, and token extraction from links.
