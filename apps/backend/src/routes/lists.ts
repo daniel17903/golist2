@@ -26,11 +26,12 @@ export function registerListRoutes(app: FastifyInstance, listRepository: ListRep
 
     const result = await listRepository.putList(params.listId, body.name, headers['x-device-id'])
 
-    reply.code(result.statusCode)
-    if (result.statusCode === 403) {
+    if (result.outcome === 'forbidden') {
+      reply.code(403)
       return { message: 'Forbidden' }
     }
 
+    reply.code(result.outcome === 'created' ? 201 : 200)
     return { listId: params.listId }
   })
 
@@ -88,9 +89,11 @@ export function registerListRoutes(app: FastifyInstance, listRepository: ListRep
 
     const result = await listRepository.upsertListItem(request.auth!.listId, params.itemId, request.auth!.deviceId, body)
 
-    reply.code(result.statusCode)
-    if (result.statusCode === 409) {
+    if (result.outcome === 'conflict') {
+      reply.code(409)
       return { message: 'Item id belongs to another list' }
     }
+
+    reply.code(result.outcome === 'created' ? 201 : 204)
   })
 }

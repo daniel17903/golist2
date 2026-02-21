@@ -1,6 +1,13 @@
 import crypto from 'node:crypto'
 
-import { type ItemUpsertInput, type ListItemRecord, type ListRecord, type ListRepository } from '../repositories/list-repository.js'
+import {
+  type ItemUpsertInput,
+  type ListItemRecord,
+  type ListRecord,
+  type ListRepository,
+  type PutListResult,
+  type UpsertListItemResult,
+} from '../repositories/list-repository.js'
 
 type ShareToken = {
   id: string
@@ -74,7 +81,7 @@ export class InMemoryListRepository implements ListRepository {
     return { tokenId: token.id, listId: token.listId }
   }
 
-  async putList(listId: string, name: string, deviceId: string): Promise<{ statusCode: 200 | 201 | 403 }> {
+  async putList(listId: string, name: string, deviceId: string): Promise<PutListResult> {
     const existing = this.lists.get(listId)
     const now = new Date().toISOString()
 
@@ -83,16 +90,16 @@ export class InMemoryListRepository implements ListRepository {
         createdByDeviceId: deviceId,
         data: { id: listId, name, createdAt: now, updatedAt: now },
       })
-      return { statusCode: 201 }
+      return { outcome: 'created' }
     }
 
     if (!(await this.hasListAccess(listId, deviceId))) {
-      return { statusCode: 403 }
+      return { outcome: 'forbidden' }
     }
 
     existing.data.name = name
     existing.data.updatedAt = now
-    return { statusCode: 200 }
+    return { outcome: 'updated' }
   }
 
   async getList(listId: string): Promise<ListRecord | null> {
@@ -139,11 +146,11 @@ export class InMemoryListRepository implements ListRepository {
     return { ...item }
   }
 
-  async upsertListItem(listId: string, itemId: string, deviceId: string, input: ItemUpsertInput): Promise<{ statusCode: 201 | 204 | 409 }> {
+  async upsertListItem(listId: string, itemId: string, deviceId: string, input: ItemUpsertInput): Promise<UpsertListItemResult> {
     const existing = this.items.get(itemId)
     const list = this.lists.get(listId)
     if (!list) {
-      return { statusCode: 409 }
+      return { outcome: 'conflict' }
     }
 
     if (!existing) {
@@ -158,11 +165,11 @@ export class InMemoryListRepository implements ListRepository {
         updatedAt: input.updatedAt,
       })
       list.data.updatedAt = input.updatedAt > list.data.updatedAt ? input.updatedAt : list.data.updatedAt
-      return { statusCode: 201 }
+      return { outcome: 'created' }
     }
 
     if (existing.listId !== listId) {
-      return { statusCode: 409 }
+      return { outcome: 'conflict' }
     }
 
     const shouldUpdate =
@@ -183,7 +190,7 @@ export class InMemoryListRepository implements ListRepository {
 
     void deviceId
 
-    return { statusCode: 204 }
+    return { outcome: 'updated' }
   }
 
   async createShareToken(listId: string, deviceId: string): Promise<{ tokenId: string; createdAt: string }> {

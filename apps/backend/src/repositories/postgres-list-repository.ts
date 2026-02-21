@@ -3,7 +3,14 @@ import crypto from 'node:crypto'
 import { z } from 'zod'
 
 import { query, withTransaction } from '../db/client.js'
-import { type ItemUpsertInput, type ListItemRecord, type ListRecord, type ListRepository } from './list-repository.js'
+import {
+  type ItemUpsertInput,
+  type ListItemRecord,
+  type ListRecord,
+  type ListRepository,
+  type PutListResult,
+  type UpsertListItemResult,
+} from './list-repository.js'
 
 type Queryable = {
   query: (text: string, values?: unknown[]) => Promise<{ rows: unknown[]; rowCount: number | null }>
@@ -96,7 +103,7 @@ export class PostgresListRepository implements ListRepository {
     }
   }
 
-  async putList(listId: string, name: string, deviceId: string): Promise<{ statusCode: 200 | 201 | 403 }> {
+  async putList(listId: string, name: string, deviceId: string): Promise<PutListResult> {
     return withTransaction(async (client) => {
       const existingListResult = await client.query<{ id: string }>('SELECT id FROM shared_lists WHERE id = $1 FOR UPDATE', [listId])
 
@@ -105,16 +112,16 @@ export class PostgresListRepository implements ListRepository {
           'INSERT INTO shared_lists(id, name, created_by_device_id, created_at, updated_at) VALUES ($1, $2, $3, NOW(), NOW())',
           [listId, name, deviceId],
         )
-        return { statusCode: 201 }
+        return { outcome: 'created' }
       }
 
       if (!(await hasListAccessWithClient(client, listId, deviceId))) {
-        return { statusCode: 403 }
+        return { outcome: 'forbidden' }
       }
 
       await client.query('UPDATE shared_lists SET name = $1, updated_at = NOW() WHERE id = $2', [name, listId])
 
-      return { statusCode: 200 }
+      return { outcome: 'updated' }
     })
   }
 
@@ -217,7 +224,7 @@ export class PostgresListRepository implements ListRepository {
     itemId: string,
     deviceId: string,
     input: ItemUpsertInput,
-  ): Promise<{ statusCode: 201 | 204 | 409 }> {
+  ): Promise<UpsertListItemResult> {
     const tieBreakValue = computeItemTieBreakValue(input)
 
     return withTransaction(async (client) => {
@@ -234,11 +241,11 @@ export class PostgresListRepository implements ListRepository {
 
         await touchListUpdatedAt(client, listId, input.updatedAt)
 
-        return { statusCode: 201 }
+        return { outcome: 'created' }
       }
 
       if (existingItemResult.rows[0].list_id !== listId) {
-        return { statusCode: 409 }
+        return { outcome: 'conflict' }
       }
 
       const updateResult = await client.query(
@@ -265,7 +272,7 @@ export class PostgresListRepository implements ListRepository {
         await touchListUpdatedAt(client, listId, input.updatedAt)
       }
 
-      return { statusCode: 204 }
+      return { outcome: 'updated' }
     })
   }
 

@@ -3,8 +3,8 @@ import crypto from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { z } from 'zod'
 
-import { runMigrations } from './db/migrate.js'
 import { buildServer } from './server.js'
+import { InMemoryListRepository } from './test/in-memory-list-repository.js'
 
 const testDeviceId = '11111111-1111-4111-8111-111111111111'
 
@@ -24,11 +24,9 @@ const createShareTokenForList = async (listId: string, deviceId: string) => {
     .parse(await response.json())
 }
 
-describe('backend runtime integration (real postgres)', () => {
+describe('backend runtime integration', () => {
   beforeAll(async () => {
-    await runMigrations()
-
-    app = buildServer()
+    app = buildServer({ listRepository: new InMemoryListRepository() })
     await app.listen({ host: '127.0.0.1', port: 0 })
 
     const address = app.server.address()
@@ -44,7 +42,7 @@ describe('backend runtime integration (real postgres)', () => {
     await app.close()
   })
 
-  it('serves health and handles list lifecycle endpoints against real DB', async () => {
+  it('serves health and handles list lifecycle endpoints', async () => {
     const healthResponse = await fetch(`${baseUrl}/health`)
 
     expect(healthResponse.status).toBe(200)
