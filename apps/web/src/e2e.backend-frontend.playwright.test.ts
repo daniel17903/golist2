@@ -153,6 +153,13 @@ describe("frontend/backend integration via playwright", () => {
     expect(defaultList?.data.name).toBe("Einkaufsliste");
     expect(defaultList ? isUuid(defaultList.data.id) : false).toBe(true);
     expect(defaultList ? isUuid(defaultList.createdByDeviceId) : false).toBe(true);
+
+    await expect.poll(() =>
+      observedRequests.some(
+        (request) => request.method === "GET" && request.url.includes(`/v1/lists/${defaultList!.data.id}`),
+      ),
+    ).toBe(true);
+
     expectListPutBeforeFirstGet(defaultList!.data.id);
   });
 
@@ -165,13 +172,24 @@ describe("frontend/backend integration via playwright", () => {
       }
     });
 
+    await expect.poll(async () => page!.getByRole("heading", { name: "Neue Liste erstellen" }).isVisible()).toBe(true);
+    await page!.getByRole("textbox", { name: "Name" }).fill("Wochenmarkt");
+    await page!.getByRole("button", { name: "Erstellen" }).click();
+
     await expect.poll(() => readRepositoryState().lists.size).toBe(2);
     const lists = [...readRepositoryState().lists.values()];
     const names = lists.map((entry) => entry.data.name);
-    expect(names).toEqual(expect.arrayContaining(["Einkaufsliste", "Liste 2"]));
+    expect(names).toEqual(expect.arrayContaining(["Einkaufsliste", "Wochenmarkt"]));
 
-    const newList = lists.find((entry) => entry.data.name === "Liste 2");
+    const newList = lists.find((entry) => entry.data.name === "Wochenmarkt");
     expect(newList).toBeDefined();
+
+    await expect.poll(() =>
+      observedRequests.some(
+        (request) => request.method === "GET" && request.url.includes(`/v1/lists/${newList!.data.id}`),
+      ),
+    ).toBe(true);
+
     expectListPutBeforeFirstGet(newList!.data.id);
   });
 
