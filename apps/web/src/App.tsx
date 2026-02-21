@@ -7,6 +7,7 @@ import EditItemModal from "./components/EditItemModal";
 import ItemGrid from "./components/ItemGrid";
 import ListsDrawer from "./components/ListsDrawer";
 import RenameListModal from "./components/RenameListModal";
+import CreateListModal from "./components/CreateListModal";
 import { useAppState } from "./hooks/useAppState";
 import { useLongPressItem } from "./hooks/useLongPressItem";
 
@@ -31,6 +32,8 @@ const App = () => {
     editItemQuantity,
     isDrawerOpen,
     isAddDialogOpen,
+    isCreateListModalOpen,
+    createListName,
     setNewListName,
     setEditingTitle,
     setItemName,
@@ -39,6 +42,8 @@ const App = () => {
     setEditItemQuantity,
     setIsDrawerOpen,
     setIsAddDialogOpen,
+    setIsCreateListModalOpen,
+    setCreateListName,
     setActiveList,
     toggleItem,
     openEditItem,
@@ -48,6 +53,7 @@ const App = () => {
     handleSaveItem,
     openAddDialog,
     handleCreateList,
+    handleConfirmCreateList,
     handleDeleteList,
     handleShareActiveList,
     backendConnection,
@@ -247,6 +253,20 @@ const App = () => {
         onClose={() => setIsAddDialogOpen(false)}
         onAddItem={handleAddItem}
         onAddSuggestion={handleAddSuggestion}
+      />
+
+
+      <CreateListModal
+        isOpen={isCreateListModalOpen}
+        value={createListName}
+        onChange={setCreateListName}
+        onCancel={() => {
+          setCreateListName("");
+          setIsCreateListModalOpen(false);
+        }}
+        onSave={() => {
+          void handleConfirmCreateList();
+        }}
       />
 
       <RenameListModal

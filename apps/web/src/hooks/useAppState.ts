@@ -36,6 +36,8 @@ export const useAppState = () => {
   const [editItemQuantity, setEditItemQuantity] = useState("");
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isCreateListModalOpen, setIsCreateListModalOpen] = useState(false);
+  const [createListName, setCreateListName] = useState("");
 
   useEffect(() => {
     void load();
@@ -199,17 +201,20 @@ export const useAppState = () => {
   };
 
   const handleCreateList = () => {
-    const enteredName = window.prompt("Name für die neue Liste:");
-    if (enteredName === null) {
-      return;
-    }
+    setCreateListName("");
+    setIsDrawerOpen(false);
+    setIsCreateListModalOpen(true);
+  };
 
-    const trimmedName = enteredName.trim();
+  const handleConfirmCreateList = async () => {
+    const trimmedName = createListName.trim();
     if (!trimmedName) {
       return;
     }
 
-    void addList(trimmedName);
+    await addList(trimmedName);
+    setCreateListName("");
+    setIsCreateListModalOpen(false);
     setIsDrawerOpen(false);
   };
 
@@ -241,6 +246,8 @@ export const useAppState = () => {
     editItemQuantity,
     isDrawerOpen,
     isAddDialogOpen,
+    isCreateListModalOpen,
+    createListName,
     setNewListName,
     setEditingTitle,
     setItemName,
@@ -249,6 +256,8 @@ export const useAppState = () => {
     setEditItemQuantity,
     setIsDrawerOpen,
     setIsAddDialogOpen,
+    setIsCreateListModalOpen,
+    setCreateListName,
     setActiveList,
     toggleItem,
     openEditItem,
@@ -258,6 +267,7 @@ export const useAppState = () => {
     handleSaveItem,
     openAddDialog,
     handleCreateList,
+    handleConfirmCreateList,
     handleDeleteList,
     handleShareActiveList,
     joinSharedList,
