@@ -10,6 +10,7 @@ import {
 
 const createId = () => crypto.randomUUID();
 const appVersion = __APP_VERSION__;
+const selectedListStorageKey = "golist.selectedListId";
 
 const toIsoTimestamp = (value: number) => new Date(value).toISOString();
 const toMillis = (value: string) => new Date(value).getTime();
@@ -24,6 +25,18 @@ const getOrCreateDeviceId = (): string => {
   const created = crypto.randomUUID();
   localStorage.setItem(storageKey, created);
   return created;
+};
+
+const getStoredSelectedListId = (): string | undefined =>
+  localStorage.getItem(selectedListStorageKey) ?? undefined;
+
+const persistSelectedListId = (listId: string | undefined) => {
+  if (!listId) {
+    localStorage.removeItem(selectedListStorageKey);
+    return;
+  }
+
+  localStorage.setItem(selectedListStorageKey, listId);
 };
 
 type StoreState = {
@@ -167,10 +180,16 @@ export const useStore = create<StoreState>((set, get) => ({
       lastOpenedAt: Date.now(),
     };
     await db.metadata.put(metadata);
+    const storedSelectedListId = getStoredSelectedListId();
+    const initialActiveListId = sortedLists.some((list) => list.id === storedSelectedListId)
+      ? storedSelectedListId
+      : sortedLists[0]?.id;
+
+    persistSelectedListId(initialActiveListId);
     set({
       lists: sortedLists,
       items,
-      activeListId: sortedLists[0]?.id,
+      activeListId: initialActiveListId,
       metadata,
       listShareTokens: {},
       isLoaded: true,
@@ -187,6 +206,7 @@ export const useStore = create<StoreState>((set, get) => ({
       updatedAt: now,
     };
     await db.lists.add(list);
+    persistSelectedListId(list.id);
     set((state) => ({
       lists: [...state.lists, list],
       activeListId: list.id,
@@ -222,6 +242,7 @@ export const useStore = create<StoreState>((set, get) => ({
       const remainingLists = state.lists.filter((list) => list.id !== listId);
       const nextActiveListId =
         state.activeListId === listId ? remainingLists[0]?.id : state.activeListId;
+      persistSelectedListId(nextActiveListId);
       const remainingTokens = { ...state.listShareTokens };
       delete remainingTokens[listId];
       return {
@@ -232,7 +253,10 @@ export const useStore = create<StoreState>((set, get) => ({
       };
     });
   },
-  setActiveList: (listId: string) => set({ activeListId: listId }),
+  setActiveList: (listId: string) => {
+    persistSelectedListId(listId);
+    set({ activeListId: listId });
+  },
   addItem: async (listId: string, name: string, quantityOrUnit?: string) => {
     const now = Date.now();
     const item: Item = {
@@ -359,6 +383,7 @@ export const useStore = create<StoreState>((set, get) => ({
 
       await db.lists.put(localList);
       await db.items.bulkPut(localItems);
+      persistSelectedListId(localList.id);
       set((current) => {
         const withoutListItems = current.items.filter((item) => item.listId !== localList.id);
         const withoutList = current.lists.filter((list) => list.id !== localList.id);
