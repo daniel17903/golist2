@@ -188,6 +188,7 @@ const App = () => {
 
   return (
     <div className="app">
+      <div className="header-glass" aria-hidden="true" />
       <AppHeader
         activeListName={activeList?.name ?? ""}
         isEditingTitle={editingTitle}
