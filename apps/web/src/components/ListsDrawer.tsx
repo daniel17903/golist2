@@ -5,6 +5,7 @@ type ListsDrawerProps = {
   isOpen: boolean;
   lists: List[];
   activeListId: string | null | undefined;
+  listMetadataById: Record<string, { openItems: number; lastUpdated: number }>;
   onClose: () => void;
   onOpen: () => void;
   onSelectList: (listId: string) => void;
@@ -16,10 +17,24 @@ type DragMode = "opening" | "closing";
 
 const EDGE_SWIPE_WIDTH = 28;
 
+const formatRelativeDate = (timestamp: number) => {
+  if (!Number.isFinite(timestamp) || timestamp <= 0) {
+    return "Aktualisiert: —";
+  }
+
+  return `Aktualisiert: ${new Intl.DateTimeFormat("de-DE", {
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(timestamp))}`;
+};
+
 const ListsDrawer = ({
   isOpen,
   lists,
   activeListId,
+  listMetadataById,
   onClose,
   onOpen,
   onSelectList,
@@ -29,6 +44,7 @@ const ListsDrawer = ({
   const drawerRef = useRef<HTMLElement | null>(null);
   const dragStateRef = useRef<{ pointerId: number; startX: number; mode: DragMode } | null>(null);
   const [dragOffset, setDragOffset] = useState<number | null>(null);
+  const [confirmDeleteListId, setConfirmDeleteListId] = useState<string | null>(null);
 
   const getDrawerWidth = () => {
     const measured = drawerRef.current?.offsetWidth;
@@ -126,40 +142,59 @@ const ListsDrawer = ({
           <div className="drawer__section">
             <p className="drawer__title">Meine Listen</p>
             <div className="drawer__list">
-              {lists.map((list) => (
-                <div key={list.id} className="drawer__item">
-                  <button
-                    type="button"
-                    className={`drawer__item-button ${
-                      list.id === activeListId ? "drawer__item-button--active" : ""
-                    }`}
-                    onClick={() => onSelectList(list.id)}
-                  >
-                    <span className="drawer__item-icon" aria-hidden="true">
-                      <svg viewBox="0 0 24 24">
-                        <path
-                          d="M3 5h2v2H3V5zm0 6h2v2H3v-2zm0 6h2v2H3v-2zm4-12h14v2H7V5zm0 6h14v2H7v-2zm0 6h14v2H7v-2z"
-                          fill="currentColor"
-                        />
-                      </svg>
-                    </span>
-                    <span className="drawer__item-label">{list.name}</span>
-                  </button>
-                  <button
-                    type="button"
-                    className="drawer__delete"
-                    aria-label={`Delete ${list.name}`}
-                    onClick={() => onDeleteList(list.id)}
-                  >
-                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                      <path
-                        d="M16 9v10H8V9h8m-1.5-6h-5l-1 1H5v2h14V4h-4.5l-1-1z"
-                        fill="currentColor"
-                      />
-                    </svg>
-                  </button>
-                </div>
-              ))}
+              {lists.map((list) => {
+                const metadata = listMetadataById[list.id];
+                const deleteArmed = confirmDeleteListId === list.id;
+
+                return (
+                  <div key={list.id} className="drawer__item">
+                    <button
+                      type="button"
+                      className={`drawer__item-button ${
+                        list.id === activeListId ? "drawer__item-button--active" : ""
+                      }`}
+                      onClick={() => onSelectList(list.id)}
+                    >
+                      <span className="drawer__item-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24">
+                          <path
+                            d="M3 5h2v2H3V5zm0 6h2v2H3v-2zm0 6h2v2H3v-2zm4-12h14v2H7V5zm0 6h14v2H7v-2zm0 6h14v2H7v-2z"
+                            fill="currentColor"
+                          />
+                        </svg>
+                      </span>
+                      <span className="drawer__item-content">
+                        <span className="drawer__item-label">{list.name}</span>
+                        <span className="drawer__item-meta">
+                          {metadata?.openItems ?? 0} offen • {formatRelativeDate(metadata?.lastUpdated ?? list.updatedAt)}
+                        </span>
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      className={`drawer__delete ${deleteArmed ? "drawer__delete--armed" : ""}`}
+                      aria-label={deleteArmed ? `Löschen bestätigen: ${list.name}` : `Delete ${list.name}`}
+                      onClick={() => {
+                        if (!deleteArmed) {
+                          setConfirmDeleteListId(list.id);
+                          return;
+                        }
+                        setConfirmDeleteListId(null);
+                        onDeleteList(list.id);
+                      }}
+                    >
+                      {deleteArmed ? "Bestätigen" : (
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                          <path
+                            d="M16 9v10H8V9h8m-1.5-6h-5l-1 1H5v2h14V4h-4.5l-1-1z"
+                            fill="currentColor"
+                          />
+                        </svg>
+                      )}
+                    </button>
+                  </div>
+                );
+              })}
               <button type="button" className="drawer__new" onClick={onCreateList}>
                 <span className="drawer__item-icon" aria-hidden="true">
                   <svg viewBox="0 0 24 24">

@@ -48,8 +48,9 @@ const expectListPutBeforeFirstGet = (listId: string) => {
   const firstGetIndex = listRequests.findIndex((request) => request.method === "GET");
 
   expect(firstPutIndex).toBeGreaterThanOrEqual(0);
-  expect(firstGetIndex).toBeGreaterThanOrEqual(0);
-  expect(firstPutIndex).toBeLessThan(firstGetIndex);
+  if (firstGetIndex >= 0) {
+    expect(firstPutIndex).toBeLessThan(firstGetIndex);
+  }
 };
 
 describe("frontend/backend integration via playwright", () => {

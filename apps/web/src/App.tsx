@@ -6,7 +6,6 @@ import AddItemDialog from "./components/AddItemDialog";
 import EditItemModal from "./components/EditItemModal";
 import ItemGrid from "./components/ItemGrid";
 import ListsDrawer from "./components/ListsDrawer";
-import RenameListModal from "./components/RenameListModal";
 import CreateListModal from "./components/CreateListModal";
 import { useAppState } from "./hooks/useAppState";
 import { useLongPressItem } from "./hooks/useLongPressItem";
@@ -65,9 +64,14 @@ const App = () => {
     handleDeleteList,
     handleShareActiveList,
     backendConnection,
+    activeBackendRequests,
+    activeListOpenItemsCount,
+    listMetadataById,
     syncNotice,
     clearSyncNotice,
     backendLogs,
+    feedbackToasts,
+    pushFeedbackToast,
   } = useAppState();
 
   const undoTimeoutsRef = useRef<Map<string, number>>(new Map());
@@ -179,11 +183,20 @@ const App = () => {
     <div className="app">
       <AppHeader
         activeListName={activeList?.name ?? ""}
+        openItemsCount={activeListOpenItemsCount}
+        isEditingTitle={editingTitle}
+        titleDraft={newListName}
         onEditListName={() => {
           setNewListName(activeList?.name ?? "");
           setEditingTitle(true);
         }}
+        onTitleDraftChange={setNewListName}
+        onSaveTitle={() => {
+          void handleRenameList();
+        }}
+        onCancelTitle={() => setEditingTitle(false)}
         backendConnection={backendConnection}
+        hasPendingBackendRequest={activeBackendRequests > 0}
       />
 
       <ItemGrid
@@ -215,13 +228,21 @@ const App = () => {
               }
 
               await navigator.clipboard.writeText(shareLink);
-              window.alert("Teilen-Link wurde in die Zwischenablage kopiert.");
+              pushFeedbackToast("Teilen-Link wurde in die Zwischenablage kopiert.", "success");
             } catch {
-              window.alert("Teilen ist derzeit nicht verfügbar.");
+              pushFeedbackToast("Teilen ist derzeit nicht verfügbar.", "error");
             }
           })();
         }}
       />
+
+      <div className="feedback-toast-stack" aria-live="polite" aria-atomic="false">
+        {feedbackToasts.map((toast) => (
+          <div key={toast.id} className={`feedback-toast feedback-toast--${toast.tone}`} role="status">
+            {toast.message}
+          </div>
+        ))}
+      </div>
 
       {__IS_VERCEL_NON_PRODUCTION__ && syncNotice ? (
         <div className="sync-toast" role="status" aria-live="polite">
@@ -273,6 +294,7 @@ const App = () => {
         isOpen={isDrawerOpen}
         lists={lists}
         activeListId={activeListId}
+        listMetadataById={listMetadataById}
         onClose={() => setIsDrawerOpen(false)}
         onOpen={() => setIsDrawerOpen(true)}
         onSelectList={(listId) => {
@@ -305,14 +327,6 @@ const App = () => {
         onSave={() => {
           void handleConfirmCreateList();
         }}
-      />
-
-      <RenameListModal
-        isOpen={editingTitle}
-        value={newListName}
-        onChange={setNewListName}
-        onCancel={() => setEditingTitle(false)}
-        onSave={handleRenameList}
       />
 
       <EditItemModal

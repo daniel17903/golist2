@@ -5,6 +5,7 @@ import { db } from "../storage/db";
 import {
   extractShareToken,
   setBackendCallLogger,
+  setBackendRequestActivityLogger,
   sharingApiClient,
 } from "../sharing/apiClient";
 
@@ -46,6 +47,7 @@ type StoreState = {
   activeListId?: string;
   listShareTokens: Record<string, string>;
   backendConnection: "unknown" | "online" | "offline";
+  activeBackendRequests: number;
   syncNotice?: { id: string; message: string };
   backendLogs: Array<{ id: string; message: string; outcome: "success" | "error" | "skipped" }>;
   isLoaded: boolean;
@@ -165,6 +167,7 @@ export const useStore = create<StoreState>((set, get) => ({
   activeListId: undefined,
   listShareTokens: {},
   backendConnection: "unknown",
+  activeBackendRequests: 0,
   syncNotice: undefined,
   backendLogs: [],
   load: async () => {
@@ -528,4 +531,12 @@ setBackendCallLogger((entry) => {
     message: `${entry.endpoint}: ${entry.message}`,
     outcome: entry.outcome,
   });
+});
+
+setBackendRequestActivityLogger((entry) => {
+  useStore.setState((state) => ({
+    activeBackendRequests: entry.active
+      ? state.activeBackendRequests + 1
+      : Math.max(0, state.activeBackendRequests - 1),
+  }));
 });

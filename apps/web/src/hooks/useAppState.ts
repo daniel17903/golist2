@@ -23,6 +23,7 @@ export const useAppState = () => {
     joinSharedList,
     syncAllLists,
     backendConnection,
+    activeBackendRequests,
     syncNotice,
     clearSyncNotice,
     backendLogs,
@@ -38,6 +39,15 @@ export const useAppState = () => {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isCreateListModalOpen, setIsCreateListModalOpen] = useState(false);
   const [createListName, setCreateListName] = useState("");
+  const [feedbackToasts, setFeedbackToasts] = useState<Array<{ id: string; message: string; tone: "success" | "error" }>>([]);
+
+  const pushFeedbackToast = (message: string, tone: "success" | "error") => {
+    const toastId = crypto.randomUUID();
+    setFeedbackToasts((current) => [...current, { id: toastId, message, tone }]);
+    window.setTimeout(() => {
+      setFeedbackToasts((current) => current.filter((toast) => toast.id !== toastId));
+    }, 4200);
+  };
 
   useEffect(() => {
     void load();
@@ -63,7 +73,7 @@ export const useAppState = () => {
       try {
         await joinSharedList(shareTokenFromUrl);
       } catch {
-        window.alert("Geteilter Link konnte nicht geöffnet werden.");
+        pushFeedbackToast("Geteilter Link konnte nicht geöffnet werden.", "error");
       } finally {
         const cleanedUrl = new URL(window.location.href);
         cleanedUrl.searchParams.delete("shareToken");
@@ -98,6 +108,20 @@ export const useAppState = () => {
   }, [isLoaded, syncAllLists]);
 
   const activeList = lists.find((list) => list.id === activeListId) ?? null;
+  const activeListOpenItemsCount = useMemo(
+    () => items.filter((item) => item.listId === activeListId && !item.deleted).length,
+    [items, activeListId],
+  );
+  const listMetadataById = useMemo(() => {
+    return Object.fromEntries(
+      lists.map((list) => {
+        const listItems = items.filter((item) => item.listId === list.id);
+        const openItems = listItems.filter((item) => !item.deleted).length;
+        const lastUpdated = Math.max(list.updatedAt, ...listItems.map((item) => item.updatedAt));
+        return [list.id, { openItems, lastUpdated }];
+      }),
+    );
+  }, [lists, items]);
   const listItems = useMemo(() => {
     const filtered = items.filter((item) => item.listId === activeListId && !item.deleted);
     return sortItemsForList(filtered);
@@ -272,8 +296,13 @@ export const useAppState = () => {
     handleShareActiveList,
     joinSharedList,
     backendConnection,
+    activeBackendRequests,
+    activeListOpenItemsCount,
+    listMetadataById,
     syncNotice,
     clearSyncNotice,
     backendLogs,
+    feedbackToasts,
+    pushFeedbackToast,
   };
 };

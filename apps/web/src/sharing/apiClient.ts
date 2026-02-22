@@ -14,10 +14,22 @@ type BackendCallLog = {
   outcome: "success" | "error" | "skipped";
 };
 
+type BackendRequestActivity = {
+  endpoint: string;
+  active: boolean;
+};
+
 let backendCallLogger: ((entry: BackendCallLog) => void) | null = null;
+let backendRequestActivityLogger: ((entry: BackendRequestActivity) => void) | null = null;
 
 export const setBackendCallLogger = (logger: ((entry: BackendCallLog) => void) | null) => {
   backendCallLogger = logger;
+};
+
+export const setBackendRequestActivityLogger = (
+  logger: ((entry: BackendRequestActivity) => void) | null,
+) => {
+  backendRequestActivityLogger = logger;
 };
 
 const logBackendCall = (entry: BackendCallLog) => {
@@ -101,6 +113,7 @@ const fetchWithTimeout = async (url: string, options: RequestInit, context: stri
   }, requestTimeoutMs);
 
   try {
+    backendRequestActivityLogger?.({ endpoint: url, active: true });
     const response = await fetch(url, { ...options, signal: controller.signal });
     if (!response.ok) {
       const responseBody = await response.clone().text();
@@ -129,6 +142,7 @@ const fetchWithTimeout = async (url: string, options: RequestInit, context: stri
     logBackendCall({ endpoint: url, outcome: "error", message });
     throw error;
   } finally {
+    backendRequestActivityLogger?.({ endpoint: url, active: false });
     globalThis.clearTimeout(timeout);
   }
 };
