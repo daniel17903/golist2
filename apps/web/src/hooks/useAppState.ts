@@ -26,6 +26,7 @@ export const useAppState = () => {
     syncNotice,
     clearSyncNotice,
     backendLogs,
+    isBackendBusy,
   } = useStore();
 
   const [newListName, setNewListName] = useState("");
@@ -62,8 +63,6 @@ export const useAppState = () => {
     void (async () => {
       try {
         await joinSharedList(shareTokenFromUrl);
-      } catch {
-        window.alert("Geteilter Link konnte nicht geöffnet werden.");
       } finally {
         const cleanedUrl = new URL(window.location.href);
         cleanedUrl.searchParams.delete("shareToken");
@@ -130,6 +129,31 @@ export const useAppState = () => {
     });
     return names;
   }, [listItems]);
+
+
+  const openItemCount = listItems.length;
+
+  const listMetaById = useMemo(() => {
+    const openByListId = new Map<string, number>();
+    const latestItemUpdateByListId = new Map<string, number>();
+
+    for (const item of items) {
+      if (!item.deleted) {
+        openByListId.set(item.listId, (openByListId.get(item.listId) ?? 0) + 1);
+      }
+      latestItemUpdateByListId.set(item.listId, Math.max(latestItemUpdateByListId.get(item.listId) ?? 0, item.updatedAt));
+    }
+
+    return Object.fromEntries(
+      lists.map((list) => [
+        list.id,
+        {
+          openItemCount: openByListId.get(list.id) ?? 0,
+          lastUpdatedAt: Math.max(list.updatedAt, latestItemUpdateByListId.get(list.id) ?? 0),
+        },
+      ]),
+    );
+  }, [items, lists]);
 
   const suggestions = useMemo(() => {
     const trimmed = itemName.trim();
@@ -237,6 +261,8 @@ export const useAppState = () => {
     activeListId,
     activeList,
     listItems,
+    openItemCount,
+    listMetaById,
     suggestions,
     newListName,
     editingTitle,
@@ -275,5 +301,6 @@ export const useAppState = () => {
     syncNotice,
     clearSyncNotice,
     backendLogs,
+    isBackendBusy,
   };
 };

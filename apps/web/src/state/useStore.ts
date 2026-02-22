@@ -6,6 +6,7 @@ import {
   extractShareToken,
   setBackendCallLogger,
   sharingApiClient,
+  setBackendActivityListener,
 } from "../sharing/apiClient";
 
 const createId = () => crypto.randomUUID();
@@ -47,7 +48,8 @@ type StoreState = {
   listShareTokens: Record<string, string>;
   backendConnection: "unknown" | "online" | "offline";
   syncNotice?: { id: string; message: string };
-  backendLogs: Array<{ id: string; message: string; outcome: "success" | "error" | "skipped" }>;
+  backendLogs: Array<{ id: string; message: string; outcome: "success" | "error" | "skipped" }>
+  isBackendBusy: boolean;
   isLoaded: boolean;
   load: () => Promise<void>;
   addList: (name: string) => Promise<void>;
@@ -167,6 +169,7 @@ export const useStore = create<StoreState>((set, get) => ({
   backendConnection: "unknown",
   syncNotice: undefined,
   backendLogs: [],
+  isBackendBusy: false,
   load: async () => {
     const [lists, items] = await Promise.all([
       db.lists.toArray(),
@@ -528,4 +531,9 @@ setBackendCallLogger((entry) => {
     message: `${entry.endpoint}: ${entry.message}`,
     outcome: entry.outcome,
   });
+});
+
+
+setBackendActivityListener((inFlightRequests) => {
+  useStore.setState({ isBackendBusy: inFlightRequests > 0 });
 });

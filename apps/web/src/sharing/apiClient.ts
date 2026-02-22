@@ -15,13 +15,24 @@ type BackendCallLog = {
 };
 
 let backendCallLogger: ((entry: BackendCallLog) => void) | null = null;
+let backendActivityListener: ((inFlightRequests: number) => void) | null = null;
+let inFlightRequestCount = 0;
 
 export const setBackendCallLogger = (logger: ((entry: BackendCallLog) => void) | null) => {
   backendCallLogger = logger;
 };
 
+export const setBackendActivityListener = (listener: ((inFlightRequests: number) => void) | null) => {
+  backendActivityListener = listener;
+};
+
 const logBackendCall = (entry: BackendCallLog) => {
   backendCallLogger?.(entry);
+};
+
+const updateBackendActivity = (delta: number) => {
+  inFlightRequestCount = Math.max(0, inFlightRequestCount + delta);
+  backendActivityListener?.(inFlightRequestCount);
 };
 
 const readApiBaseUrl = () => {
@@ -95,6 +106,7 @@ const readBoolean = (payload: unknown, key: string): boolean | null => {
 
 const fetchWithTimeout = async (url: string, options: RequestInit, context: string) => {
   const startedAt = Date.now();
+  updateBackendActivity(1);
   const controller = new AbortController();
   const timeout = globalThis.setTimeout(() => {
     controller.abort();
@@ -129,6 +141,7 @@ const fetchWithTimeout = async (url: string, options: RequestInit, context: stri
     logBackendCall({ endpoint: url, outcome: "error", message });
     throw error;
   } finally {
+    updateBackendActivity(-1);
     globalThis.clearTimeout(timeout);
   }
 };
