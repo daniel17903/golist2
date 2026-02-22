@@ -1,10 +1,16 @@
-import { useRef, useState, type PointerEvent } from "react";
+import { useMemo, useRef, useState, type PointerEvent } from "react";
 import type { List } from "@golist/shared/domain/types";
+
+type ListMeta = {
+  openItems: number;
+  lastUpdatedAt: number;
+};
 
 type ListsDrawerProps = {
   isOpen: boolean;
   lists: List[];
   activeListId: string | null | undefined;
+  listMetaById: Record<string, ListMeta>;
   onClose: () => void;
   onOpen: () => void;
   onSelectList: (listId: string) => void;
@@ -16,10 +22,48 @@ type DragMode = "opening" | "closing";
 
 const EDGE_SWIPE_WIDTH = 28;
 
+const formatLastUpdated = (timestamp: number) => {
+  if (!timestamp) {
+    return "Noch nie aktualisiert";
+  }
+
+  const elapsedMs = Date.now() - timestamp;
+  if (elapsedMs < 0) {
+    return "gerade eben";
+  }
+
+  const elapsedMinutes = Math.floor(elapsedMs / 60_000);
+  if (elapsedMinutes < 1) {
+    return "gerade eben";
+  }
+
+  if (elapsedMinutes < 60) {
+    return `vor ${elapsedMinutes} Min.`;
+  }
+
+  const elapsedHours = Math.floor(elapsedMinutes / 60);
+  if (elapsedHours < 24) {
+    return `vor ${elapsedHours} Std.`;
+  }
+
+  const elapsedDays = Math.floor(elapsedHours / 24);
+  if (elapsedDays <= 7) {
+    return `vor ${elapsedDays} Tag${elapsedDays === 1 ? "" : "en"}`;
+  }
+
+  return new Intl.DateTimeFormat("de-DE", {
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(timestamp));
+};
+
 const ListsDrawer = ({
   isOpen,
   lists,
   activeListId,
+  listMetaById,
   onClose,
   onOpen,
   onSelectList,
@@ -29,12 +73,19 @@ const ListsDrawer = ({
   const drawerRef = useRef<HTMLElement | null>(null);
   const dragStateRef = useRef<{ pointerId: number; startX: number; mode: DragMode } | null>(null);
   const [dragOffset, setDragOffset] = useState<number | null>(null);
+  const [confirmDeleteListId, setConfirmDeleteListId] = useState<string | null>(null);
 
   const getDrawerWidth = () => {
     const measured = drawerRef.current?.offsetWidth;
     if (measured && measured > 0) {return measured;}
     return Math.min(320, Math.round(window.innerWidth * 0.8));
   };
+
+  const canDelete = lists.length > 1;
+  const nextDeleteLabel = useMemo(
+    () => lists.find((list) => list.id === confirmDeleteListId)?.name ?? "",
+    [lists, confirmDeleteListId],
+  );
 
   const handleDragStart = (event: PointerEvent<HTMLElement>, mode: DragMode) => {
     dragStateRef.current = { pointerId: event.pointerId, startX: event.clientX, mode };
@@ -126,40 +177,60 @@ const ListsDrawer = ({
           <div className="drawer__section">
             <p className="drawer__title">Meine Listen</p>
             <div className="drawer__list">
-              {lists.map((list) => (
-                <div key={list.id} className="drawer__item">
-                  <button
-                    type="button"
-                    className={`drawer__item-button ${
-                      list.id === activeListId ? "drawer__item-button--active" : ""
-                    }`}
-                    onClick={() => onSelectList(list.id)}
-                  >
-                    <span className="drawer__item-icon" aria-hidden="true">
-                      <svg viewBox="0 0 24 24">
-                        <path
-                          d="M3 5h2v2H3V5zm0 6h2v2H3v-2zm0 6h2v2H3v-2zm4-12h14v2H7V5zm0 6h14v2H7v-2zm0 6h14v2H7v-2z"
-                          fill="currentColor"
-                        />
-                      </svg>
-                    </span>
-                    <span className="drawer__item-label">{list.name}</span>
-                  </button>
-                  <button
-                    type="button"
-                    className="drawer__delete"
-                    aria-label={`Delete ${list.name}`}
-                    onClick={() => onDeleteList(list.id)}
-                  >
-                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                      <path
-                        d="M16 9v10H8V9h8m-1.5-6h-5l-1 1H5v2h14V4h-4.5l-1-1z"
-                        fill="currentColor"
-                      />
-                    </svg>
-                  </button>
-                </div>
-              ))}
+              {lists.map((list) => {
+                const listMeta = listMetaById[list.id] ?? { openItems: 0, lastUpdatedAt: list.updatedAt };
+                const isConfirmingDelete = confirmDeleteListId === list.id;
+
+                return (
+                  <div key={list.id} className="drawer__item">
+                    <button
+                      type="button"
+                      className={`drawer__item-button ${
+                        list.id === activeListId ? "drawer__item-button--active" : ""
+                      }`}
+                      onClick={() => onSelectList(list.id)}
+                    >
+                      <span className="drawer__item-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24">
+                          <path
+                            d="M3 5h2v2H3V5zm0 6h2v2H3v-2zm0 6h2v2H3v-2zm4-12h14v2H7V5zm0 6h14v2H7v-2zm0 6h14v2H7v-2z"
+                            fill="currentColor"
+                          />
+                        </svg>
+                      </span>
+                      <span className="drawer__item-copy">
+                        <span className="drawer__item-label">{list.name}</span>
+                        <span className="drawer__item-meta">{`${listMeta.openItems} offen · aktualisiert ${formatLastUpdated(listMeta.lastUpdatedAt)}`}</span>
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      className={`drawer__delete ${isConfirmingDelete ? "drawer__delete--confirm" : ""}`}
+                      aria-label={isConfirmingDelete ? `Löschen bestätigen: ${list.name}` : `Löschen: ${list.name}`}
+                      disabled={!canDelete}
+                      onClick={() => {
+                        if (isConfirmingDelete) {
+                          onDeleteList(list.id);
+                          setConfirmDeleteListId(null);
+                          return;
+                        }
+
+                        setConfirmDeleteListId(list.id);
+                      }}
+                    >
+                      {isConfirmingDelete ? "OK" : (
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                          <path
+                            d="M16 9v10H8V9h8m-1.5-6h-5l-1 1H5v2h14V4h-4.5l-1-1z"
+                            fill="currentColor"
+                          />
+                        </svg>
+                      )}
+                    </button>
+                  </div>
+                );
+              })}
+              {nextDeleteLabel ? <p className="drawer__delete-hint">Erneut tippen, um „{nextDeleteLabel}“ zu löschen.</p> : null}
               <button type="button" className="drawer__new" onClick={onCreateList}>
                 <span className="drawer__item-icon" aria-hidden="true">
                   <svg viewBox="0 0 24 24">
@@ -170,15 +241,6 @@ const ListsDrawer = ({
               </button>
             </div>
           </div>
-          <button type="button" className="drawer__settings">
-            <span>Einstellungen</span>
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path
-                d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7.07 7.07 0 0 0-1.63-.94l-.36-2.54a.5.5 0 0 0-.5-.42h-3.84a.5.5 0 0 0-.5.42l-.36 2.54c-.59.23-1.13.54-1.63.94l-2.39-.96a.5.5 0 0 0-.6.22L2.65 8.84a.5.5 0 0 0 .12.64l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58a.5.5 0 0 0-.12.64l1.92 3.32c.13.22.39.31.6.22l2.39-.96c.5.4 1.04.71 1.63.94l.36 2.54c.04.24.25.42.5.42h3.84c.25 0 .46-.18.5-.42l.36-2.54c.59-.23 1.13-.54 1.63-.94l2.39.96c.22.09.47 0 .6-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.03-1.58zM12 15.5A3.5 3.5 0 1 1 12 8a3.5 3.5 0 0 1 0 7.5z"
-                fill="currentColor"
-              />
-            </svg>
-          </button>
         </aside>
       </div>
     </>

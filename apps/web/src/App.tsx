@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Item } from "@golist/shared/domain/types";
 import AppHeader from "./components/AppHeader";
 import BottomBar from "./components/BottomBar";
@@ -6,7 +6,6 @@ import AddItemDialog from "./components/AddItemDialog";
 import EditItemModal from "./components/EditItemModal";
 import ItemGrid from "./components/ItemGrid";
 import ListsDrawer from "./components/ListsDrawer";
-import RenameListModal from "./components/RenameListModal";
 import CreateListModal from "./components/CreateListModal";
 import { useAppState } from "./hooks/useAppState";
 import { useLongPressItem } from "./hooks/useLongPressItem";
@@ -14,6 +13,12 @@ import { useLongPressItem } from "./hooks/useLongPressItem";
 type UndoToast = {
   id: string;
   item: Item;
+};
+
+type AppToast = {
+  id: string;
+  message: string;
+  tone: "success" | "error";
 };
 
 const isAbortError = (error: unknown): boolean => {
@@ -42,6 +47,7 @@ const App = () => {
     isAddDialogOpen,
     isCreateListModalOpen,
     createListName,
+    backendBusyRequests,
     setNewListName,
     setEditingTitle,
     setItemName,
@@ -71,8 +77,36 @@ const App = () => {
   } = useAppState();
 
   const undoTimeoutsRef = useRef<Map<string, number>>(new Map());
+  const toastTimeoutsRef = useRef<Map<string, number>>(new Map());
   const [exitingItemIds, setExitingItemIds] = useState<Set<string>>(new Set());
   const [undoToasts, setUndoToasts] = useState<UndoToast[]>([]);
+  const [appToasts, setAppToasts] = useState<AppToast[]>([]);
+
+  const listMetaById = useMemo(() => {
+    const openCountByList = new Map<string, number>();
+    const updatedAtByList = new Map<string, number>();
+
+    for (const list of lists) {
+      updatedAtByList.set(list.id, list.updatedAt);
+    }
+
+    for (const item of items) {
+      if (!item.deleted) {
+        openCountByList.set(item.listId, (openCountByList.get(item.listId) ?? 0) + 1);
+      }
+      updatedAtByList.set(item.listId, Math.max(updatedAtByList.get(item.listId) ?? 0, item.updatedAt));
+    }
+
+    return Object.fromEntries(
+      lists.map((list) => [
+        list.id,
+        {
+          openItems: openCountByList.get(list.id) ?? 0,
+          lastUpdatedAt: updatedAtByList.get(list.id) ?? list.updatedAt,
+        },
+      ]),
+    );
+  }, [lists, items]);
 
   const clearUndoTimeout = (toastId: string) => {
     const timeout = undoTimeoutsRef.current.get(toastId);
@@ -82,9 +116,31 @@ const App = () => {
     }
   };
 
+  const clearAppToastTimeout = (toastId: string) => {
+    const timeout = toastTimeoutsRef.current.get(toastId);
+    if (timeout !== undefined) {
+      window.clearTimeout(timeout);
+      toastTimeoutsRef.current.delete(toastId);
+    }
+  };
+
   const removeUndoToast = (toastId: string) => {
     clearUndoTimeout(toastId);
     setUndoToasts((current) => current.filter((toast) => toast.id !== toastId));
+  };
+
+  const removeAppToast = (toastId: string) => {
+    clearAppToastTimeout(toastId);
+    setAppToasts((current) => current.filter((toast) => toast.id !== toastId));
+  };
+
+  const pushAppToast = (message: string, tone: "success" | "error") => {
+    const toastId = crypto.randomUUID();
+    setAppToasts((current) => [...current, { id: toastId, message, tone }]);
+    const timeout = window.setTimeout(() => {
+      removeAppToast(toastId);
+    }, 4500);
+    toastTimeoutsRef.current.set(toastId, timeout);
   };
 
   const showUndo = (item: Item) => {
@@ -100,6 +156,8 @@ const App = () => {
     () => () => {
       undoTimeoutsRef.current.forEach((timeout) => window.clearTimeout(timeout));
       undoTimeoutsRef.current.clear();
+      toastTimeoutsRef.current.forEach((timeout) => window.clearTimeout(timeout));
+      toastTimeoutsRef.current.clear();
     },
     [],
   );
@@ -179,11 +237,23 @@ const App = () => {
     <div className="app">
       <AppHeader
         activeListName={activeList?.name ?? ""}
-        onEditListName={() => {
+        openItemCount={listItems.length}
+        backendConnection={backendConnection}
+        isBackendBusy={backendBusyRequests > 0}
+        renameValue={newListName}
+        isEditingName={editingTitle}
+        onRenameValueChange={setNewListName}
+        onStartRename={() => {
           setNewListName(activeList?.name ?? "");
           setEditingTitle(true);
         }}
-        backendConnection={backendConnection}
+        onSaveRename={() => {
+          void handleRenameList();
+        }}
+        onCancelRename={() => {
+          setNewListName(activeList?.name ?? "");
+          setEditingTitle(false);
+        }}
       />
 
       <ItemGrid
@@ -206,6 +276,7 @@ const App = () => {
               try {
                 const shared = await shareWithSystemSheet(shareLink);
                 if (shared) {
+                  pushAppToast("Link erfolgreich geteilt.", "success");
                   return;
                 }
               } catch (error) {
@@ -215,13 +286,24 @@ const App = () => {
               }
 
               await navigator.clipboard.writeText(shareLink);
-              window.alert("Teilen-Link wurde in die Zwischenablage kopiert.");
+              pushAppToast("Teilen-Link wurde in die Zwischenablage kopiert.", "success");
             } catch {
-              window.alert("Teilen ist derzeit nicht verfügbar.");
+              pushAppToast("Teilen ist derzeit nicht verfügbar.", "error");
             }
           })();
         }}
       />
+
+      <div className="app-toast-stack" aria-live="polite" aria-atomic="false">
+        {appToasts.map((toast) => (
+          <div key={toast.id} className={`app-toast app-toast--${toast.tone}`} role="status">
+            <span className="app-toast__text">{toast.message}</span>
+            <button type="button" className="app-toast__close" onClick={() => removeAppToast(toast.id)}>
+              Schließen
+            </button>
+          </div>
+        ))}
+      </div>
 
       {__IS_VERCEL_NON_PRODUCTION__ && syncNotice ? (
         <div className="sync-toast" role="status" aria-live="polite">
@@ -273,6 +355,7 @@ const App = () => {
         isOpen={isDrawerOpen}
         lists={lists}
         activeListId={activeListId}
+        listMetaById={listMetaById}
         onClose={() => setIsDrawerOpen(false)}
         onOpen={() => setIsDrawerOpen(true)}
         onSelectList={(listId) => {
@@ -293,7 +376,6 @@ const App = () => {
         onAddSuggestion={handleAddSuggestion}
       />
 
-
       <CreateListModal
         isOpen={isCreateListModalOpen}
         value={createListName}
@@ -305,14 +387,6 @@ const App = () => {
         onSave={() => {
           void handleConfirmCreateList();
         }}
-      />
-
-      <RenameListModal
-        isOpen={editingTitle}
-        value={newListName}
-        onChange={setNewListName}
-        onCancel={() => setEditingTitle(false)}
-        onSave={handleRenameList}
       />
 
       <EditItemModal

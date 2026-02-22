@@ -26,6 +26,7 @@ export const useAppState = () => {
     syncNotice,
     clearSyncNotice,
     backendLogs,
+    backendBusyRequests,
   } = useStore();
 
   const [newListName, setNewListName] = useState("");
@@ -62,8 +63,6 @@ export const useAppState = () => {
     void (async () => {
       try {
         await joinSharedList(shareTokenFromUrl);
-      } catch {
-        window.alert("Geteilter Link konnte nicht geöffnet werden.");
       } finally {
         const cleanedUrl = new URL(window.location.href);
         cleanedUrl.searchParams.delete("shareToken");
@@ -175,6 +174,7 @@ export const useAppState = () => {
     const trimmed = newListName.trim();
     if (!trimmed) {return;}
     await renameList(activeListId, trimmed);
+    setNewListName(trimmed);
     setEditingTitle(false);
   };
 
@@ -275,5 +275,6 @@ export const useAppState = () => {
     syncNotice,
     clearSyncNotice,
     backendLogs,
+    backendBusyRequests,
   };
 };
