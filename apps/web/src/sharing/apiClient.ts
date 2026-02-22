@@ -15,9 +15,16 @@ type BackendCallLog = {
 };
 
 let backendCallLogger: ((entry: BackendCallLog) => void) | null = null;
+let activeBackendRequestLogger: ((count: number) => void) | null = null;
+let activeBackendRequestCount = 0;
 
 export const setBackendCallLogger = (logger: ((entry: BackendCallLog) => void) | null) => {
   backendCallLogger = logger;
+};
+
+export const setActiveBackendRequestLogger = (logger: ((count: number) => void) | null) => {
+  activeBackendRequestLogger = logger;
+  activeBackendRequestLogger?.(activeBackendRequestCount);
 };
 
 const logBackendCall = (entry: BackendCallLog) => {
@@ -95,6 +102,8 @@ const readBoolean = (payload: unknown, key: string): boolean | null => {
 
 const fetchWithTimeout = async (url: string, options: RequestInit, context: string) => {
   const startedAt = Date.now();
+  activeBackendRequestCount += 1;
+  activeBackendRequestLogger?.(activeBackendRequestCount);
   const controller = new AbortController();
   const timeout = globalThis.setTimeout(() => {
     controller.abort();
@@ -130,6 +139,8 @@ const fetchWithTimeout = async (url: string, options: RequestInit, context: stri
     throw error;
   } finally {
     globalThis.clearTimeout(timeout);
+    activeBackendRequestCount = Math.max(0, activeBackendRequestCount - 1);
+    activeBackendRequestLogger?.(activeBackendRequestCount);
   }
 };
 
