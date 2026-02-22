@@ -150,7 +150,7 @@ describe("frontend/backend integration via playwright", () => {
 
   runE2E("creates the default list in the in-memory repository", async () => {
     const [defaultList] = [...readRepositoryState().lists.values()];
-    expect(defaultList?.data.name).toBe("Einkaufsliste");
+    expect(defaultList?.data.name).toBe("Shopping list");
     expect(defaultList ? isUuid(defaultList.data.id) : false).toBe(true);
     expect(defaultList ? isUuid(defaultList.createdByDeviceId) : false).toBe(true);
 
@@ -172,14 +172,14 @@ describe("frontend/backend integration via playwright", () => {
       }
     });
 
-    await expect.poll(async () => page!.getByRole("heading", { name: "Neue Liste erstellen" }).isVisible()).toBe(true);
+    await expect.poll(async () => page!.getByRole("heading", { name: "Create new list" }).isVisible()).toBe(true);
     await page!.getByRole("textbox", { name: "Name" }).fill("Wochenmarkt");
-    await page!.getByRole("button", { name: "Erstellen" }).click();
+    await page!.getByRole("button", { name: "Create" }).click();
 
     await expect.poll(() => readRepositoryState().lists.size).toBe(2);
     const lists = [...readRepositoryState().lists.values()];
     const names = lists.map((entry) => entry.data.name);
-    expect(names).toEqual(expect.arrayContaining(["Einkaufsliste", "Wochenmarkt"]));
+    expect(names).toEqual(expect.arrayContaining(["Shopping list", "Wochenmarkt"]));
 
     const newList = lists.find((entry) => entry.data.name === "Wochenmarkt");
     expect(newList).toBeDefined();
