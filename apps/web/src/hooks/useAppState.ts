@@ -26,6 +26,7 @@ export const useAppState = () => {
     syncNotice,
     clearSyncNotice,
     backendLogs,
+    activeBackendRequests,
   } = useStore();
 
   const [newListName, setNewListName] = useState("");
@@ -102,6 +103,26 @@ export const useAppState = () => {
     const filtered = items.filter((item) => item.listId === activeListId && !item.deleted);
     return sortItemsForList(filtered);
   }, [items, activeListId]);
+
+  const openItemsCount = listItems.length;
+
+  const listMetaById = useMemo(() => {
+    const meta = new Map<string, { openItemsCount: number; lastUpdatedAt: number }>();
+
+    lists.forEach((list) => {
+      meta.set(list.id, { openItemsCount: 0, lastUpdatedAt: list.updatedAt });
+    });
+
+    items.forEach((item) => {
+      const current = meta.get(item.listId) ?? { openItemsCount: 0, lastUpdatedAt: 0 };
+      meta.set(item.listId, {
+        openItemsCount: current.openItemsCount + (item.deleted ? 0 : 1),
+        lastUpdatedAt: Math.max(current.lastUpdatedAt, item.updatedAt),
+      });
+    });
+
+    return Object.fromEntries(meta.entries());
+  }, [lists, items]);
 
   const suggestionPool = useMemo(() => {
     if (!activeListId) {return [];}
@@ -237,6 +258,8 @@ export const useAppState = () => {
     activeListId,
     activeList,
     listItems,
+    openItemsCount,
+    listMetaById,
     suggestions,
     newListName,
     editingTitle,
@@ -275,5 +298,6 @@ export const useAppState = () => {
     syncNotice,
     clearSyncNotice,
     backendLogs,
+    activeBackendRequests,
   };
 };
