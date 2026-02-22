@@ -11,6 +11,7 @@ import {
 const createId = () => crypto.randomUUID();
 const appVersion = __APP_VERSION__;
 const selectedListStorageKey = "golist.selectedListId";
+const localePreferenceStorageKey = "golist.locale";
 
 const toIsoTimestamp = (value: number) => new Date(value).toISOString();
 const toMillis = (value: string) => new Date(value).getTime();
@@ -39,6 +40,17 @@ const persistSelectedListId = (listId: string | undefined) => {
   localStorage.setItem(selectedListStorageKey, listId);
 };
 
+const getStoredLocalePreference = (): string | undefined =>
+  localStorage.getItem(localePreferenceStorageKey) ?? undefined;
+
+const persistLocalePreference = (locale: string | undefined) => {
+  if (!locale) {
+    localStorage.removeItem(localePreferenceStorageKey);
+    return;
+  }
+
+  localStorage.setItem(localePreferenceStorageKey, locale);
+};
 type StoreState = {
   lists: List[];
   items: Item[];
@@ -48,6 +60,7 @@ type StoreState = {
   backendConnection: "unknown" | "online" | "offline";
   syncNotice?: { id: string; message: string };
   backendLogs: Array<{ id: string; message: string; outcome: "success" | "error" | "skipped" }>;
+  languagePreference?: string;
   isLoaded: boolean;
   load: () => Promise<void>;
   addList: (name: string) => Promise<void>;
@@ -63,6 +76,7 @@ type StoreState = {
   syncAllLists: () => Promise<void>;
   clearSyncNotice: () => void;
   appendBackendLog: (entry: { message: string; outcome: "success" | "error" | "skipped" }) => void;
+  setLanguagePreference: (locale: string) => void;
 };
 
 const triggerSyncInBackground = (listId: string) => {
@@ -167,6 +181,7 @@ export const useStore = create<StoreState>((set, get) => ({
   backendConnection: "unknown",
   syncNotice: undefined,
   backendLogs: [],
+  languagePreference: getStoredLocalePreference(),
   load: async () => {
     const [lists, items] = await Promise.all([
       db.lists.toArray(),
@@ -521,6 +536,10 @@ export const useStore = create<StoreState>((set, get) => ({
         { id: crypto.randomUUID(), message: entry.message, outcome: entry.outcome },
       ],
     })),
+  setLanguagePreference: (locale) => {
+    persistLocalePreference(locale);
+    set({ languagePreference: locale });
+  },
 }));
 
 setBackendCallLogger((entry) => {

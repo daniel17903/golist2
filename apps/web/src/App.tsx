@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { Item } from "@golist/shared/domain/types";
 import AppHeader from "./components/AppHeader";
 import BottomBar from "./components/BottomBar";
@@ -25,6 +26,8 @@ const isAbortError = (error: unknown): boolean => {
 };
 
 const App = () => {
+  const { t, i18n } = useTranslation();
+
   const {
     lists,
     items,
@@ -68,6 +71,8 @@ const App = () => {
     syncNotice,
     clearSyncNotice,
     backendLogs,
+    languagePreference,
+    handleLanguagePreferenceChange,
   } = useAppState();
 
   const undoTimeoutsRef = useRef<Map<string, number>>(new Map());
@@ -137,8 +142,8 @@ const App = () => {
     }
 
     const sharePayload: ShareData = {
-      title: activeList?.name ?? "GoList",
-      text: "Teile diese Einkaufsliste",
+      title: activeList?.name ?? t("app.name"),
+      text: t("app.shareText"),
       url: shareLink,
     };
 
@@ -215,9 +220,9 @@ const App = () => {
               }
 
               await navigator.clipboard.writeText(shareLink);
-              window.alert("Teilen-Link wurde in die Zwischenablage kopiert.");
+              window.alert(t("app.copiedShareLink"));
             } catch {
-              window.alert("Teilen ist derzeit nicht verfügbar.");
+              window.alert(t("app.shareUnavailable"));
             }
           })();
         }}
@@ -227,18 +232,18 @@ const App = () => {
         <div className="sync-toast" role="status" aria-live="polite">
           <span>{syncNotice.message}</span>
           <button type="button" className="sync-toast__close" onClick={clearSyncNotice}>
-            Schließen
+            {t("app.close")}
           </button>
         </div>
       ) : null}
 
       {__IS_VERCEL_NON_PRODUCTION__ ? (
         <div className="backend-log-panel" aria-live="polite">
-          <p className="backend-log-panel__title">Backend-Logs</p>
+          <p className="backend-log-panel__title">{t("app.backendLogs")}</p>
           <ul className="backend-log-panel__list">
             {backendLogs.length === 0 ? (
               <li className="backend-log-panel__entry backend-log-panel__entry--skipped">
-                Noch keine Backend-Aufrufe protokolliert.
+                {t("app.noBackendLogs")}
               </li>
             ) : (
               backendLogs.slice().reverse().map((entry) => (
@@ -257,13 +262,13 @@ const App = () => {
       <div className="undo-toast-stack" aria-live="polite" aria-atomic="false">
         {undoToasts.map((toast) => (
           <div key={toast.id} className="undo-toast" role="status">
-            <span className="undo-toast__text">{`„${toast.item.name}“ gelöscht.`}</span>
+            <span className="undo-toast__text">{t("app.undoDeleted", { item: toast.item.name })}</span>
             <button
               type="button"
               className="undo-toast__action"
               onClick={() => void handleUndoDelete(toast.id, toast.item.id)}
             >
-              Rückgängig
+              {t("app.undo")}
             </button>
           </div>
         ))}
@@ -281,6 +286,8 @@ const App = () => {
         }}
         onDeleteList={handleDeleteList}
         onCreateList={handleCreateList}
+        locale={languagePreference ?? i18n.language}
+        onLocaleChange={handleLanguagePreferenceChange}
       />
 
       <AddItemDialog

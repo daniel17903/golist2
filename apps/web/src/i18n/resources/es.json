@@ -1,0 +1,47 @@
+{
+  "app": {
+    "name": "GoList",
+    "defaultListName": "Lista de compras",
+    "shareText": "Comparte esta lista de compras",
+    "copiedShareLink": "Enlace compartido copiado al portapapeles.",
+    "shareUnavailable": "Compartir no está disponible actualmente.",
+    "close": "Cerrar",
+    "backendLogs": "Registros del backend",
+    "noBackendLogs": "Aún no hay llamadas al backend registradas.",
+    "undoDeleted": "Se eliminó \"{{item}}\".",
+    "undo": "Deshacer"
+  },
+  "header": {
+    "editListName": "Editar nombre de lista",
+    "backendStatus": "Estado del backend: {{status}}"
+  },
+  "bottomBar": {
+    "openListMenu": "Abrir menú de listas",
+    "addItem": "Añadir artículo",
+    "shareList": "Compartir lista"
+  },
+  "drawer": {
+    "myLists": "Mis listas",
+    "deleteList": "Eliminar {{name}}",
+    "createNewList": "Crear nueva lista",
+    "settings": "Ajustes",
+    "language": "Idioma"
+  },
+  "dialog": {
+    "addItemPlaceholder": "¿Qué quieres comprar?",
+    "itemNameAriaLabel": "Nombre del artículo",
+    "name": "Nombre",
+    "quantity": "Cantidad",
+    "listNamePlaceholder": "Nombre de la lista",
+    "cancel": "Cancelar",
+    "save": "Guardar",
+    "create": "Crear",
+    "createList": "Crear nueva lista",
+    "editList": "Editar lista",
+    "editItem": "Editar artículo"
+  },
+  "errors": {
+    "openSharedLink": "No se pudo abrir el enlace compartido.",
+    "noActiveList": "No hay ninguna lista activa seleccionada"
+  }
+}

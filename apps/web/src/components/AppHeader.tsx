@@ -1,3 +1,5 @@
+import { useTranslation } from "react-i18next";
+
 type AppHeaderProps = {
   activeListName: string;
   onEditListName: () => void;
@@ -5,6 +7,9 @@ type AppHeaderProps = {
 };
 
 const AppHeader = ({ activeListName, onEditListName, backendConnection }: AppHeaderProps) => {
+  const { t } = useTranslation();
+  const backendStatus = t("header.backendStatus", { status: backendConnection });
+
   return (
     <header className="app__header">
       <div className="title-row">
@@ -12,14 +17,14 @@ const AppHeader = ({ activeListName, onEditListName, backendConnection }: AppHea
         <div className="header-actions">
           <span
             className={`connection-indicator connection-indicator--${backendConnection}`}
-            aria-label={`Backend status: ${backendConnection}`}
-            title={`Backend status: ${backendConnection}`}
+            aria-label={backendStatus}
+            title={backendStatus}
           />
           <button
             type="button"
             className="icon-button"
             onClick={onEditListName}
-            aria-label="Edit list name"
+            aria-label={t("header.editListName")}
           >
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path

@@ -1,0 +1,47 @@
+{
+  "app": {
+    "name": "GoList",
+    "defaultListName": "Einkaufsliste",
+    "shareText": "Teile diese Einkaufsliste",
+    "copiedShareLink": "Teilen-Link wurde in die Zwischenablage kopiert.",
+    "shareUnavailable": "Teilen ist derzeit nicht verfügbar.",
+    "close": "Schließen",
+    "backendLogs": "Backend-Logs",
+    "noBackendLogs": "Noch keine Backend-Aufrufe protokolliert.",
+    "undoDeleted": "„{{item}}“ gelöscht.",
+    "undo": "Rückgängig"
+  },
+  "header": {
+    "editListName": "Listenname bearbeiten",
+    "backendStatus": "Backend-Status: {{status}}"
+  },
+  "bottomBar": {
+    "openListMenu": "Listenmenü öffnen",
+    "addItem": "Eintrag hinzufügen",
+    "shareList": "Liste teilen"
+  },
+  "drawer": {
+    "myLists": "Meine Listen",
+    "deleteList": "{{name}} löschen",
+    "createNewList": "Neue Liste erstellen",
+    "settings": "Einstellungen",
+    "language": "Sprache"
+  },
+  "dialog": {
+    "addItemPlaceholder": "Was möchtest du einkaufen?",
+    "itemNameAriaLabel": "Eintragsname",
+    "name": "Name",
+    "quantity": "Menge",
+    "listNamePlaceholder": "Listenname",
+    "cancel": "Abbrechen",
+    "save": "Speichern",
+    "create": "Erstellen",
+    "createList": "Neue Liste erstellen",
+    "editList": "Liste bearbeiten",
+    "editItem": "Eintrag bearbeiten"
+  },
+  "errors": {
+    "openSharedLink": "Geteilter Link konnte nicht geöffnet werden.",
+    "noActiveList": "Keine aktive Liste ausgewählt"
+  }
+}

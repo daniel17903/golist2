@@ -1,0 +1,47 @@
+{
+  "app": {
+    "name": "GoList",
+    "defaultListName": "Shopping list",
+    "shareText": "Share this shopping list",
+    "copiedShareLink": "Share link copied to clipboard.",
+    "shareUnavailable": "Sharing is currently unavailable.",
+    "close": "Close",
+    "backendLogs": "Backend logs",
+    "noBackendLogs": "No backend calls logged yet.",
+    "undoDeleted": "\"{{item}}\" deleted.",
+    "undo": "Undo"
+  },
+  "header": {
+    "editListName": "Edit list name",
+    "backendStatus": "Backend status: {{status}}"
+  },
+  "bottomBar": {
+    "openListMenu": "Open list menu",
+    "addItem": "Add item",
+    "shareList": "Share list"
+  },
+  "drawer": {
+    "myLists": "My lists",
+    "deleteList": "Delete {{name}}",
+    "createNewList": "Create new list",
+    "settings": "Settings",
+    "language": "Language"
+  },
+  "dialog": {
+    "addItemPlaceholder": "What do you want to buy?",
+    "itemNameAriaLabel": "Item name",
+    "name": "Name",
+    "quantity": "Quantity",
+    "listNamePlaceholder": "List name",
+    "cancel": "Cancel",
+    "save": "Save",
+    "create": "Create",
+    "createList": "Create new list",
+    "editList": "Edit list",
+    "editItem": "Edit item"
+  },
+  "errors": {
+    "openSharedLink": "Could not open shared link.",
+    "noActiveList": "No active list selected"
+  }
+}

@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { parseItemInput } from "../domain/inputParser";
 import { sortItemsForList } from "../domain/sort";
+import { normalizeLocale, storedLocaleKey } from "../i18n/config";
+import { getLocaleFromUrl, resolveLocale } from "../i18n/resolveLocale";
 import { useStore } from "../state/useStore";
 
-const defaultListName = "Einkaufsliste";
-
 export const useAppState = () => {
+  const { t, i18n } = useTranslation();
   const {
     lists,
     items,
@@ -26,6 +28,8 @@ export const useAppState = () => {
     syncNotice,
     clearSyncNotice,
     backendLogs,
+    languagePreference,
+    setLanguagePreference,
   } = useStore();
 
   const [newListName, setNewListName] = useState("");
@@ -44,10 +48,25 @@ export const useAppState = () => {
   }, [load]);
 
   useEffect(() => {
-    if (isLoaded && lists.length === 0) {
-      void addList(defaultListName);
+    const locale = resolveLocale({
+      userPreference: languagePreference,
+      urlLocale: getLocaleFromUrl(window.location),
+      storedLocale: localStorage.getItem(storedLocaleKey) ?? undefined,
+      browserLocales: navigator.languages,
+    });
+
+    if (i18n.language !== locale) {
+      void i18n.changeLanguage(locale);
     }
-  }, [isLoaded, lists.length, addList]);
+
+    document.documentElement.lang = locale;
+  }, [i18n, languagePreference]);
+
+  useEffect(() => {
+    if (isLoaded && lists.length === 0) {
+      void addList(t("app.defaultListName"));
+    }
+  }, [isLoaded, lists.length, addList, t]);
 
   useEffect(() => {
     if (!isLoaded) {
@@ -63,14 +82,14 @@ export const useAppState = () => {
       try {
         await joinSharedList(shareTokenFromUrl);
       } catch {
-        window.alert("Geteilter Link konnte nicht geöffnet werden.");
+        window.alert(t("errors.openSharedLink"));
       } finally {
         const cleanedUrl = new URL(window.location.href);
         cleanedUrl.searchParams.delete("shareToken");
         window.history.replaceState({}, "", cleanedUrl.toString());
       }
     })();
-  }, [isLoaded, joinSharedList]);
+  }, [isLoaded, joinSharedList, t]);
 
   useEffect(() => {
     if (!isLoaded) {
@@ -153,9 +172,11 @@ export const useAppState = () => {
     return filtered.slice(0, 12);
   }, [itemName, suggestionPool, currentItemNames]);
 
+  const parseLocale = normalizeLocale(i18n.language) ?? "en";
+
   const handleAddItem = async () => {
     if (!activeListId) {return;}
-    const parsed = parseItemInput(itemName);
+    const parsed = parseItemInput(itemName, parseLocale);
     if (!parsed.name.trim()) {return;}
     await addItem(activeListId, parsed.name, parsed.quantityOrUnit);
     setItemName("");
@@ -225,10 +246,15 @@ export const useAppState = () => {
 
   const handleShareActiveList = async () => {
     if (!activeListId) {
-      throw new Error("Keine aktive Liste ausgewählt");
+      throw new Error(t("errors.noActiveList"));
     }
     const token = await ensureShareToken(activeListId);
     return `${window.location.origin}/?shareToken=${token}`;
+  };
+
+  const handleLanguagePreferenceChange = (locale: string) => {
+    setLanguagePreference(locale);
+    localStorage.setItem(storedLocaleKey, locale);
   };
 
   return {
@@ -275,5 +301,7 @@ export const useAppState = () => {
     syncNotice,
     clearSyncNotice,
     backendLogs,
+    languagePreference,
+    handleLanguagePreferenceChange,
   };
 };
