@@ -1,3 +1,5 @@
+import { useI18n } from "../i18n";
+
 type CreateListModalProps = {
   isOpen: boolean;
   value: string;
@@ -6,46 +8,36 @@ type CreateListModalProps = {
   onSave: () => void;
 };
 
-const CreateListModal = ({
-  isOpen,
-  value,
-  onChange,
-  onCancel,
-  onSave,
-}: CreateListModalProps) => {
+const CreateListModal = ({ isOpen, value, onChange, onCancel, onSave }: CreateListModalProps) => {
+  const { t } = useI18n();
   if (!isOpen) {return null;}
 
   const isSaveDisabled = !value.trim();
 
   return (
     <div className="modal-backdrop" role="dialog" aria-modal="true" onClick={onCancel}>
-      <div
-        className="modal"
-        onClick={(event) => {
-          event.stopPropagation();
-        }}
-      >
+      <div className="modal" onClick={(event) => event.stopPropagation()}>
         <div className="modal__header">
-          <h2>Neue Liste erstellen</h2>
+          <h2>{t("createList.title")}</h2>
         </div>
         <div className="modal__body">
           <div className="modal__field">
-            <label htmlFor="new-list-name">Name</label>
+            <label htmlFor="new-list-name">{t("common.name")}</label>
             <input
               id="new-list-name"
               value={value}
               onChange={(event) => onChange(event.target.value)}
-              placeholder="Listenname"
+              placeholder={t("createList.placeholder")}
               autoFocus
             />
           </div>
         </div>
         <div className="modal__actions">
           <button type="button" className="text-button" onClick={onCancel}>
-            Abbrechen
+            {t("common.cancel")}
           </button>
           <button type="button" className="text-button" onClick={onSave} disabled={isSaveDisabled}>
-            Erstellen
+            {t("common.create")}
           </button>
         </div>
       </div>

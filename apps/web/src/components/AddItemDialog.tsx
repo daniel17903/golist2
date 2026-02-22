@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { getItemIcon } from "../domain/categories";
 import { parseItemInput } from "../domain/inputParser";
+import { useI18n } from "../i18n";
 
 type AddItemDialogProps = {
   isOpen: boolean;
@@ -22,6 +23,7 @@ const AddItemDialog = ({
   onAddSuggestion,
 }: AddItemDialogProps) => {
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const { t, locale } = useI18n();
 
   useEffect(() => {
     if (!isOpen) {return;}
@@ -33,12 +35,7 @@ const AddItemDialog = ({
 
   return (
     <div className="modal-backdrop add-dialog" role="dialog" aria-modal="true" onClick={onClose}>
-      <div
-        className="modal"
-        onClick={(event) => {
-          event.stopPropagation();
-        }}
-      >
+      <div className="modal" onClick={(event) => event.stopPropagation()}>
         <form
           className="add-panel"
           onSubmit={(event) => {
@@ -50,13 +47,13 @@ const AddItemDialog = ({
             ref={inputRef}
             value={itemName}
             onChange={(event) => onItemNameChange(event.target.value)}
-            placeholder="Was möchtest du einkaufen?"
-            aria-label="Item name"
+            placeholder={t("add.placeholder")}
+            aria-label={t("add.itemName")}
           />
         </form>
         <div className="modal__grid">
           {suggestions.map((name) => {
-            const parsed = parseItemInput(name);
+            const parsed = parseItemInput(name, locale);
             const displayName = parsed.name || name;
             return (
               <button
@@ -73,9 +70,7 @@ const AddItemDialog = ({
                 </span>
                 <div className="item-text">
                   <span className="item-name">{displayName}</span>
-                  {parsed.quantityOrUnit && (
-                    <span className="item-quantity">{parsed.quantityOrUnit}</span>
-                  )}
+                  {parsed.quantityOrUnit && <span className="item-quantity">{parsed.quantityOrUnit}</span>}
                 </div>
               </button>
             );

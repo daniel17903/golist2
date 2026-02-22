@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { parseItemInput } from "../domain/inputParser";
+import { useI18n } from "../i18n";
 import { sortItemsForList } from "../domain/sort";
 import { useStore } from "../state/useStore";
 
-const defaultListName = "Einkaufsliste";
-
 export const useAppState = () => {
+  const { t, locale } = useI18n();
   const {
     lists,
     items,
@@ -46,9 +46,9 @@ export const useAppState = () => {
 
   useEffect(() => {
     if (isLoaded && lists.length === 0) {
-      void addList(defaultListName);
+      void addList(t("list.defaultName"));
     }
-  }, [isLoaded, lists.length, addList]);
+  }, [isLoaded, lists.length, addList, t]);
 
   useEffect(() => {
     if (!isLoaded) {
@@ -154,7 +154,7 @@ export const useAppState = () => {
 
   const handleAddItem = async () => {
     if (!activeListId) {return;}
-    const parsed = parseItemInput(itemName);
+    const parsed = parseItemInput(itemName, locale);
     if (!parsed.name.trim()) {return;}
     await addItem(activeListId, parsed.name, parsed.quantityOrUnit);
     setItemName("");

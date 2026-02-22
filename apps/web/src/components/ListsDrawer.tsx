@@ -1,16 +1,12 @@
-import { useMemo, useRef, useState, type PointerEvent } from "react";
+import { type PointerEvent, useMemo, useRef, useState } from "react";
 import type { List } from "@golist/shared/domain/types";
-
-type ListMeta = {
-  openItems: number;
-  lastUpdatedAt: number;
-};
+import { useI18n } from "../i18n";
 
 type ListsDrawerProps = {
   isOpen: boolean;
   lists: List[];
-  activeListId: string | null | undefined;
-  listMetaById: Record<string, ListMeta>;
+  activeListId?: string;
+  listMetaById: Record<string, { openItems: number; lastUpdatedAt: number }>;
   onClose: () => void;
   onOpen: () => void;
   onSelectList: (listId: string) => void;
@@ -18,84 +14,41 @@ type ListsDrawerProps = {
   onCreateList: () => void;
 };
 
-type DragMode = "opening" | "closing";
+type DragState = {
+  mode: "opening" | "closing";
+  pointerId: number;
+  startX: number;
+};
 
 const EDGE_SWIPE_WIDTH = 28;
 
-const formatLastUpdated = (timestamp: number) => {
-  if (!timestamp) {
-    return "Noch nie aktualisiert";
-  }
+const formatLastUpdated = (timestamp: number) => new Date(timestamp).toLocaleDateString();
 
-  const elapsedMs = Date.now() - timestamp;
-  if (elapsedMs < 0) {
-    return "gerade eben";
-  }
-
-  const elapsedMinutes = Math.floor(elapsedMs / 60_000);
-  if (elapsedMinutes < 1) {
-    return "gerade eben";
-  }
-
-  if (elapsedMinutes < 60) {
-    return `vor ${elapsedMinutes} Min.`;
-  }
-
-  const elapsedHours = Math.floor(elapsedMinutes / 60);
-  if (elapsedHours < 24) {
-    return `vor ${elapsedHours} Std.`;
-  }
-
-  const elapsedDays = Math.floor(elapsedHours / 24);
-  if (elapsedDays <= 7) {
-    return `vor ${elapsedDays} Tag${elapsedDays === 1 ? "" : "en"}`;
-  }
-
-  return new Intl.DateTimeFormat("de-DE", {
-    day: "2-digit",
-    month: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(timestamp));
-};
-
-const ListsDrawer = ({
-  isOpen,
-  lists,
-  activeListId,
-  listMetaById,
-  onClose,
-  onOpen,
-  onSelectList,
-  onDeleteList,
-  onCreateList,
-}: ListsDrawerProps) => {
-  const drawerRef = useRef<HTMLElement | null>(null);
-  const dragStateRef = useRef<{ pointerId: number; startX: number; mode: DragMode } | null>(null);
-  const [dragOffset, setDragOffset] = useState<number | null>(null);
-  const [confirmDeleteListId, setConfirmDeleteListId] = useState<string | null>(null);
-
-  const getDrawerWidth = () => {
-    const measured = drawerRef.current?.offsetWidth;
-    if (measured && measured > 0) {return measured;}
-    return Math.min(320, Math.round(window.innerWidth * 0.8));
-  };
-
+const ListsDrawer = ({ isOpen, lists, activeListId, listMetaById, onClose, onOpen, onSelectList, onDeleteList, onCreateList }: ListsDrawerProps) => {
   const canDelete = lists.length > 1;
-  const nextDeleteLabel = useMemo(
-    () => lists.find((list) => list.id === confirmDeleteListId)?.name ?? "",
-    [lists, confirmDeleteListId],
-  );
+  const [confirmDeleteListId, setConfirmDeleteListId] = useState<string | null>(null);
+  const [dragOffset, setDragOffset] = useState<number | null>(null);
+  const drawerRef = useRef<HTMLElement | null>(null);
+  const dragStateRef = useRef<DragState | null>(null);
+  const { t, locale, setLocale, supportedLocales } = useI18n();
+  const isSupportedLocale = (value: string): value is (typeof supportedLocales)[number] =>
+    supportedLocales.some((entry) => entry === value);
 
-  const handleDragStart = (event: PointerEvent<HTMLElement>, mode: DragMode) => {
-    dragStateRef.current = { pointerId: event.pointerId, startX: event.clientX, mode };
+  const nextDeleteLabel = useMemo(() => {
+    if (!confirmDeleteListId) {return null;}
+    return lists.find((list) => list.id === confirmDeleteListId)?.name ?? null;
+  }, [confirmDeleteListId, lists]);
+
+  const getDrawerWidth = () => drawerRef.current?.getBoundingClientRect().width ?? 320;
+
+  const handleDragStart = (event: PointerEvent<HTMLElement>, mode: DragState["mode"]) => {
+    dragStateRef.current = { mode, pointerId: event.pointerId, startX: event.clientX };
     event.currentTarget.setPointerCapture(event.pointerId);
   };
 
   const handleDragMove = (event: PointerEvent<HTMLElement>) => {
     const dragState = dragStateRef.current;
     if (!dragState || dragState.pointerId !== event.pointerId) {return;}
-
     const drawerWidth = getDrawerWidth();
     const deltaX = event.clientX - dragState.startX;
 
@@ -118,9 +71,7 @@ const ListsDrawer = ({
     const threshold = drawerWidth * 0.35;
 
     if (dragState.mode === "opening") {
-      if (deltaX > threshold) {
-        onOpen();
-      }
+      if (deltaX > threshold) {onOpen();}
     } else if (-deltaX > threshold) {
       onClose();
     }
@@ -150,17 +101,7 @@ const ListsDrawer = ({
         />
       ) : null}
       <div className={`drawer-overlay ${isOpen ? "drawer-overlay--open" : ""}`}>
-        <div
-          className="drawer-backdrop"
-          role="button"
-          tabIndex={-1}
-          onClick={onClose}
-          onKeyDown={(event) => {
-            if (event.key === "Escape") {
-              onClose();
-            }
-          }}
-        />
+        <div className="drawer-backdrop" role="button" tabIndex={-1} onClick={onClose} onKeyDown={(event) => event.key === "Escape" && onClose()} />
         <aside
           ref={drawerRef}
           className={`drawer ${isOpen ? "drawer--open" : ""}`}
@@ -171,11 +112,22 @@ const ListsDrawer = ({
           onPointerUp={handleDragEnd}
           onPointerCancel={handleDragEnd}
         >
-          <div className="drawer__header">
-            <span>GoList</span>
-          </div>
+          <div className="drawer__header"><span>GoList</span></div>
           <div className="drawer__section">
-            <p className="drawer__title">Meine Listen</p>
+            <p className="drawer__title">{t("drawer.myLists")}</p>
+            <label className="modal__field">
+              {t("common.language")}
+              <select value={locale} onChange={(event) => {
+                const next = event.target.value;
+                if (isSupportedLocale(next)) {
+                  setLocale(next);
+                }
+              }}>
+                {supportedLocales.map((entry) => (
+                  <option key={entry} value={entry}>{entry.toUpperCase()}</option>
+                ))}
+              </select>
+            </label>
             <div className="drawer__list">
               {lists.map((list) => {
                 const listMeta = listMetaById[list.id] ?? { openItems: 0, lastUpdatedAt: list.updatedAt };
@@ -185,28 +137,19 @@ const ListsDrawer = ({
                   <div key={list.id} className="drawer__item">
                     <button
                       type="button"
-                      className={`drawer__item-button ${
-                        list.id === activeListId ? "drawer__item-button--active" : ""
-                      }`}
+                      className={`drawer__item-button ${list.id === activeListId ? "drawer__item-button--active" : ""}`}
                       onClick={() => onSelectList(list.id)}
                     >
-                      <span className="drawer__item-icon" aria-hidden="true">
-                        <svg viewBox="0 0 24 24">
-                          <path
-                            d="M3 5h2v2H3V5zm0 6h2v2H3v-2zm0 6h2v2H3v-2zm4-12h14v2H7V5zm0 6h14v2H7v-2zm0 6h14v2H7v-2z"
-                            fill="currentColor"
-                          />
-                        </svg>
-                      </span>
+                      <span className="drawer__item-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 5h2v2H3V5zm0 6h2v2H3v-2zm0 6h2v2H3v-2zm4-12h14v2H7V5zm0 6h14v2H7v-2zm0 6h14v2H7v-2z" fill="currentColor" /></svg></span>
                       <span className="drawer__item-copy">
                         <span className="drawer__item-label">{list.name}</span>
-                        <span className="drawer__item-meta">{`${listMeta.openItems} offen · aktualisiert ${formatLastUpdated(listMeta.lastUpdatedAt)}`}</span>
+                        <span className="drawer__item-meta">{`${t("list.openItems", { count: listMeta.openItems })} · ${t("list.updated", { time: formatLastUpdated(listMeta.lastUpdatedAt) })}`}</span>
                       </span>
                     </button>
                     <button
                       type="button"
                       className={`drawer__delete ${isConfirmingDelete ? "drawer__delete--confirm" : ""}`}
-                      aria-label={isConfirmingDelete ? `Löschen bestätigen: ${list.name}` : `Löschen: ${list.name}`}
+                      aria-label={isConfirmingDelete ? t("drawer.deleteConfirm", { name: list.name }) : t("drawer.delete", { name: list.name })}
                       disabled={!canDelete}
                       onClick={() => {
                         if (isConfirmingDelete) {
@@ -214,30 +157,20 @@ const ListsDrawer = ({
                           setConfirmDeleteListId(null);
                           return;
                         }
-
                         setConfirmDeleteListId(list.id);
                       }}
                     >
-                      {isConfirmingDelete ? "OK" : (
-                        <svg viewBox="0 0 24 24" aria-hidden="true">
-                          <path
-                            d="M16 9v10H8V9h8m-1.5-6h-5l-1 1H5v2h14V4h-4.5l-1-1z"
-                            fill="currentColor"
-                          />
-                        </svg>
+                      {isConfirmingDelete ? t("common.ok") : (
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 9v10H8V9h8m-1.5-6h-5l-1 1H5v2h14V4h-4.5l-1-1z" fill="currentColor" /></svg>
                       )}
                     </button>
                   </div>
                 );
               })}
-              {nextDeleteLabel ? <p className="drawer__delete-hint">Erneut tippen, um „{nextDeleteLabel}“ zu löschen.</p> : null}
+              {nextDeleteLabel ? <p className="drawer__delete-hint">{t("drawer.deleteHint", { name: nextDeleteLabel })}</p> : null}
               <button type="button" className="drawer__new" onClick={onCreateList}>
-                <span className="drawer__item-icon" aria-hidden="true">
-                  <svg viewBox="0 0 24 24">
-                    <path d="M19 13H13v6h-2v-6H5v-2h6V5h2v6h6v2z" fill="currentColor" />
-                  </svg>
-                </span>
-                Neue Liste erstellen
+                <span className="drawer__item-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M19 13H13v6h-2v-6H5v-2h6V5h2v6h6v2z" fill="currentColor" /></svg></span>
+                {t("drawer.createList")}
               </button>
             </div>
           </div>

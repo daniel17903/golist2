@@ -22,21 +22,26 @@ describe("parseAmount", () => {
 
   Object.entries(inputsToExpected).forEach(([input, expected]) => {
     it(`${input} -> ${expected ?? "no amount"}`, () => {
-      expect(parseAmount(input)).toBe(expected);
+      expect(parseAmount(input, "de")).toBe(expected);
     });
+  });
+
+  it("parses english and spanish units", () => {
+    expect(parseAmount("milk 2 cups", "en")).toBe("2 cups");
+    expect(parseAmount("pan 3 latas", "es")).toBe("3 latas");
   });
 });
 
 describe("parseItemInput", () => {
   it("returns parsed name and quantityOrUnit", () => {
-    expect(parseItemInput("2 Liter Milch")).toEqual({
+    expect(parseItemInput("2 Liter Milch", "de")).toEqual({
       name: "Milch",
       quantityOrUnit: "2 Liter",
     });
   });
 
   it("returns the full input when no amount is present", () => {
-    expect(parseItemInput("Äpfel")).toEqual({
+    expect(parseItemInput("Äpfel", "de")).toEqual({
       name: "Äpfel",
       quantityOrUnit: undefined,
     });
