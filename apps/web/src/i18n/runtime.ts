@@ -1,5 +1,4 @@
-import { createContext, type ReactNode, useContext, useMemo, useSyncExternalStore } from "react";
-import { defaultLocale, localeStorageKey, type Locale, supportedLocales } from "./config";
+import { defaultLocale, localeStorageKey, type Locale } from "./config";
 import { resources } from "./resources";
 import { getLocaleFromUrl, resolveLocale } from "./resolveLocale";
 
@@ -20,6 +19,11 @@ export const t = (key: string, params?: Record<string, string | number>): string
 
 export const getCurrentLocale = (): Locale => currentLocale;
 
+export const subscribeToLocale = (listener: () => void) => {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+};
+
 export const setLocale = (locale: Locale, persist = true) => {
   currentLocale = locale;
   if (persist) {
@@ -36,34 +40,3 @@ export const initializeLocale = () => {
   });
   currentLocale = resolved;
 };
-
-type I18nContextValue = {
-  locale: Locale;
-  setLocale: (locale: Locale) => void;
-  t: (key: string, params?: Record<string, string | number>) => string;
-};
-
-const I18nContext = createContext<I18nContextValue | null>(null);
-
-export const I18nProvider = ({ children }: { children: ReactNode }) => {
-  const locale = useSyncExternalStore(
-    (listener) => {
-      listeners.add(listener);
-      return () => listeners.delete(listener);
-    },
-    () => currentLocale,
-  );
-
-  const value = useMemo(() => ({ locale, setLocale, t }), [locale]);
-  return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
-};
-
-export const useI18n = () => {
-  const context = useContext(I18nContext);
-  if (!context) {
-    throw new Error("useI18n must be used inside I18nProvider");
-  }
-  return { ...context, supportedLocales };
-};
-
-export { supportedLocales };
