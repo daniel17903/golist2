@@ -1,23 +1,21 @@
 FROM node:24.8.0-alpine3.22 AS build
 WORKDIR /app
 
-COPY package*.json ./
-COPY tsconfig.base.json ./tsconfig.base.json
-COPY apps/web/package.json ./apps/web/package.json
-COPY packages/shared/package.json ./packages/shared/package.json
+COPY package.json ./package.json
 
-RUN npm ci
+# @golist/shared is a workspace-local type-only dependency used in source imports.
+# In isolated frontend builds (context=apps/web), that workspace package is not present.
+RUN npm pkg delete dependencies.@golist/shared
+RUN npm install
 
-COPY apps/web ./apps/web
-COPY packages/shared ./packages/shared
-
-RUN npm run build -w apps/web
+COPY . ./
+RUN npm run build
 
 FROM nginx:1.29.1-alpine3.22 AS runtime
 WORKDIR /usr/share/nginx/html
 
-COPY apps/web/nginx.conf /etc/nginx/conf.d/default.conf
-COPY --from=build /app/apps/web/dist ./
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=build /app/dist ./
 
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]
