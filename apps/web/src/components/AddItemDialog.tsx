@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { getItemIcon } from "../domain/categories";
 import { parseItemInput } from "../domain/inputParser";
+import { useI18n } from "../i18n";
 
 type AddItemDialogProps = {
   isOpen: boolean;
@@ -22,6 +23,7 @@ const AddItemDialog = ({
   onAddSuggestion,
 }: AddItemDialogProps) => {
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const { locale, t } = useI18n();
 
   useEffect(() => {
     if (!isOpen) {return;}
@@ -50,13 +52,13 @@ const AddItemDialog = ({
             ref={inputRef}
             value={itemName}
             onChange={(event) => onItemNameChange(event.target.value)}
-            placeholder="Was möchtest du einkaufen?"
-            aria-label="Item name"
+            placeholder={t("addItem.placeholder")}
+            aria-label={t("addItem.itemName")}
           />
         </form>
         <div className="modal__grid">
           {suggestions.map((name) => {
-            const parsed = parseItemInput(name);
+            const parsed = parseItemInput(name, locale);
             const displayName = parsed.name || name;
             return (
               <button
@@ -69,7 +71,7 @@ const AddItemDialog = ({
                 }}
               >
                 <span className="item-icon" aria-hidden="true">
-                  <img src={getItemIcon(displayName)} alt="" />
+                  <img src={getItemIcon(displayName, locale)} alt="" />
                 </span>
                 <div className="item-text">
                   <span className="item-name">{displayName}</span>

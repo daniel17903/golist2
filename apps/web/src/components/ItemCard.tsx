@@ -1,5 +1,5 @@
 import type { MouseEvent } from "react";
-import { getItemIcon } from "../domain/categories";
+import { getItemIconForCategory } from "../domain/categories";
 import type { Item } from "@golist/shared/domain/types";
 
 type ItemCardProps = {
@@ -39,7 +39,7 @@ const ItemCard = ({
       onClick={onClick}
     >
       <span className="item-icon" aria-hidden="true">
-        <img src={getItemIcon(item.name)} alt="" />
+        <img src={getItemIconForCategory(item.category)} alt="" />
       </span>
       <div className="item-text">
         <span className="item-name">{item.name}</span>

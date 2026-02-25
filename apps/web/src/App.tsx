@@ -7,8 +7,10 @@ import EditItemModal from "./components/EditItemModal";
 import ItemGrid from "./components/ItemGrid";
 import ListsDrawer from "./components/ListsDrawer";
 import CreateListModal from "./components/CreateListModal";
+import SettingsModal from "./components/SettingsModal";
 import { useAppState } from "./hooks/useAppState";
 import { useLongPressItem } from "./hooks/useLongPressItem";
+import { useI18n } from "./i18n";
 
 type UndoToast = {
   id: string;
@@ -30,6 +32,8 @@ const isAbortError = (error: unknown): boolean => {
 };
 
 const App = () => {
+  const { t } = useI18n();
+
   const {
     lists,
     items,
@@ -81,6 +85,7 @@ const App = () => {
   const [exitingItemIds, setExitingItemIds] = useState<Set<string>>(new Set());
   const [undoToasts, setUndoToasts] = useState<UndoToast[]>([]);
   const [appToasts, setAppToasts] = useState<AppToast[]>([]);
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
 
   const listMetaById = useMemo(() => {
     const openCountByList = new Map<string, number>();
@@ -196,7 +201,7 @@ const App = () => {
 
     const sharePayload: ShareData = {
       title: activeList?.name ?? "GoList",
-      text: "Teile diese Einkaufsliste",
+      text: t("share.text"),
       url: shareLink,
     };
 
@@ -276,7 +281,7 @@ const App = () => {
               try {
                 const shared = await shareWithSystemSheet(shareLink);
                 if (shared) {
-                  pushAppToast("Link erfolgreich geteilt.", "success");
+                  pushAppToast(t("toast.shareSuccess"), "success");
                   return;
                 }
               } catch (error) {
@@ -286,9 +291,9 @@ const App = () => {
               }
 
               await navigator.clipboard.writeText(shareLink);
-              pushAppToast("Teilen-Link wurde in die Zwischenablage kopiert.", "success");
+              pushAppToast(t("toast.shareCopied"), "success");
             } catch {
-              pushAppToast("Teilen ist derzeit nicht verfügbar.", "error");
+              pushAppToast(t("toast.shareUnavailable"), "error");
             }
           })();
         }}
@@ -299,7 +304,7 @@ const App = () => {
           <div key={toast.id} className={`app-toast app-toast--${toast.tone}`} role="status">
             <span className="app-toast__text">{toast.message}</span>
             <button type="button" className="app-toast__close" onClick={() => removeAppToast(toast.id)}>
-              Schließen
+              {t("common.close")}
             </button>
           </div>
         ))}
@@ -309,18 +314,18 @@ const App = () => {
         <div className="sync-toast" role="status" aria-live="polite">
           <span>{syncNotice.message}</span>
           <button type="button" className="sync-toast__close" onClick={clearSyncNotice}>
-            Schließen
+            {t("common.close")}
           </button>
         </div>
       ) : null}
 
       {__IS_VERCEL_NON_PRODUCTION__ ? (
         <div className="backend-log-panel" aria-live="polite">
-          <p className="backend-log-panel__title">Backend-Logs</p>
+          <p className="backend-log-panel__title">{t("debug.backendLogs")}</p>
           <ul className="backend-log-panel__list">
             {backendLogs.length === 0 ? (
               <li className="backend-log-panel__entry backend-log-panel__entry--skipped">
-                Noch keine Backend-Aufrufe protokolliert.
+                {t("debug.noBackendLogs")}
               </li>
             ) : (
               backendLogs.slice().reverse().map((entry) => (
@@ -339,13 +344,13 @@ const App = () => {
       <div className="undo-toast-stack" aria-live="polite" aria-atomic="false">
         {undoToasts.map((toast) => (
           <div key={toast.id} className="undo-toast" role="status">
-            <span className="undo-toast__text">{`„${toast.item.name}“ gelöscht.`}</span>
+            <span className="undo-toast__text">{t("toast.undoDeleted", { name: toast.item.name })}</span>
             <button
               type="button"
               className="undo-toast__action"
               onClick={() => void handleUndoDelete(toast.id, toast.item.id)}
             >
-              Rückgängig
+              {t("toast.undo")}
             </button>
           </div>
         ))}
@@ -364,6 +369,10 @@ const App = () => {
         }}
         onDeleteList={handleDeleteList}
         onCreateList={handleCreateList}
+        onOpenSettings={() => {
+          setIsDrawerOpen(false);
+          setIsSettingsModalOpen(true);
+        }}
       />
 
       <AddItemDialog
@@ -387,6 +396,11 @@ const App = () => {
         onSave={() => {
           void handleConfirmCreateList();
         }}
+      />
+
+      <SettingsModal
+        isOpen={isSettingsModalOpen}
+        onClose={() => setIsSettingsModalOpen(false)}
       />
 
       <EditItemModal

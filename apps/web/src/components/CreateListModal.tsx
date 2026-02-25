@@ -1,3 +1,5 @@
+import { useI18n } from "../i18n";
+
 type CreateListModalProps = {
   isOpen: boolean;
   value: string;
@@ -13,6 +15,8 @@ const CreateListModal = ({
   onCancel,
   onSave,
 }: CreateListModalProps) => {
+  const { t } = useI18n();
+
   if (!isOpen) {return null;}
 
   const isSaveDisabled = !value.trim();
@@ -26,26 +30,26 @@ const CreateListModal = ({
         }}
       >
         <div className="modal__header">
-          <h2>Neue Liste erstellen</h2>
+          <h2>{t("modal.createList")}</h2>
         </div>
         <div className="modal__body">
           <div className="modal__field">
-            <label htmlFor="new-list-name">Name</label>
+            <label htmlFor="new-list-name">{t("common.name")}</label>
             <input
               id="new-list-name"
               value={value}
               onChange={(event) => onChange(event.target.value)}
-              placeholder="Listenname"
+              placeholder={t("modal.listName")}
               autoFocus
             />
           </div>
         </div>
         <div className="modal__actions">
           <button type="button" className="text-button" onClick={onCancel}>
-            Abbrechen
+            {t("common.cancel")}
           </button>
           <button type="button" className="text-button" onClick={onSave} disabled={isSaveDisabled}>
-            Erstellen
+            {t("modal.create")}
           </button>
         </div>
       </div>

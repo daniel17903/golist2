@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState, type PointerEvent } from "react";
 import type { List } from "@golist/shared/domain/types";
+import { useI18n } from "../i18n";
 
 type ListMeta = {
   openItems: number;
@@ -16,48 +17,12 @@ type ListsDrawerProps = {
   onSelectList: (listId: string) => void;
   onDeleteList: (listId: string) => void;
   onCreateList: () => void;
+  onOpenSettings: () => void;
 };
 
 type DragMode = "opening" | "closing";
 
 const EDGE_SWIPE_WIDTH = 28;
-
-const formatLastUpdated = (timestamp: number) => {
-  if (!timestamp) {
-    return "Noch nie aktualisiert";
-  }
-
-  const elapsedMs = Date.now() - timestamp;
-  if (elapsedMs < 0) {
-    return "gerade eben";
-  }
-
-  const elapsedMinutes = Math.floor(elapsedMs / 60_000);
-  if (elapsedMinutes < 1) {
-    return "gerade eben";
-  }
-
-  if (elapsedMinutes < 60) {
-    return `vor ${elapsedMinutes} Min.`;
-  }
-
-  const elapsedHours = Math.floor(elapsedMinutes / 60);
-  if (elapsedHours < 24) {
-    return `vor ${elapsedHours} Std.`;
-  }
-
-  const elapsedDays = Math.floor(elapsedHours / 24);
-  if (elapsedDays <= 7) {
-    return `vor ${elapsedDays} Tag${elapsedDays === 1 ? "" : "en"}`;
-  }
-
-  return new Intl.DateTimeFormat("de-DE", {
-    day: "2-digit",
-    month: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(timestamp));
-};
 
 const ListsDrawer = ({
   isOpen,
@@ -69,11 +34,26 @@ const ListsDrawer = ({
   onSelectList,
   onDeleteList,
   onCreateList,
+  onOpenSettings,
 }: ListsDrawerProps) => {
+  const { t, locale } = useI18n();
   const drawerRef = useRef<HTMLElement | null>(null);
   const dragStateRef = useRef<{ pointerId: number; startX: number; mode: DragMode } | null>(null);
   const [dragOffset, setDragOffset] = useState<number | null>(null);
   const [confirmDeleteListId, setConfirmDeleteListId] = useState<string | null>(null);
+
+  const formatLastUpdated = (timestamp: number) => {
+    if (!timestamp) {
+      return t("drawer.neverUpdated");
+    }
+
+    return new Intl.DateTimeFormat(locale, {
+      day: "2-digit",
+      month: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(new Date(timestamp));
+  };
 
   const getDrawerWidth = () => {
     const measured = drawerRef.current?.offsetWidth;
@@ -176,7 +156,7 @@ const ListsDrawer = ({
             <span>GoList</span>
           </div>
           <div className="drawer__section">
-            <p className="drawer__title">Meine Listen</p>
+            <p className="drawer__title">{t("drawer.myLists")}</p>
             <div className="drawer__list">
               {lists.map((list) => {
                 const listMeta = listMetaById[list.id] ?? { openItems: 0, lastUpdatedAt: list.updatedAt };
@@ -201,13 +181,22 @@ const ListsDrawer = ({
                       </span>
                       <span className="drawer__item-copy">
                         <span className="drawer__item-label">{list.name}</span>
-                        <span className="drawer__item-meta">{`${listMeta.openItems} offen · aktualisiert ${formatLastUpdated(listMeta.lastUpdatedAt)}`}</span>
+                        <span className="drawer__item-meta">
+                          {t("drawer.openUpdated", {
+                            count: listMeta.openItems,
+                            updated: formatLastUpdated(listMeta.lastUpdatedAt),
+                          })}
+                        </span>
                       </span>
                     </button>
                     <button
                       type="button"
                       className={`drawer__delete ${isConfirmingDelete ? "drawer__delete--confirm" : ""}`}
-                      aria-label={isConfirmingDelete ? `Löschen bestätigen: ${list.name}` : `Löschen: ${list.name}`}
+                      aria-label={
+                        isConfirmingDelete
+                          ? t("drawer.confirmDelete", { name: list.name })
+                          : t("drawer.delete", { name: list.name })
+                      }
                       disabled={!canDelete}
                       onClick={() => {
                         if (isConfirmingDelete) {
@@ -231,17 +220,29 @@ const ListsDrawer = ({
                   </div>
                 );
               })}
-              {nextDeleteLabel ? <p className="drawer__delete-hint">Erneut tippen, um „{nextDeleteLabel}“ zu löschen.</p> : null}
+              {nextDeleteLabel ? <p className="drawer__delete-hint">{t("drawer.tapAgainToDelete", { name: nextDeleteLabel })}</p> : null}
               <button type="button" className="drawer__new" onClick={onCreateList}>
                 <span className="drawer__item-icon" aria-hidden="true">
                   <svg viewBox="0 0 24 24">
                     <path d="M19 13H13v6h-2v-6H5v-2h6V5h2v6h6v2z" fill="currentColor" />
                   </svg>
                 </span>
-                Neue Liste erstellen
+                {t("drawer.createList")}
               </button>
             </div>
           </div>
+
+          <button type="button" className="drawer__settings" onClick={onOpenSettings}>
+            <span>{t("drawer.settings")}</span>
+            <span className="drawer__item-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <path
+                  d="M19.14 12.94a7.43 7.43 0 0 0 .05-.94 7.43 7.43 0 0 0-.05-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7.2 7.2 0 0 0-1.63-.94l-.36-2.54a.5.5 0 0 0-.49-.42h-3.84a.5.5 0 0 0-.49.42l-.36 2.54a7.2 7.2 0 0 0-1.63.94l-2.39-.96a.5.5 0 0 0-.6.22L2.7 8.84a.5.5 0 0 0 .12.64l2.03 1.58a7.43 7.43 0 0 0-.05.94c0 .32.02.63.05.94L2.82 14.52a.5.5 0 0 0-.12.64l1.92 3.32c.13.22.39.31.6.22l2.39-.96c.5.39 1.05.71 1.63.94l.36 2.54c.04.24.25.42.49.42h3.84c.24 0 .45-.18.49-.42l.36-2.54c.58-.23 1.13-.55 1.63-.94l2.39.96c.22.09.47 0 .6-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.03-1.58zM12 15.5A3.5 3.5 0 1 1 12 8a3.5 3.5 0 0 1 0 7.5z"
+                  fill="currentColor"
+                />
+              </svg>
+            </span>
+          </button>
         </aside>
       </div>
     </>

@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { useI18n } from "../i18n";
 
 type AppHeaderProps = {
   activeListName: string;
@@ -26,6 +27,7 @@ const AppHeader = ({
   onCancelRename,
 }: AppHeaderProps) => {
   const renameInputRef = useRef<HTMLInputElement | null>(null);
+  const { t } = useI18n();
 
   useEffect(() => {
     if (isEditingName) {
@@ -35,11 +37,11 @@ const AppHeader = ({
   }, [isEditingName]);
 
   return (
-    <header className="app__header" aria-label="Aktive Liste">
+    <header className="app__header" aria-label={t("header.activeList")}>
       <div className="header-card">
         <div className="title-row">
           {isEditingName ? (
-            <div className="title-edit" role="group" aria-label="Listenname bearbeiten">
+            <div className="title-edit" role="group" aria-label={t("header.editListName")}>
               <input
                 ref={renameInputRef}
                 value={renameValue}
@@ -54,14 +56,14 @@ const AppHeader = ({
                     onCancelRename();
                   }
                 }}
-                aria-label="Listenname"
+                aria-label={t("modal.listName")}
                 maxLength={120}
               />
               <button type="button" className="header-chip-button" onClick={onSaveRename}>
-                Speichern
+                {t("common.save")}
               </button>
               <button type="button" className="header-chip-button" onClick={onCancelRename}>
-                Abbrechen
+                {t("common.cancel")}
               </button>
             </div>
           ) : (
@@ -71,7 +73,7 @@ const AppHeader = ({
                 type="button"
                 className="icon-button"
                 onClick={onStartRename}
-                aria-label="Listenname bearbeiten"
+                aria-label={t("header.editListName")}
               >
                 <svg viewBox="0 0 24 24" aria-hidden="true">
                   <path
@@ -85,19 +87,19 @@ const AppHeader = ({
         </div>
 
         <div className="header-meta-row">
-          <span className="header-meta">{openItemCount} offen</span>
+          <span className="header-meta">{t("header.openItems", { count: openItemCount })}</span>
           <span className="header-status" role="status" aria-live="polite">
             {isBackendBusy ? (
               <span
                 className="connection-spinner"
-                aria-label="Backend synchronisiert gerade"
-                title="Backend synchronisiert gerade"
+                aria-label={t("header.backendSyncing")}
+                title={t("header.backendSyncing")}
               />
             ) : (
               <span
                 className={`connection-icon connection-icon--${backendConnection}`}
-                aria-label={`Backend Status: ${backendConnection}`}
-                title={`Backend Status: ${backendConnection}`}
+                aria-label={t("header.backendStatus", { status: backendConnection })}
+                title={t("header.backendStatus", { status: backendConnection })}
               >
                 <svg viewBox="0 0 24 24" aria-hidden="true">
                   <path
