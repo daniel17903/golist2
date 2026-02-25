@@ -3,7 +3,6 @@ import type { List } from "@golist/shared/domain/types";
 import { useI18n } from "../i18n";
 
 type ListMeta = {
-  openItems: number;
   lastUpdatedAt: number;
 };
 
@@ -42,17 +41,36 @@ const ListsDrawer = ({
   const [dragOffset, setDragOffset] = useState<number | null>(null);
   const [confirmDeleteListId, setConfirmDeleteListId] = useState<string | null>(null);
 
+  const relativeTimeFormatter = useMemo(
+    () =>
+      new Intl.RelativeTimeFormat(locale, {
+        numeric: "auto",
+      }),
+    [locale],
+  );
+
   const formatLastUpdated = (timestamp: number) => {
     if (!timestamp) {
       return t("drawer.neverUpdated");
     }
 
-    return new Intl.DateTimeFormat(locale, {
-      day: "2-digit",
-      month: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-    }).format(new Date(timestamp));
+    const elapsedMs = Date.now() - timestamp;
+    const elapsedMinutes = Math.round(elapsedMs / 60000);
+
+    if (elapsedMinutes < 1) {
+      return relativeTimeFormatter.format(0, "minute");
+    }
+    if (elapsedMinutes < 60) {
+      return relativeTimeFormatter.format(-elapsedMinutes, "minute");
+    }
+
+    const elapsedHours = Math.round(elapsedMinutes / 60);
+    if (elapsedHours < 24) {
+      return relativeTimeFormatter.format(-elapsedHours, "hour");
+    }
+
+    const elapsedDays = Math.round(elapsedHours / 24);
+    return relativeTimeFormatter.format(-elapsedDays, "day");
   };
 
   const getDrawerWidth = () => {
@@ -159,7 +177,7 @@ const ListsDrawer = ({
             <p className="drawer__title">{t("drawer.myLists")}</p>
             <div className="drawer__list">
               {lists.map((list) => {
-                const listMeta = listMetaById[list.id] ?? { openItems: 0, lastUpdatedAt: list.updatedAt };
+                const listMeta = listMetaById[list.id] ?? { lastUpdatedAt: list.updatedAt };
                 const isConfirmingDelete = confirmDeleteListId === list.id;
 
                 return (
@@ -183,7 +201,6 @@ const ListsDrawer = ({
                         <span className="drawer__item-label">{list.name}</span>
                         <span className="drawer__item-meta">
                           {t("drawer.openUpdated", {
-                            count: listMeta.openItems,
                             updated: formatLastUpdated(listMeta.lastUpdatedAt),
                           })}
                         </span>

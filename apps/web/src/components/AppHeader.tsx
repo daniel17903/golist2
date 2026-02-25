@@ -3,9 +3,6 @@ import { useI18n } from "../i18n";
 
 type AppHeaderProps = {
   activeListName: string;
-  openItemCount: number;
-  backendConnection: "unknown" | "online" | "offline";
-  isBackendBusy: boolean;
   renameValue: string;
   isEditingName: boolean;
   onRenameValueChange: (value: string) => void;
@@ -16,9 +13,6 @@ type AppHeaderProps = {
 
 const AppHeader = ({
   activeListName,
-  openItemCount,
-  backendConnection,
-  isBackendBusy,
   renameValue,
   isEditingName,
   onRenameValueChange,
@@ -86,31 +80,6 @@ const AppHeader = ({
           )}
         </div>
 
-        <div className="header-meta-row">
-          <span className="header-meta">{t("header.openItems", { count: openItemCount })}</span>
-          <span className="header-status" role="status" aria-live="polite">
-            {isBackendBusy ? (
-              <span
-                className="connection-spinner"
-                aria-label={t("header.backendSyncing")}
-                title={t("header.backendSyncing")}
-              />
-            ) : (
-              <span
-                className={`connection-icon connection-icon--${backendConnection}`}
-                aria-label={t("header.backendStatus", { status: backendConnection })}
-                title={t("header.backendStatus", { status: backendConnection })}
-              >
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path
-                    d="M19 18H6a4 4 0 1 1 .6-7.96A5.5 5.5 0 0 1 17.06 9a3.75 3.75 0 0 1 1.94 7z"
-                    fill="currentColor"
-                  />
-                </svg>
-              </span>
-            )}
-          </span>
-        </div>
       </div>
     </header>
   );

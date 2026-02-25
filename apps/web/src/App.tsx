@@ -88,7 +88,6 @@ const App = () => {
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
 
   const listMetaById = useMemo(() => {
-    const openCountByList = new Map<string, number>();
     const updatedAtByList = new Map<string, number>();
 
     for (const list of lists) {
@@ -96,9 +95,6 @@ const App = () => {
     }
 
     for (const item of items) {
-      if (!item.deleted) {
-        openCountByList.set(item.listId, (openCountByList.get(item.listId) ?? 0) + 1);
-      }
       updatedAtByList.set(item.listId, Math.max(updatedAtByList.get(item.listId) ?? 0, item.updatedAt));
     }
 
@@ -106,7 +102,6 @@ const App = () => {
       lists.map((list) => [
         list.id,
         {
-          openItems: openCountByList.get(list.id) ?? 0,
           lastUpdatedAt: updatedAtByList.get(list.id) ?? list.updatedAt,
         },
       ]),
@@ -242,9 +237,6 @@ const App = () => {
     <div className="app">
       <AppHeader
         activeListName={activeList?.name ?? ""}
-        openItemCount={listItems.length}
-        backendConnection={backendConnection}
-        isBackendBusy={backendBusyRequests > 0}
         renameValue={newListName}
         isEditingName={editingTitle}
         onRenameValueChange={setNewListName}
@@ -274,6 +266,8 @@ const App = () => {
       <BottomBar
         onOpenDrawer={() => setIsDrawerOpen(true)}
         onAddItem={openAddDialog}
+        backendConnection={backendConnection}
+        isBackendBusy={backendBusyRequests > 0}
         onShareList={() => {
           void (async () => {
             try {

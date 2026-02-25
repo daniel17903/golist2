@@ -4,9 +4,11 @@ type BottomBarProps = {
   onOpenDrawer: () => void;
   onAddItem: () => void;
   onShareList: () => void;
+  backendConnection: "unknown" | "online" | "offline";
+  isBackendBusy: boolean;
 };
 
-const BottomBar = ({ onOpenDrawer, onAddItem, onShareList }: BottomBarProps) => {
+const BottomBar = ({ onOpenDrawer, onAddItem, onShareList, backendConnection, isBackendBusy }: BottomBarProps) => {
   const { t } = useI18n();
 
   return (
@@ -29,6 +31,28 @@ const BottomBar = ({ onOpenDrawer, onAddItem, onShareList }: BottomBarProps) => 
           <path d="M19 13H13v6h-2v-6H5v-2h6V5h2v6h6v2z" fill="currentColor" />
         </svg>
       </button>
+      <span className="header-status bottom-bar__status" role="status" aria-live="polite">
+        {isBackendBusy ? (
+          <span
+            className="connection-spinner"
+            aria-label={t("header.backendSyncing")}
+            title={t("header.backendSyncing")}
+          />
+        ) : (
+          <span
+            className={`connection-icon connection-icon--${backendConnection}`}
+            aria-label={t("header.backendStatus", { status: backendConnection })}
+            title={t("header.backendStatus", { status: backendConnection })}
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M19 18H6a4 4 0 1 1 .6-7.96A5.5 5.5 0 0 1 17.06 9a3.75 3.75 0 0 1 1.94 7z"
+                fill="currentColor"
+              />
+            </svg>
+          </span>
+        )}
+      </span>
       <button className="bottom-icon" type="button" aria-label={t("bottom.shareList")} onClick={onShareList}>
         <svg viewBox="0 0 24 24" aria-hidden="true">
           <path
