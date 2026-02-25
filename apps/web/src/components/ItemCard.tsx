@@ -23,10 +23,12 @@ const ItemCard = ({
   onPointerCancel,
   onClick,
 }: ItemCardProps) => {
+  const hasLongText = item.name.length > 16 || (item.quantityOrUnit?.length ?? 0) > 12;
+
   return (
     <button
       type="button"
-      className={`item-card ${isExiting ? "item-card--exit" : ""}`}
+      className={`item-card ${isExiting ? "item-card--exit" : ""} ${hasLongText ? "item-card--long-text" : ""}`}
       onPointerDown={() => onPointerDown(item.id, item.name, item.quantityOrUnit)}
       onPointerUp={() => onPointerUp(item.id)}
       onPointerLeave={onPointerLeave}

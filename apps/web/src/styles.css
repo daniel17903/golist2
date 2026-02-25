@@ -251,19 +251,24 @@ body {
 
 
 .item-icon {
-  width: 44px;
-  height: 44px;
+  width: 52px;
+  height: 52px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .item-icon img {
-  width: 42px;
-  height: 42px;
+  width: 50px;
+  height: 50px;
   object-fit: contain;
   filter: brightness(0) invert(1);
 }
+
+.item-card--long-text .item-icon {
+  margin-top: -4px;
+}
+
 
 .item-text {
   display: grid;
