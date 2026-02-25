@@ -18,6 +18,12 @@ describe("categories helpers", () => {
     expect(getCategoryForItem("apfel", "en")).toBeUndefined();
   });
 
+
+  it("uses translated locale entries for spanish", () => {
+    expect(getCategoryForItem("manzana", "es")?.id).toBe("fruitsVegetables");
+    expect(getItemIcon("manzana", "es")).toBe("/icons/apple.svg");
+  });
+
   it("falls back to the default icon when no match exists", () => {
     expect(getItemIcon("mystery item", "en")).toBe("/icons/default.svg");
   });

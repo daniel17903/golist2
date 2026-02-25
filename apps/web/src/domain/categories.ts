@@ -27,7 +27,7 @@ type CategoryEntry = {
   category: string;
 };
 
-const categoryEntries: CategoryEntry[] = [
+const mixedCategoryEntries: CategoryEntry[] = [
   {
     assetFileName: "apple",
     matchingNames: ["fruit", "apples", "apple"],
@@ -755,59 +755,225 @@ const categoryEntries: CategoryEntry[] = [
   },
 ];
 
-const itemCategoryMap = new Map<string, string>();
-const itemAssetMap = new Map<string, string>();
+const deToEn: Record<string, string> = {
+  apfel: "apple",
+  birne: "pear",
+  zitrone: "lemon",
+  limette: "lime",
+  banane: "banana",
+  orange: "orange",
+  tomate: "tomato",
+  kartoffel: "potato",
+  kartoffeln: "potatoes",
+  zwiebel: "onion",
+  knoblauch: "garlic",
+  gurke: "cucumber",
+  paprika: "pepper",
+  salat: "salad",
+  spinat: "spinach",
+  kohl: "cabbage",
+  brokkoli: "broccoli",
+  aubergine: "eggplant",
+  kürbis: "pumpkin",
+  kuerbis: "pumpkin",
+  melone: "melon",
+  ananas: "pineapple",
+  beeren: "berries",
+  erdbeere: "strawberry",
+  himbeeren: "raspberries",
+  blaubeeren: "blueberries",
+  milch: "milk",
+  käse: "cheese",
+  kaese: "cheese",
+  eier: "eggs",
+  butter: "butter",
+  joghurt: "yogurt",
+  quark: "quark",
+  sahne: "cream",
+  brot: "bread",
+  brötchen: "bread roll",
+  broetchen: "bread roll",
+  baguette: "baguette",
+  semmel: "bread roll",
+  nudeln: "pasta",
+  reis: "rice",
+  mehl: "flour",
+  haferflocken: "oats",
+  zucker: "sugar",
+  salz: "salt",
+  pfeffer: "pepper",
+  öl: "oil",
+  oel: "oil",
+  essig: "vinegar",
+  wasser: "water",
+  saft: "juice",
+  tee: "tea",
+  kaffee: "coffee",
+  keks: "cookie",
+  kekse: "cookies",
+  chips: "chips",
+  schokolade: "chocolate",
+  eis: "ice cream",
+  putzmittel: "cleaner",
+  spülmittel: "dish soap",
+  spuelmittel: "dish soap",
+  toilettenpapier: "toilet paper",
+  küchenrolle: "paper towels",
+  kuechenrolle: "paper towels",
+  shampoo: "shampoo",
+  duschgel: "shower gel",
+  schwamm: "sponge",
+  tüte: "bag",
+  tuete: "bag",
+  beutel: "bag",
+};
+
+const deToEs: Record<string, string> = {
+  apfel: "manzana",
+  birne: "pera",
+  zitrone: "limón",
+  limette: "lima",
+  banane: "plátano",
+  orange: "naranja",
+  tomate: "tomate",
+  kartoffel: "patata",
+  kartoffeln: "patatas",
+  zwiebel: "cebolla",
+  knoblauch: "ajo",
+  gurke: "pepino",
+  paprika: "pimiento",
+  salat: "ensalada",
+  spinat: "espinaca",
+  kohl: "col",
+  brokkoli: "brócoli",
+  aubergine: "berenjena",
+  kürbis: "calabaza",
+  kuerbis: "calabaza",
+  melone: "melón",
+  ananas: "piña",
+  beeren: "bayas",
+  erdbeere: "fresa",
+  himbeeren: "frambuesas",
+  blaubeeren: "arándanos",
+  milch: "leche",
+  käse: "queso",
+  kaese: "queso",
+  eier: "huevos",
+  butter: "mantequilla",
+  joghurt: "yogur",
+  quark: "requesón",
+  sahne: "nata",
+  brot: "pan",
+  brötchen: "panecillo",
+  broetchen: "panecillo",
+  baguette: "baguette",
+  semmel: "panecillo",
+  nudeln: "pasta",
+  reis: "arroz",
+  mehl: "harina",
+  haferflocken: "copos de avena",
+  zucker: "azúcar",
+  salz: "sal",
+  pfeffer: "pimienta",
+  öl: "aceite",
+  oel: "aceite",
+  essig: "vinagre",
+  wasser: "agua",
+  saft: "zumo",
+  tee: "té",
+  kaffee: "café",
+  keks: "galleta",
+  kekse: "galletas",
+  chips: "patatas fritas",
+  schokolade: "chocolate",
+  eis: "helado",
+  putzmittel: "limpiador",
+  spülmittel: "lavavajillas",
+  spuelmittel: "lavavajillas",
+  toilettenpapier: "papel higiénico",
+  küchenrolle: "papel de cocina",
+  kuechenrolle: "papel de cocina",
+  shampoo: "champú",
+  duschgel: "gel de ducha",
+  schwamm: "esponja",
+  tüte: "bolsa",
+  tuete: "bolsa",
+  beutel: "bolsa",
+};
+
+const germanKnownTerms = new Set<string>([
+  ...Object.keys(deToEn),
+  ...Object.keys(deToEs),
+]);
+
+const isLikelyGerman = (value: string) =>
+  germanKnownTerms.has(value) || /[äöüß]/i.test(value) || /\b(kaese|spuel|tuete|broet|kuechen|schwaemme)\b/i.test(value);
+
+const translateNameForLocale = (name: string, locale: Locale): string | undefined => {
+  const key = name.trim().toLowerCase();
+  if (!key) {
+    return undefined;
+  }
+
+  if (locale === "de") {
+    return key;
+  }
+
+  if (locale === "en") {
+    return deToEn[key] ?? (isLikelyGerman(key) ? undefined : key);
+  }
+
+  return deToEs[key] ?? (isLikelyGerman(key) ? undefined : key);
+};
+
+const localizeEntries = (locale: Locale): CategoryEntry[] =>
+  mixedCategoryEntries
+    .map((entry) => ({
+      ...entry,
+      matchingNames: Array.from(
+        new Set(
+          entry.matchingNames
+            .map((name) => translateNameForLocale(name, locale))
+            .filter((name): name is string => Boolean(name)),
+        ),
+      ),
+    }))
+    .filter((entry) => entry.matchingNames.length > 0);
+
+const itemCategoryMapByLocale: Record<Locale, Map<string, string>> = {
+  en: new Map(),
+  de: new Map(),
+  es: new Map(),
+};
+
+const itemAssetMapByLocale: Record<Locale, Map<string, string>> = {
+  en: new Map(),
+  de: new Map(),
+  es: new Map(),
+};
+
 const iconBasePath = "/icons";
 const defaultIconName = "default";
 const buildIconPath = (iconName: string) => `${iconBasePath}/${iconName}.svg`;
 
-categoryEntries.forEach((entry) => {
-  entry.matchingNames.forEach((name) => {
-    const key = name.trim().toLowerCase();
-    if (!key) {return;}
-    if (!itemCategoryMap.has(key)) {
-      itemCategoryMap.set(key, entry.category);
-    }
-    if (!itemAssetMap.has(key)) {
-      itemAssetMap.set(key, entry.assetFileName);
-    }
+(["en", "de", "es"] as const).forEach((locale) => {
+  localizeEntries(locale).forEach((entry) => {
+    entry.matchingNames.forEach((name) => {
+      const key = name.trim().toLowerCase();
+      if (!key) {return;}
+      if (!itemCategoryMapByLocale[locale].has(key)) {
+        itemCategoryMapByLocale[locale].set(key, entry.category);
+      }
+      if (!itemAssetMapByLocale[locale].has(key)) {
+        itemAssetMapByLocale[locale].set(key, entry.assetFileName);
+      }
+    });
   });
 });
 
-const localeSpecificNames: Record<Locale, Set<string>> = {
-  en: new Set(["apple"]),
-  de: new Set(["apfel"]),
-  es: new Set(["manzana"]),
-};
-
-const localeSpecificAssets: Record<string, string> = {
-  apple: "apple",
-  apfel: "apple",
-  manzana: "apple",
-};
-
-const localeSpecificCategory: Record<string, string> = {
-  apple: "fruitsVegetables",
-  apfel: "fruitsVegetables",
-  manzana: "fruitsVegetables",
-};
-
-const resolveLocaleAwareCategory = (key: string, locale: Locale): string | undefined => {
-  const isLocaleSpecificName = Object.values(localeSpecificNames).some((names) => names.has(key));
-  if (!isLocaleSpecificName) {
-    return itemCategoryMap.get(key);
-  }
-
-  if (localeSpecificNames[locale].has(key)) {
-    return localeSpecificCategory[key];
-  }
-
-  return undefined;
-};
-
 export const getCategoryForItem = (name: string, locale: Locale = getLocale()): Category | undefined => {
   const key = name.trim().toLowerCase();
-  const categoryId = resolveLocaleAwareCategory(key, locale);
+  const categoryId = itemCategoryMapByLocale[locale].get(key);
   return categories.find((category) => category.id === categoryId);
 };
 
@@ -818,12 +984,7 @@ export const getCategoryOrder = (name: string, locale: Locale = getLocale()): nu
 
 export const getItemIcon = (name: string, locale: Locale = getLocale()): string => {
   const key = name.trim().toLowerCase();
-  const isLocaleSpecificName = Object.values(localeSpecificNames).some((names) => names.has(key));
-  if (isLocaleSpecificName && !localeSpecificNames[locale].has(key)) {
-    return buildIconPath(defaultIconName);
-  }
-
-  const asset = localeSpecificAssets[key] ?? itemAssetMap.get(key);
+  const asset = itemAssetMapByLocale[locale].get(key);
   if (asset) {
     return buildIconPath(asset);
   }
