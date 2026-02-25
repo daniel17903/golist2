@@ -1,3 +1,6 @@
+import { getCurrentLocale } from "../i18n";
+import type { Locale } from "../i18n/config";
+
 export type Category = {
   id: string;
   label: string;
@@ -753,6 +756,29 @@ const categoryEntries: CategoryEntry[] = [
   },
 ];
 
+
+const localizedItemEntries: Record<Locale, Record<string, { category: string; asset: string }>> = {
+  en: {
+    apple: { category: "fruitsVegetables", asset: "apple" },
+    apples: { category: "fruitsVegetables", asset: "apple" },
+  },
+  de: {
+    apfel: { category: "fruitsVegetables", asset: "apple" },
+    "äpfel": { category: "fruitsVegetables", asset: "apple" },
+    aepfel: { category: "fruitsVegetables", asset: "apple" },
+  },
+  es: {
+    manzana: { category: "fruitsVegetables", asset: "apple" },
+    manzanas: { category: "fruitsVegetables", asset: "apple" },
+  },
+};
+
+const localeScopedNames = new Set(
+  Object.values(localizedItemEntries)
+    .flatMap((entries) => Object.keys(entries))
+    .map((name) => name.trim().toLowerCase()),
+);
+
 const itemCategoryMap = new Map<string, string>();
 const itemAssetMap = new Map<string, string>();
 const iconBasePath = "/icons";
@@ -772,19 +798,33 @@ categoryEntries.forEach((entry) => {
   });
 });
 
-export const getCategoryForItem = (name: string): Category | undefined => {
+export const getCategoryForItem = (name: string, locale: Locale = getCurrentLocale()): Category | undefined => {
   const key = name.trim().toLowerCase();
+  const localized = localizedItemEntries[locale][key];
+  if (localized) {
+    return categories.find((category) => category.id === localized.category);
+  }
+  if (localeScopedNames.has(key)) {
+    return undefined;
+  }
   const categoryId = itemCategoryMap.get(key);
   return categories.find((category) => category.id === categoryId);
 };
 
-export const getCategoryOrder = (name: string): number | undefined => {
-  const category = getCategoryForItem(name);
+export const getCategoryOrder = (name: string, locale: Locale = getCurrentLocale()): number | undefined => {
+  const category = getCategoryForItem(name, locale);
   return category?.order;
 };
 
-export const getItemIcon = (name: string): string => {
+export const getItemIcon = (name: string, locale: Locale = getCurrentLocale()): string => {
   const key = name.trim().toLowerCase();
+  const localized = localizedItemEntries[locale][key];
+  if (localized) {
+    return buildIconPath(localized.asset);
+  }
+  if (localeScopedNames.has(key)) {
+    return buildIconPath(defaultIconName);
+  }
   const asset = itemAssetMap.get(key);
   if (asset) {
     return buildIconPath(asset);
