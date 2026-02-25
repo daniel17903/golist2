@@ -20,7 +20,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: "autoUpdate",
-      includeAssets: ["favicon.png", "icons/*.svg", "icons/icon.png"],
+      includeAssets: ["favicon.svg", "favicon.ico", "favicon-96x96.png", "apple-touch-icon.png", "web-app-manifest-192x192.png", "web-app-manifest-512x512.png", "icons/*.svg"],
       manifest: {
         name: "GoList",
         short_name: "GoList",
@@ -34,16 +34,14 @@ export default defineConfig({
         scope: "/",
         icons: [
           {
-            src: "/favicon.png",
-            sizes: "512x512",
+            src: "/web-app-manifest-192x192.png",
+            sizes: "192x192",
             type: "image/png",
-            purpose: "any maskable",
           },
           {
-            src: "/icons/icon.png",
+            src: "/web-app-manifest-512x512.png",
             sizes: "512x512",
             type: "image/png",
-            purpose: "any maskable",
           },
         ],
       },
