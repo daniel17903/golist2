@@ -926,15 +926,22 @@ body {
 
 @media (max-width: 420px) {
   .list-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(110px, 1fr));
     width: 100%;
     justify-content: stretch;
   }
 
   .list-grid .item-card {
     width: 100%;
+    min-width: 110px;
     height: auto;
     aspect-ratio: 1 / 1;
+  }
+
+  .list-grid .item-icon,
+  .list-grid .item-icon img {
+    width: 56px;
+    height: 56px;
   }
 
   .app {
