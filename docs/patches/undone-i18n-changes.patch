@@ -1,0 +1,1608 @@
+From 79e7901a6e7f2ec72128ef4785edf7d835666e64 Mon Sep 17 00:00:00 2001
+From: Codex <codex@openai.com>
+Date: Wed, 25 Feb 2026 11:36:44 +0000
+Subject: [PATCH] Move language selection to settings modal and make item
+ detection locale-aware
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+### Motivation
+
+- Centralize user-facing text into a stable i18n surface and avoid Fast Refresh / export-of-non-components issues by providing a runtime/provider separation.
+- Make parsing and item-category/icon detection locale-aware so the app recognizes item names in the active language (e.g. `apfel` in `de`, `apple` in `en`, `manzana` in `es`).
+
+### Description
+
+- Added an i18n runtime and React integration under `apps/web/src/i18n/` including `config.ts`, `runtime.ts`, `I18nProvider.tsx`, `context.ts`, `useI18n.ts`, `resources.ts`, and locale resolution tests (`resolveLocale.test.ts`, `resources.test.ts`).
+- Wired i18n into app bootstrap by calling `initializeLocale()` and wrapping `<App />` with `<I18nProvider />` in `main.tsx`.
+- Moved the language picker out of the drawer list area and implemented a settings popup opened from the existing settings button at the bottom of the sidebar; the modal contains the language selector and a close action (changes in `ListsDrawer.tsx`).
+- Made UI text locale-aware by replacing hardcoded strings with `t(...)` and `useI18n()` in components (`App.tsx`, `AddItemDialog.tsx`, `AppHeader.tsx`, `BottomBar.tsx`, `CreateListModal.tsx`, `EditItemModal.tsx`, etc.).
+- Implemented locale-scoped item-name detection and icon resolution in `apps/web/src/domain/categories.ts` via a `localizedItemEntries` map and updated `getCategoryForItem`, `getCategoryOrder`, and `getItemIcon` to accept a `locale` (defaulting to the resolved locale).
+- Made the input parser locale-aware by adding `parseAmount(input, locale)` and `parseItemInput(input, locale)` with EN/ES unit aliases while preserving existing DE behavior (changes in `inputParser.ts`).
+- Updated and added unit tests for the new behavior (`domain/categories.test.ts`, `domain/inputParser.test.ts`, `i18n/*` tests) to cover locale-specific detection and key parity.
+
+### Testing
+
+- Ran lint: `npm run lint -w apps/web` — passed.
+- Ran typecheck: `npm run typecheck -w apps/web` — passed.
+- Ran unit tests: `npm run test -w apps/web` — Vitest suite passed (unit tests passed; Playwright E2E file initially skipped then executed).
+- Ran Playwright E2E with browser install: `npx playwright install chromium`, `npx playwright install-deps chromium`, and `RUN_PLAYWRIGHT_E2E=1 npm run test -w apps/web -- src/e2e.backend-frontend.playwright.test.ts` — passed.
+- Ran production build: `npm run build -w apps/web` — passed.
+---
+ apps/web/src/App.tsx                          |  25 +--
+ apps/web/src/components/AddItemDialog.tsx     |  19 +-
+ apps/web/src/components/AppHeader.tsx         |  40 ++--
+ apps/web/src/components/BottomBar.tsx         |  20 +-
+ apps/web/src/components/CreateListModal.tsx   |  28 +--
+ apps/web/src/components/EditItemModal.tsx     |  28 ++-
+ apps/web/src/components/ListsDrawer.tsx       | 178 +++++++++---------
+ apps/web/src/domain/categories.test.ts        |  17 +-
+ apps/web/src/domain/categories.ts             |  48 ++++-
+ apps/web/src/domain/inputParser.test.ts       |  11 +-
+ apps/web/src/domain/inputParser.ts            |  69 ++++++-
+ .../e2e.backend-frontend.playwright.test.ts   |   8 +-
+ apps/web/src/hooks/useAppState.ts             |  10 +-
+ apps/web/src/i18n/I18nProvider.tsx            |  10 +
+ apps/web/src/i18n/config.ts                   |   7 +
+ apps/web/src/i18n/context.ts                  |  10 +
+ apps/web/src/i18n/index.ts                    |   4 +
+ apps/web/src/i18n/resolveLocale.test.ts       |  29 +++
+ apps/web/src/i18n/resolveLocale.ts            |  47 +++++
+ apps/web/src/i18n/resources.test.ts           |  11 ++
+ apps/web/src/i18n/resources.ts                | 124 ++++++++++++
+ apps/web/src/i18n/runtime.ts                  |  42 +++++
+ apps/web/src/i18n/useI18n.ts                  |  11 ++
+ apps/web/src/main.tsx                         |   7 +-
+ docs/i18n-multilanguage-plan.md               | 117 ------------
+ package-lock.json                             |   2 +-
+ 26 files changed, 591 insertions(+), 331 deletions(-)
+ create mode 100644 apps/web/src/i18n/I18nProvider.tsx
+ create mode 100644 apps/web/src/i18n/config.ts
+ create mode 100644 apps/web/src/i18n/context.ts
+ create mode 100644 apps/web/src/i18n/index.ts
+ create mode 100644 apps/web/src/i18n/resolveLocale.test.ts
+ create mode 100644 apps/web/src/i18n/resolveLocale.ts
+ create mode 100644 apps/web/src/i18n/resources.test.ts
+ create mode 100644 apps/web/src/i18n/resources.ts
+ create mode 100644 apps/web/src/i18n/runtime.ts
+ create mode 100644 apps/web/src/i18n/useI18n.ts
+ delete mode 100644 docs/i18n-multilanguage-plan.md
+
+diff --git a/apps/web/src/App.tsx b/apps/web/src/App.tsx
+index 7c14f66..2ce7ad5 100644
+--- a/apps/web/src/App.tsx
++++ b/apps/web/src/App.tsx
+@@ -9,6 +9,7 @@ import ListsDrawer from "./components/ListsDrawer";
+ import CreateListModal from "./components/CreateListModal";
+ import { useAppState } from "./hooks/useAppState";
+ import { useLongPressItem } from "./hooks/useLongPressItem";
++import { useI18n } from "./i18n";
+ 
+ type UndoToast = {
+   id: string;
+@@ -30,6 +31,8 @@ const isAbortError = (error: unknown): boolean => {
+ };
+ 
+ const App = () => {
++  const { t } = useI18n();
++
+   const {
+     lists,
+     items,
+@@ -195,8 +198,8 @@ const App = () => {
+     }
+ 
+     const sharePayload: ShareData = {
+-      title: activeList?.name ?? "GoList",
+-      text: "Teile diese Einkaufsliste",
++      title: activeList?.name ?? t("app.title"),
++      text: t("share.systemText"),
+       url: shareLink,
+     };
+ 
+@@ -276,7 +279,7 @@ const App = () => {
+               try {
+                 const shared = await shareWithSystemSheet(shareLink);
+                 if (shared) {
+-                  pushAppToast("Link erfolgreich geteilt.", "success");
++                  pushAppToast(t("toast.shareSuccess"), "success");
+                   return;
+                 }
+               } catch (error) {
+@@ -286,9 +289,9 @@ const App = () => {
+               }
+ 
+               await navigator.clipboard.writeText(shareLink);
+-              pushAppToast("Teilen-Link wurde in die Zwischenablage kopiert.", "success");
++              pushAppToast(t("toast.shareCopied"), "success");
+             } catch {
+-              pushAppToast("Teilen ist derzeit nicht verfügbar.", "error");
++              pushAppToast(t("toast.shareUnavailable"), "error");
+             }
+           })();
+         }}
+@@ -299,7 +302,7 @@ const App = () => {
+           <div key={toast.id} className={`app-toast app-toast--${toast.tone}`} role="status">
+             <span className="app-toast__text">{toast.message}</span>
+             <button type="button" className="app-toast__close" onClick={() => removeAppToast(toast.id)}>
+-              Schließen
++              {t("common.close")}
+             </button>
+           </div>
+         ))}
+@@ -309,18 +312,18 @@ const App = () => {
+         <div className="sync-toast" role="status" aria-live="polite">
+           <span>{syncNotice.message}</span>
+           <button type="button" className="sync-toast__close" onClick={clearSyncNotice}>
+-            Schließen
++            {t("common.close")}
+           </button>
+         </div>
+       ) : null}
+ 
+       {__IS_VERCEL_NON_PRODUCTION__ ? (
+         <div className="backend-log-panel" aria-live="polite">
+-          <p className="backend-log-panel__title">Backend-Logs</p>
++          <p className="backend-log-panel__title">{t("debug.backendLogs")}</p>
+           <ul className="backend-log-panel__list">
+             {backendLogs.length === 0 ? (
+               <li className="backend-log-panel__entry backend-log-panel__entry--skipped">
+-                Noch keine Backend-Aufrufe protokolliert.
++                {t("debug.noLogs")}
+               </li>
+             ) : (
+               backendLogs.slice().reverse().map((entry) => (
+@@ -339,13 +342,13 @@ const App = () => {
+       <div className="undo-toast-stack" aria-live="polite" aria-atomic="false">
+         {undoToasts.map((toast) => (
+           <div key={toast.id} className="undo-toast" role="status">
+-            <span className="undo-toast__text">{`„${toast.item.name}“ gelöscht.`}</span>
++            <span className="undo-toast__text">{t("toast.deleted", { name: toast.item.name })}</span>
+             <button
+               type="button"
+               className="undo-toast__action"
+               onClick={() => void handleUndoDelete(toast.id, toast.item.id)}
+             >
+-              Rückgängig
++              {t("toast.undo")}
+             </button>
+           </div>
+         ))}
+diff --git a/apps/web/src/components/AddItemDialog.tsx b/apps/web/src/components/AddItemDialog.tsx
+index 7200841..3ab53be 100644
+--- a/apps/web/src/components/AddItemDialog.tsx
++++ b/apps/web/src/components/AddItemDialog.tsx
+@@ -1,6 +1,7 @@
+ import { useEffect, useRef } from "react";
+ import { getItemIcon } from "../domain/categories";
+ import { parseItemInput } from "../domain/inputParser";
++import { useI18n } from "../i18n";
+ 
+ type AddItemDialogProps = {
+   isOpen: boolean;
+@@ -22,6 +23,7 @@ const AddItemDialog = ({
+   onAddSuggestion,
+ }: AddItemDialogProps) => {
+   const inputRef = useRef<HTMLInputElement | null>(null);
++  const { t, locale } = useI18n();
+ 
+   useEffect(() => {
+     if (!isOpen) {return;}
+@@ -33,12 +35,7 @@ const AddItemDialog = ({
+ 
+   return (
+     <div className="modal-backdrop add-dialog" role="dialog" aria-modal="true" onClick={onClose}>
+-      <div
+-        className="modal"
+-        onClick={(event) => {
+-          event.stopPropagation();
+-        }}
+-      >
++      <div className="modal" onClick={(event) => event.stopPropagation()}>
+         <form
+           className="add-panel"
+           onSubmit={(event) => {
+@@ -50,13 +47,13 @@ const AddItemDialog = ({
+             ref={inputRef}
+             value={itemName}
+             onChange={(event) => onItemNameChange(event.target.value)}
+-            placeholder="Was möchtest du einkaufen?"
+-            aria-label="Item name"
++            placeholder={t("add.placeholder")}
++            aria-label={t("add.itemName")}
+           />
+         </form>
+         <div className="modal__grid">
+           {suggestions.map((name) => {
+-            const parsed = parseItemInput(name);
++            const parsed = parseItemInput(name, locale);
+             const displayName = parsed.name || name;
+             return (
+               <button
+@@ -73,9 +70,7 @@ const AddItemDialog = ({
+                 </span>
+                 <div className="item-text">
+                   <span className="item-name">{displayName}</span>
+-                  {parsed.quantityOrUnit && (
+-                    <span className="item-quantity">{parsed.quantityOrUnit}</span>
+-                  )}
++                  {parsed.quantityOrUnit && <span className="item-quantity">{parsed.quantityOrUnit}</span>}
+                 </div>
+               </button>
+             );
+diff --git a/apps/web/src/components/AppHeader.tsx b/apps/web/src/components/AppHeader.tsx
+index 76fb436..2ca30ef 100644
+--- a/apps/web/src/components/AppHeader.tsx
++++ b/apps/web/src/components/AppHeader.tsx
+@@ -1,4 +1,5 @@
+ import { useEffect, useRef } from "react";
++import { useI18n } from "../i18n";
+ 
+ type AppHeaderProps = {
+   activeListName: string;
+@@ -26,6 +27,7 @@ const AppHeader = ({
+   onCancelRename,
+ }: AppHeaderProps) => {
+   const renameInputRef = useRef<HTMLInputElement | null>(null);
++  const { t } = useI18n();
+ 
+   useEffect(() => {
+     if (isEditingName) {
+@@ -35,11 +37,11 @@ const AppHeader = ({
+   }, [isEditingName]);
+ 
+   return (
+-    <header className="app__header" aria-label="Aktive Liste">
++    <header className="app__header" aria-label={t("header.activeList")}>
+       <div className="header-card">
+         <div className="title-row">
+           {isEditingName ? (
+-            <div className="title-edit" role="group" aria-label="Listenname bearbeiten">
++            <div className="title-edit" role="group" aria-label={t("header.editListName")}>
+               <input
+                 ref={renameInputRef}
+                 value={renameValue}
+@@ -54,25 +56,20 @@ const AppHeader = ({
+                     onCancelRename();
+                   }
+                 }}
+-                aria-label="Listenname"
++                aria-label={t("common.name")}
+                 maxLength={120}
+               />
+               <button type="button" className="header-chip-button" onClick={onSaveRename}>
+-                Speichern
++                {t("common.save")}
+               </button>
+               <button type="button" className="header-chip-button" onClick={onCancelRename}>
+-                Abbrechen
++                {t("common.cancel")}
+               </button>
+             </div>
+           ) : (
+             <>
+               <h1>{activeListName}</h1>
+-              <button
+-                type="button"
+-                className="icon-button"
+-                onClick={onStartRename}
+-                aria-label="Listenname bearbeiten"
+-              >
++              <button type="button" className="icon-button" onClick={onStartRename} aria-label={t("header.editListName")}>
+                 <svg viewBox="0 0 24 24" aria-hidden="true">
+                   <path
+                     d="M3 17.25V21h3.75l11.06-11.06-3.75-3.75L3 17.25zm17.71-10.04c.39-.39.39-1.02 0-1.41l-2.51-2.5c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.99-1.67z"
+@@ -85,27 +82,12 @@ const AppHeader = ({
+         </div>
+ 
+         <div className="header-meta-row">
+-          <span className="header-meta">{openItemCount} offen</span>
++          <span className="header-meta">{t("list.openItems", { count: openItemCount })}</span>
+           <span className="header-status" role="status" aria-live="polite">
+             {isBackendBusy ? (
+-              <span
+-                className="connection-spinner"
+-                aria-label="Backend synchronisiert gerade"
+-                title="Backend synchronisiert gerade"
+-              />
++              <span className="connection-spinner" aria-label={t("header.backendSyncing")} title={t("header.backendSyncing")} />
+             ) : (
+-              <span
+-                className={`connection-icon connection-icon--${backendConnection}`}
+-                aria-label={`Backend Status: ${backendConnection}`}
+-                title={`Backend Status: ${backendConnection}`}
+-              >
+-                <svg viewBox="0 0 24 24" aria-hidden="true">
+-                  <path
+-                    d="M19 18H6a4 4 0 1 1 .6-7.96A5.5 5.5 0 0 1 17.06 9a3.75 3.75 0 0 1 1.94 7z"
+-                    fill="currentColor"
+-                  />
+-                </svg>
+-              </span>
++              <span className={`connection-icon connection-icon--${backendConnection}`} aria-label={`Backend Status: ${backendConnection}`} title={`Backend Status: ${backendConnection}`} />
+             )}
+           </span>
+         </div>
+diff --git a/apps/web/src/components/BottomBar.tsx b/apps/web/src/components/BottomBar.tsx
+index d4612d7..68f6d10 100644
+--- a/apps/web/src/components/BottomBar.tsx
++++ b/apps/web/src/components/BottomBar.tsx
+@@ -1,3 +1,5 @@
++import { useI18n } from "../i18n";
++
+ type BottomBarProps = {
+   onOpenDrawer: () => void;
+   onAddItem: () => void;
+@@ -5,27 +7,21 @@ type BottomBarProps = {
+ };
+ 
+ const BottomBar = ({ onOpenDrawer, onAddItem, onShareList }: BottomBarProps) => {
++  const { t } = useI18n();
++
+   return (
+     <footer className="bottom-bar">
+-      <button
+-        className="bottom-icon"
+-        type="button"
+-        aria-label="Open list menu"
+-        onClick={onOpenDrawer}
+-      >
++      <button className="bottom-icon" type="button" aria-label={t("bottom.openListMenu")} onClick={onOpenDrawer}>
+         <svg viewBox="0 0 24 24" aria-hidden="true">
+-          <path
+-            d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"
+-            fill="currentColor"
+-          />
++          <path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z" fill="currentColor" />
+         </svg>
+       </button>
+-      <button className="fab" type="button" onClick={onAddItem} aria-label="Add item">
++      <button className="fab" type="button" onClick={onAddItem} aria-label={t("bottom.addItem")}>
+         <svg viewBox="0 0 24 24" aria-hidden="true">
+           <path d="M19 13H13v6h-2v-6H5v-2h6V5h2v6h6v2z" fill="currentColor" />
+         </svg>
+       </button>
+-      <button className="bottom-icon" type="button" aria-label="Share list" onClick={onShareList}>
++      <button className="bottom-icon" type="button" aria-label={t("bottom.shareList")} onClick={onShareList}>
+         <svg viewBox="0 0 24 24" aria-hidden="true">
+           <path
+             d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7 0-.24-.03-.47-.09-.7l7.02-4.11c.54.5 1.25.81 2.07.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.03.47.09.7L8.91 9.81C8.37 9.31 7.66 9 6.84 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.82 0 1.53-.31 2.07-.81l7.12 4.19c-.05.2-.08.41-.08.62 0 1.66 1.34 3 3 3s3-1.34 3-3-1.34-3-3-3z"
+diff --git a/apps/web/src/components/CreateListModal.tsx b/apps/web/src/components/CreateListModal.tsx
+index 692d797..077748b 100644
+--- a/apps/web/src/components/CreateListModal.tsx
++++ b/apps/web/src/components/CreateListModal.tsx
+@@ -1,3 +1,5 @@
++import { useI18n } from "../i18n";
++
+ type CreateListModalProps = {
+   isOpen: boolean;
+   value: string;
+@@ -6,46 +8,36 @@ type CreateListModalProps = {
+   onSave: () => void;
+ };
+ 
+-const CreateListModal = ({
+-  isOpen,
+-  value,
+-  onChange,
+-  onCancel,
+-  onSave,
+-}: CreateListModalProps) => {
++const CreateListModal = ({ isOpen, value, onChange, onCancel, onSave }: CreateListModalProps) => {
++  const { t } = useI18n();
+   if (!isOpen) {return null;}
+ 
+   const isSaveDisabled = !value.trim();
+ 
+   return (
+     <div className="modal-backdrop" role="dialog" aria-modal="true" onClick={onCancel}>
+-      <div
+-        className="modal"
+-        onClick={(event) => {
+-          event.stopPropagation();
+-        }}
+-      >
++      <div className="modal" onClick={(event) => event.stopPropagation()}>
+         <div className="modal__header">
+-          <h2>Neue Liste erstellen</h2>
++          <h2>{t("createList.title")}</h2>
+         </div>
+         <div className="modal__body">
+           <div className="modal__field">
+-            <label htmlFor="new-list-name">Name</label>
++            <label htmlFor="new-list-name">{t("common.name")}</label>
+             <input
+               id="new-list-name"
+               value={value}
+               onChange={(event) => onChange(event.target.value)}
+-              placeholder="Listenname"
++              placeholder={t("createList.placeholder")}
+               autoFocus
+             />
+           </div>
+         </div>
+         <div className="modal__actions">
+           <button type="button" className="text-button" onClick={onCancel}>
+-            Abbrechen
++            {t("common.cancel")}
+           </button>
+           <button type="button" className="text-button" onClick={onSave} disabled={isSaveDisabled}>
+-            Erstellen
++            {t("common.create")}
+           </button>
+         </div>
+       </div>
+diff --git a/apps/web/src/components/EditItemModal.tsx b/apps/web/src/components/EditItemModal.tsx
+index 72664f7..2eefb33 100644
+--- a/apps/web/src/components/EditItemModal.tsx
++++ b/apps/web/src/components/EditItemModal.tsx
+@@ -1,3 +1,5 @@
++import { useI18n } from "../i18n";
++
+ type EditItemModalProps = {
+   isOpen: boolean;
+   name: string;
+@@ -17,44 +19,36 @@ const EditItemModal = ({
+   onCancel,
+   onSave,
+ }: EditItemModalProps) => {
++  const { t } = useI18n();
+   if (!isOpen) {return null;}
+ 
+   return (
+     <div className="modal-backdrop" role="dialog" aria-modal="true" onClick={onCancel}>
+-      <div className="modal"
+-        onClick={(event) => {
+-          event.stopPropagation();
+-        }}
+-      >
++      <div className="modal" onClick={(event) => event.stopPropagation()}>
+         <div className="modal__header">
+-          <h2>Eintrag bearbeiten</h2>
++          <h2>{t("editItem.title")}</h2>
+         </div>
+         <div className="modal__body">
+           <div className="modal__field">
+-            <label htmlFor="item-name">Name</label>
+-            <input
+-              id="item-name"
+-              value={name}
+-              onChange={(event) => onNameChange(event.target.value)}
+-              placeholder="Name"
+-            />
++            <label htmlFor="item-name">{t("common.name")}</label>
++            <input id="item-name" value={name} onChange={(event) => onNameChange(event.target.value)} placeholder={t("common.name")} />
+           </div>
+           <div className="modal__field">
+-            <label htmlFor="item-quantity">Menge</label>
++            <label htmlFor="item-quantity">{t("editItem.quantity")}</label>
+             <input
+               id="item-quantity"
+               value={quantity}
+               onChange={(event) => onQuantityChange(event.target.value)}
+-              placeholder="Menge"
++              placeholder={t("editItem.quantity")}
+             />
+           </div>
+         </div>
+         <div className="modal__actions">
+           <button type="button" className="text-button" onClick={onCancel}>
+-            Abbrechen
++            {t("common.cancel")}
+           </button>
+           <button type="button" className="text-button" onClick={onSave}>
+-            Speichern
++            {t("common.save")}
+           </button>
+         </div>
+       </div>
+diff --git a/apps/web/src/components/ListsDrawer.tsx b/apps/web/src/components/ListsDrawer.tsx
+index c306cb3..5d2173c 100644
+--- a/apps/web/src/components/ListsDrawer.tsx
++++ b/apps/web/src/components/ListsDrawer.tsx
+@@ -1,16 +1,12 @@
+-import { useMemo, useRef, useState, type PointerEvent } from "react";
++import { type PointerEvent, useMemo, useRef, useState } from "react";
+ import type { List } from "@golist/shared/domain/types";
+-
+-type ListMeta = {
+-  openItems: number;
+-  lastUpdatedAt: number;
+-};
++import { useI18n } from "../i18n";
+ 
+ type ListsDrawerProps = {
+   isOpen: boolean;
+   lists: List[];
+-  activeListId: string | null | undefined;
+-  listMetaById: Record<string, ListMeta>;
++  activeListId?: string;
++  listMetaById: Record<string, { openItems: number; lastUpdatedAt: number }>;
+   onClose: () => void;
+   onOpen: () => void;
+   onSelectList: (listId: string) => void;
+@@ -18,46 +14,15 @@ type ListsDrawerProps = {
+   onCreateList: () => void;
+ };
+ 
+-type DragMode = "opening" | "closing";
++type DragState = {
++  mode: "opening" | "closing";
++  pointerId: number;
++  startX: number;
++};
+ 
+ const EDGE_SWIPE_WIDTH = 28;
+ 
+-const formatLastUpdated = (timestamp: number) => {
+-  if (!timestamp) {
+-    return "Noch nie aktualisiert";
+-  }
+-
+-  const elapsedMs = Date.now() - timestamp;
+-  if (elapsedMs < 0) {
+-    return "gerade eben";
+-  }
+-
+-  const elapsedMinutes = Math.floor(elapsedMs / 60_000);
+-  if (elapsedMinutes < 1) {
+-    return "gerade eben";
+-  }
+-
+-  if (elapsedMinutes < 60) {
+-    return `vor ${elapsedMinutes} Min.`;
+-  }
+-
+-  const elapsedHours = Math.floor(elapsedMinutes / 60);
+-  if (elapsedHours < 24) {
+-    return `vor ${elapsedHours} Std.`;
+-  }
+-
+-  const elapsedDays = Math.floor(elapsedHours / 24);
+-  if (elapsedDays <= 7) {
+-    return `vor ${elapsedDays} Tag${elapsedDays === 1 ? "" : "en"}`;
+-  }
+-
+-  return new Intl.DateTimeFormat("de-DE", {
+-    day: "2-digit",
+-    month: "2-digit",
+-    hour: "2-digit",
+-    minute: "2-digit",
+-  }).format(new Date(timestamp));
+-};
++const formatLastUpdated = (timestamp: number) => new Date(timestamp).toLocaleDateString();
+ 
+ const ListsDrawer = ({
+   isOpen,
+@@ -70,32 +35,32 @@ const ListsDrawer = ({
+   onDeleteList,
+   onCreateList,
+ }: ListsDrawerProps) => {
+-  const drawerRef = useRef<HTMLElement | null>(null);
+-  const dragStateRef = useRef<{ pointerId: number; startX: number; mode: DragMode } | null>(null);
+-  const [dragOffset, setDragOffset] = useState<number | null>(null);
++  const canDelete = lists.length > 1;
+   const [confirmDeleteListId, setConfirmDeleteListId] = useState<string | null>(null);
++  const [dragOffset, setDragOffset] = useState<number | null>(null);
++  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
++  const drawerRef = useRef<HTMLElement | null>(null);
++  const dragStateRef = useRef<DragState | null>(null);
++  const { t, locale, setLocale, supportedLocales } = useI18n();
+ 
+-  const getDrawerWidth = () => {
+-    const measured = drawerRef.current?.offsetWidth;
+-    if (measured && measured > 0) {return measured;}
+-    return Math.min(320, Math.round(window.innerWidth * 0.8));
+-  };
++  const isSupportedLocale = (value: string): value is (typeof supportedLocales)[number] =>
++    supportedLocales.some((entry) => entry === value);
+ 
+-  const canDelete = lists.length > 1;
+-  const nextDeleteLabel = useMemo(
+-    () => lists.find((list) => list.id === confirmDeleteListId)?.name ?? "",
+-    [lists, confirmDeleteListId],
+-  );
++  const nextDeleteLabel = useMemo(() => {
++    if (!confirmDeleteListId) {return null;}
++    return lists.find((list) => list.id === confirmDeleteListId)?.name ?? null;
++  }, [confirmDeleteListId, lists]);
++
++  const getDrawerWidth = () => drawerRef.current?.getBoundingClientRect().width ?? 320;
+ 
+-  const handleDragStart = (event: PointerEvent<HTMLElement>, mode: DragMode) => {
+-    dragStateRef.current = { pointerId: event.pointerId, startX: event.clientX, mode };
++  const handleDragStart = (event: PointerEvent<HTMLElement>, mode: DragState["mode"]) => {
++    dragStateRef.current = { mode, pointerId: event.pointerId, startX: event.clientX };
+     event.currentTarget.setPointerCapture(event.pointerId);
+   };
+ 
+   const handleDragMove = (event: PointerEvent<HTMLElement>) => {
+     const dragState = dragStateRef.current;
+     if (!dragState || dragState.pointerId !== event.pointerId) {return;}
+-
+     const drawerWidth = getDrawerWidth();
+     const deltaX = event.clientX - dragState.startX;
+ 
+@@ -118,9 +83,7 @@ const ListsDrawer = ({
+     const threshold = drawerWidth * 0.35;
+ 
+     if (dragState.mode === "opening") {
+-      if (deltaX > threshold) {
+-        onOpen();
+-      }
++      if (deltaX > threshold) {onOpen();}
+     } else if (-deltaX > threshold) {
+       onClose();
+     }
+@@ -155,11 +118,7 @@ const ListsDrawer = ({
+           role="button"
+           tabIndex={-1}
+           onClick={onClose}
+-          onKeyDown={(event) => {
+-            if (event.key === "Escape") {
+-              onClose();
+-            }
+-          }}
++          onKeyDown={(event) => event.key === "Escape" && onClose()}
+         />
+         <aside
+           ref={drawerRef}
+@@ -171,11 +130,9 @@ const ListsDrawer = ({
+           onPointerUp={handleDragEnd}
+           onPointerCancel={handleDragEnd}
+         >
+-          <div className="drawer__header">
+-            <span>GoList</span>
+-          </div>
++          <div className="drawer__header"><span>GoList</span></div>
+           <div className="drawer__section">
+-            <p className="drawer__title">Meine Listen</p>
++            <p className="drawer__title">{t("drawer.myLists")}</p>
+             <div className="drawer__list">
+               {lists.map((list) => {
+                 const listMeta = listMetaById[list.id] ?? { openItems: 0, lastUpdatedAt: list.updatedAt };
+@@ -185,9 +142,7 @@ const ListsDrawer = ({
+                   <div key={list.id} className="drawer__item">
+                     <button
+                       type="button"
+-                      className={`drawer__item-button ${
+-                        list.id === activeListId ? "drawer__item-button--active" : ""
+-                      }`}
++                      className={`drawer__item-button ${list.id === activeListId ? "drawer__item-button--active" : ""}`}
+                       onClick={() => onSelectList(list.id)}
+                     >
+                       <span className="drawer__item-icon" aria-hidden="true">
+@@ -200,13 +155,21 @@ const ListsDrawer = ({
+                       </span>
+                       <span className="drawer__item-copy">
+                         <span className="drawer__item-label">{list.name}</span>
+-                        <span className="drawer__item-meta">{`${listMeta.openItems} offen · aktualisiert ${formatLastUpdated(listMeta.lastUpdatedAt)}`}</span>
++                        <span className="drawer__item-meta">
++                          {`${t("list.openItems", { count: listMeta.openItems })} · ${t("list.updated", {
++                            time: formatLastUpdated(listMeta.lastUpdatedAt),
++                          })}`}
++                        </span>
+                       </span>
+                     </button>
+                     <button
+                       type="button"
+                       className={`drawer__delete ${isConfirmingDelete ? "drawer__delete--confirm" : ""}`}
+-                      aria-label={isConfirmingDelete ? `Löschen bestätigen: ${list.name}` : `Löschen: ${list.name}`}
++                      aria-label={
++                        isConfirmingDelete
++                          ? t("drawer.deleteConfirm", { name: list.name })
++                          : t("drawer.delete", { name: list.name })
++                      }
+                       disabled={!canDelete}
+                       onClick={() => {
+                         if (isConfirmingDelete) {
+@@ -214,35 +177,78 @@ const ListsDrawer = ({
+                           setConfirmDeleteListId(null);
+                           return;
+                         }
+-
+                         setConfirmDeleteListId(list.id);
+                       }}
+                     >
+-                      {isConfirmingDelete ? "OK" : (
++                      {isConfirmingDelete ? (
++                        t("common.ok")
++                      ) : (
+                         <svg viewBox="0 0 24 24" aria-hidden="true">
+-                          <path
+-                            d="M16 9v10H8V9h8m-1.5-6h-5l-1 1H5v2h14V4h-4.5l-1-1z"
+-                            fill="currentColor"
+-                          />
++                          <path d="M16 9v10H8V9h8m-1.5-6h-5l-1 1H5v2h14V4h-4.5l-1-1z" fill="currentColor" />
+                         </svg>
+                       )}
+                     </button>
+                   </div>
+                 );
+               })}
+-              {nextDeleteLabel ? <p className="drawer__delete-hint">Erneut tippen, um „{nextDeleteLabel}“ zu löschen.</p> : null}
++              {nextDeleteLabel ? <p className="drawer__delete-hint">{t("drawer.deleteHint", { name: nextDeleteLabel })}</p> : null}
+               <button type="button" className="drawer__new" onClick={onCreateList}>
+                 <span className="drawer__item-icon" aria-hidden="true">
+                   <svg viewBox="0 0 24 24">
+                     <path d="M19 13H13v6h-2v-6H5v-2h6V5h2v6h6v2z" fill="currentColor" />
+                   </svg>
+                 </span>
+-                Neue Liste erstellen
++                {t("drawer.createList")}
+               </button>
+             </div>
+           </div>
++          <button type="button" className="drawer__settings" onClick={() => setIsSettingsOpen(true)}>
++            {t("settings.open")}
++            <span className="drawer__item-icon" aria-hidden="true">
++              <svg viewBox="0 0 24 24">
++                <path
++                  d="M19.14,12.94a7.43,7.43,0,0,0,.05-.94,7.43,7.43,0,0,0-.05-.94l2.11-1.65a.48.48,0,0,0,.12-.61l-2-3.46a.5.5,0,0,0-.6-.22l-2.49,1a7.28,7.28,0,0,0-1.63-.94l-.38-2.65A.49.49,0,0,0,13.77,2H10.23a.49.49,0,0,0-.49.42L9.36,5.07a7.28,7.28,0,0,0-1.63.94l-2.49-1a.5.5,0,0,0-.6.22l-2,3.46a.48.48,0,0,0,.12.61l2.11,1.65a7.43,7.43,0,0,0-.05.94,7.43,7.43,0,0,0,.05.94L2.76,14.59a.48.48,0,0,0-.12.61l2,3.46a.5.5,0,0,0,.6.22l2.49-1a7.28,7.28,0,0,0,1.63.94l.38,2.65a.49.49,0,0,0,.49.42h3.54a.49.49,0,0,0,.49-.42l.38-2.65a7.28,7.28,0,0,0,1.63-.94l2.49,1a.5.5,0,0,0,.6-.22l2-3.46a.48.48,0,0,0-.12-.61ZM12,15.5A3.5,3.5,0,1,1,15.5,12,3.5,3.5,0,0,1,12,15.5Z"
++                  fill="currentColor"
++                />
++              </svg>
++            </span>
++          </button>
+         </aside>
+       </div>
++
++      {isSettingsOpen ? (
++        <div className="modal-backdrop" role="dialog" aria-modal="true" onClick={() => setIsSettingsOpen(false)}>
++          <div className="modal" onClick={(event) => event.stopPropagation()}>
++            <div className="modal__header">
++              <h2>{t("settings.title")}</h2>
++            </div>
++            <div className="modal__body">
++              <div className="modal__field">
++                <label htmlFor="language-select">{t("common.language")}</label>
++                <select
++                  id="language-select"
++                  value={locale}
++                  onChange={(event) => {
++                    const next = event.target.value;
++                    if (isSupportedLocale(next)) {
++                      setLocale(next);
++                    }
++                  }}
++                >
++                  {supportedLocales.map((entry) => (
++                    <option key={entry} value={entry}>{entry.toUpperCase()}</option>
++                  ))}
++                </select>
++              </div>
++            </div>
++            <div className="modal__actions">
++              <button type="button" className="text-button" onClick={() => setIsSettingsOpen(false)}>
++                {t("common.close")}
++              </button>
++            </div>
++          </div>
++        </div>
++      ) : null}
+     </>
+   );
+ };
+diff --git a/apps/web/src/domain/categories.test.ts b/apps/web/src/domain/categories.test.ts
+index 87e765b..7ba5f6e 100644
+--- a/apps/web/src/domain/categories.test.ts
++++ b/apps/web/src/domain/categories.test.ts
+@@ -3,20 +3,27 @@ import { getCategoryForItem, getCategoryOrder, getItemIcon } from "./categories"
+ 
+ describe("categories helpers", () => {
+   it("returns the category for known items regardless of case", () => {
+-    const category = getCategoryForItem("  ApPlE  ");
++    const category = getCategoryForItem("  ApPlE  ", "en");
+     expect(category?.id).toBe("fruitsVegetables");
+     expect(category?.label).toBe("Fruits & Vegetables");
+   });
+ 
+   it("returns the category order for items that map to a known category", () => {
+-    expect(getCategoryOrder("bread")).toBe(2);
++    expect(getCategoryOrder("bread", "en")).toBe(2);
+   });
+ 
+   it("returns a specific icon when an asset match exists", () => {
+-    expect(getItemIcon("apple")).toBe("/icons/apple.svg");
++    expect(getItemIcon("apple", "en")).toBe("/icons/apple.svg");
+   });
+ 
+-  it("falls back to the default icon when no match exists", () => {
+-    expect(getItemIcon("mystery item")).toBe("/icons/default.svg");
++  it("detects locale-specific item names", () => {
++    expect(getCategoryForItem("apfel", "de")?.id).toBe("fruitsVegetables");
++    expect(getCategoryForItem("apfel", "en")).toBeUndefined();
++    expect(getCategoryForItem("apple", "en")?.id).toBe("fruitsVegetables");
++  });
++
++  it("falls back to the default icon when no match exists for the active locale", () => {
++    expect(getItemIcon("apfel", "en")).toBe("/icons/default.svg");
++    expect(getItemIcon("mystery item", "en")).toBe("/icons/default.svg");
+   });
+ });
+diff --git a/apps/web/src/domain/categories.ts b/apps/web/src/domain/categories.ts
+index b3ed1d8..156ca05 100644
+--- a/apps/web/src/domain/categories.ts
++++ b/apps/web/src/domain/categories.ts
+@@ -1,3 +1,6 @@
++import { getCurrentLocale } from "../i18n";
++import type { Locale } from "../i18n/config";
++
+ export type Category = {
+   id: string;
+   label: string;
+@@ -753,6 +756,29 @@ const categoryEntries: CategoryEntry[] = [
+   },
+ ];
+ 
++
++const localizedItemEntries: Record<Locale, Record<string, { category: string; asset: string }>> = {
++  en: {
++    apple: { category: "fruitsVegetables", asset: "apple" },
++    apples: { category: "fruitsVegetables", asset: "apple" },
++  },
++  de: {
++    apfel: { category: "fruitsVegetables", asset: "apple" },
++    "äpfel": { category: "fruitsVegetables", asset: "apple" },
++    aepfel: { category: "fruitsVegetables", asset: "apple" },
++  },
++  es: {
++    manzana: { category: "fruitsVegetables", asset: "apple" },
++    manzanas: { category: "fruitsVegetables", asset: "apple" },
++  },
++};
++
++const localeScopedNames = new Set(
++  Object.values(localizedItemEntries)
++    .flatMap((entries) => Object.keys(entries))
++    .map((name) => name.trim().toLowerCase()),
++);
++
+ const itemCategoryMap = new Map<string, string>();
+ const itemAssetMap = new Map<string, string>();
+ const iconBasePath = "/icons";
+@@ -772,19 +798,33 @@ categoryEntries.forEach((entry) => {
+   });
+ });
+ 
+-export const getCategoryForItem = (name: string): Category | undefined => {
++export const getCategoryForItem = (name: string, locale: Locale = getCurrentLocale()): Category | undefined => {
+   const key = name.trim().toLowerCase();
++  const localized = localizedItemEntries[locale][key];
++  if (localized) {
++    return categories.find((category) => category.id === localized.category);
++  }
++  if (localeScopedNames.has(key)) {
++    return undefined;
++  }
+   const categoryId = itemCategoryMap.get(key);
+   return categories.find((category) => category.id === categoryId);
+ };
+ 
+-export const getCategoryOrder = (name: string): number | undefined => {
+-  const category = getCategoryForItem(name);
++export const getCategoryOrder = (name: string, locale: Locale = getCurrentLocale()): number | undefined => {
++  const category = getCategoryForItem(name, locale);
+   return category?.order;
+ };
+ 
+-export const getItemIcon = (name: string): string => {
++export const getItemIcon = (name: string, locale: Locale = getCurrentLocale()): string => {
+   const key = name.trim().toLowerCase();
++  const localized = localizedItemEntries[locale][key];
++  if (localized) {
++    return buildIconPath(localized.asset);
++  }
++  if (localeScopedNames.has(key)) {
++    return buildIconPath(defaultIconName);
++  }
+   const asset = itemAssetMap.get(key);
+   if (asset) {
+     return buildIconPath(asset);
+diff --git a/apps/web/src/domain/inputParser.test.ts b/apps/web/src/domain/inputParser.test.ts
+index 7e2278e..1fb03a1 100644
+--- a/apps/web/src/domain/inputParser.test.ts
++++ b/apps/web/src/domain/inputParser.test.ts
+@@ -22,21 +22,26 @@ describe("parseAmount", () => {
+ 
+   Object.entries(inputsToExpected).forEach(([input, expected]) => {
+     it(`${input} -> ${expected ?? "no amount"}`, () => {
+-      expect(parseAmount(input)).toBe(expected);
++      expect(parseAmount(input, "de")).toBe(expected);
+     });
+   });
++
++  it("parses english and spanish units", () => {
++    expect(parseAmount("milk 2 cups", "en")).toBe("2 cups");
++    expect(parseAmount("pan 3 latas", "es")).toBe("3 latas");
++  });
+ });
+ 
+ describe("parseItemInput", () => {
+   it("returns parsed name and quantityOrUnit", () => {
+-    expect(parseItemInput("2 Liter Milch")).toEqual({
++    expect(parseItemInput("2 Liter Milch", "de")).toEqual({
+       name: "Milch",
+       quantityOrUnit: "2 Liter",
+     });
+   });
+ 
+   it("returns the full input when no amount is present", () => {
+-    expect(parseItemInput("Äpfel")).toEqual({
++    expect(parseItemInput("Äpfel", "de")).toEqual({
+       name: "Äpfel",
+       quantityOrUnit: undefined,
+     });
+diff --git a/apps/web/src/domain/inputParser.ts b/apps/web/src/domain/inputParser.ts
+index cc157d5..a70f755 100644
+--- a/apps/web/src/domain/inputParser.ts
++++ b/apps/web/src/domain/inputParser.ts
+@@ -1,20 +1,77 @@
+-const amountPattern =
+-  "(^| +)([0-9]+((.|,)[0-9])? ?(liter|ml|l|g|kg|kilo|gramm|kilogramm|becher|glas|bund|scheiben|packung(en)?|gläser|glaeser|stueck(e)?|stück(e)?|dose(n)?|flasche(n)?|kiste(n)?|beutel(n)?|tuete(n)?|tüte(n)?|becher)?)( +|$)";
++import { getCurrentLocale } from "../i18n";
++import type { Locale } from "../i18n/config";
++
++const baseUnits = [
++  "liter",
++  "ml",
++  "l",
++  "g",
++  "kg",
++  "kilo",
++  "gramm",
++  "kilogramm",
++  "becher",
++  "glas",
++  "bund",
++  "scheiben",
++  "packung(?:en)?",
++  "gläser",
++  "glaeser",
++  "stueck(?:e)?",
++  "stück(?:e)?",
++  "dose(?:n)?",
++  "flasche(?:n)?",
++  "kiste(?:n)?",
++  "beutel(?:n)?",
++  "tuete(?:n)?",
++  "tüte(?:n)?",
++];
++
++const localeUnits: Record<Locale, string[]> = {
++  de: [...baseUnits],
++  en: [
++    ...baseUnits,
++    "cup(?:s)?",
++    "jar(?:s)?",
++    "slice(?:s)?",
++    "piece(?:s)?",
++    "can(?:s)?",
++    "bottle(?:s)?",
++    "bag(?:s)?",
++    "packet(?:s)?",
++  ],
++  es: [
++    ...baseUnits,
++    "taza(?:s)?",
++    "frasco(?:s)?",
++    "rebanada(?:s)?",
++    "pieza(?:s)?",
++    "lata(?:s)?",
++    "botella(?:s)?",
++    "bolsa(?:s)?",
++    "paquete(?:s)?",
++  ],
++};
++
++const getAmountPattern = (locale: Locale) => {
++  const units = localeUnits[locale].join("|");
++  return new RegExp(`(^| +)([0-9]+((.|,)[0-9])? ?(${units})?)( +|$)`, "i");
++};
+ 
+ export type ParsedItemInput = {
+   name: string;
+   quantityOrUnit?: string;
+ };
+ 
+-export const parseAmount = (input: string): string | undefined => {
++export const parseAmount = (input: string, locale: Locale = getCurrentLocale()): string | undefined => {
+   const cleanedInput = input.replace(/typ +[0-9]+/gi, "");
+-  const match = cleanedInput.match(new RegExp(amountPattern, "i"));
++  const match = cleanedInput.match(getAmountPattern(locale));
+   return match?.[2];
+ };
+ 
+-export const parseItemInput = (input: string): ParsedItemInput => {
++export const parseItemInput = (input: string, locale: Locale = getCurrentLocale()): ParsedItemInput => {
+   const trimmedInput = input.trim();
+-  const amount = parseAmount(trimmedInput);
++  const amount = parseAmount(trimmedInput, locale);
+   const name = amount ? trimmedInput.replace(amount, "").trim() : trimmedInput;
+   return {
+     name,
+diff --git a/apps/web/src/e2e.backend-frontend.playwright.test.ts b/apps/web/src/e2e.backend-frontend.playwright.test.ts
+index d593e29..f11acaa 100644
+--- a/apps/web/src/e2e.backend-frontend.playwright.test.ts
++++ b/apps/web/src/e2e.backend-frontend.playwright.test.ts
+@@ -150,7 +150,7 @@ describe("frontend/backend integration via playwright", () => {
+ 
+   runE2E("creates the default list in the in-memory repository", async () => {
+     const [defaultList] = [...readRepositoryState().lists.values()];
+-    expect(defaultList?.data.name).toBe("Einkaufsliste");
++    expect(defaultList?.data.name).toBe("Shopping list");
+     expect(defaultList ? isUuid(defaultList.data.id) : false).toBe(true);
+     expect(defaultList ? isUuid(defaultList.createdByDeviceId) : false).toBe(true);
+ 
+@@ -172,14 +172,14 @@ describe("frontend/backend integration via playwright", () => {
+       }
+     });
+ 
+-    await expect.poll(async () => page!.getByRole("heading", { name: "Neue Liste erstellen" }).isVisible()).toBe(true);
++    await expect.poll(async () => page!.getByRole("heading", { name: "Create new list" }).isVisible()).toBe(true);
+     await page!.getByRole("textbox", { name: "Name" }).fill("Wochenmarkt");
+-    await page!.getByRole("button", { name: "Erstellen" }).click();
++    await page!.getByRole("button", { name: "Create" }).click();
+ 
+     await expect.poll(() => readRepositoryState().lists.size).toBe(2);
+     const lists = [...readRepositoryState().lists.values()];
+     const names = lists.map((entry) => entry.data.name);
+-    expect(names).toEqual(expect.arrayContaining(["Einkaufsliste", "Wochenmarkt"]));
++    expect(names).toEqual(expect.arrayContaining(["Shopping list", "Wochenmarkt"]));
+ 
+     const newList = lists.find((entry) => entry.data.name === "Wochenmarkt");
+     expect(newList).toBeDefined();
+diff --git a/apps/web/src/hooks/useAppState.ts b/apps/web/src/hooks/useAppState.ts
+index a81f720..aa3ef8c 100644
+--- a/apps/web/src/hooks/useAppState.ts
++++ b/apps/web/src/hooks/useAppState.ts
+@@ -1,11 +1,11 @@
+ import { useEffect, useMemo, useState } from "react";
+ import { parseItemInput } from "../domain/inputParser";
++import { useI18n } from "../i18n";
+ import { sortItemsForList } from "../domain/sort";
+ import { useStore } from "../state/useStore";
+ 
+-const defaultListName = "Einkaufsliste";
+-
+ export const useAppState = () => {
++  const { t, locale } = useI18n();
+   const {
+     lists,
+     items,
+@@ -46,9 +46,9 @@ export const useAppState = () => {
+ 
+   useEffect(() => {
+     if (isLoaded && lists.length === 0) {
+-      void addList(defaultListName);
++      void addList(t("list.defaultName"));
+     }
+-  }, [isLoaded, lists.length, addList]);
++  }, [isLoaded, lists.length, addList, t]);
+ 
+   useEffect(() => {
+     if (!isLoaded) {
+@@ -154,7 +154,7 @@ export const useAppState = () => {
+ 
+   const handleAddItem = async () => {
+     if (!activeListId) {return;}
+-    const parsed = parseItemInput(itemName);
++    const parsed = parseItemInput(itemName, locale);
+     if (!parsed.name.trim()) {return;}
+     await addItem(activeListId, parsed.name, parsed.quantityOrUnit);
+     setItemName("");
+diff --git a/apps/web/src/i18n/I18nProvider.tsx b/apps/web/src/i18n/I18nProvider.tsx
+new file mode 100644
+index 0000000..0d35864
+--- /dev/null
++++ b/apps/web/src/i18n/I18nProvider.tsx
+@@ -0,0 +1,10 @@
++import type { ReactNode } from "react";
++import { useMemo, useSyncExternalStore } from "react";
++import { I18nContext } from "./context";
++import { getCurrentLocale, setLocale, subscribeToLocale, t } from "./runtime";
++
++export const I18nProvider = ({ children }: { children: ReactNode }) => {
++  const locale = useSyncExternalStore(subscribeToLocale, getCurrentLocale);
++  const value = useMemo(() => ({ locale, setLocale, t }), [locale]);
++  return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
++};
+diff --git a/apps/web/src/i18n/config.ts b/apps/web/src/i18n/config.ts
+new file mode 100644
+index 0000000..2100f6c
+--- /dev/null
++++ b/apps/web/src/i18n/config.ts
+@@ -0,0 +1,7 @@
++export const supportedLocales = ["en", "de", "es"] as const;
++
++export type Locale = (typeof supportedLocales)[number];
++
++export const defaultLocale: Locale = "en";
++
++export const localeStorageKey = "golist.locale";
+diff --git a/apps/web/src/i18n/context.ts b/apps/web/src/i18n/context.ts
+new file mode 100644
+index 0000000..88a5a60
+--- /dev/null
++++ b/apps/web/src/i18n/context.ts
+@@ -0,0 +1,10 @@
++import { createContext } from "react";
++import type { Locale } from "./config";
++
++export type I18nContextValue = {
++  locale: Locale;
++  setLocale: (locale: Locale) => void;
++  t: (key: string, params?: Record<string, string | number>) => string;
++};
++
++export const I18nContext = createContext<I18nContextValue | null>(null);
+diff --git a/apps/web/src/i18n/index.ts b/apps/web/src/i18n/index.ts
+new file mode 100644
+index 0000000..ab9076f
+--- /dev/null
++++ b/apps/web/src/i18n/index.ts
+@@ -0,0 +1,4 @@
++export { supportedLocales } from "./config";
++export { I18nProvider } from "./I18nProvider";
++export { useI18n } from "./useI18n";
++export { getCurrentLocale, initializeLocale, setLocale, t } from "./runtime";
+diff --git a/apps/web/src/i18n/resolveLocale.test.ts b/apps/web/src/i18n/resolveLocale.test.ts
+new file mode 100644
+index 0000000..1b12d03
+--- /dev/null
++++ b/apps/web/src/i18n/resolveLocale.test.ts
+@@ -0,0 +1,29 @@
++import { describe, expect, it } from "vitest";
++import { getLocaleFromUrl, resolveLocale } from "./resolveLocale";
++
++describe("resolveLocale", () => {
++  it("prioritizes explicit preference over all other sources", () => {
++    expect(
++      resolveLocale({
++        userPreference: "es",
++        urlLocale: "de",
++        storedLocale: "en",
++        browserLocales: ["de-DE"],
++        geoLocale: "de",
++      }),
++    ).toBe("es");
++  });
++
++  it("falls back through sources and defaults to en", () => {
++    expect(resolveLocale({ urlLocale: "fr", storedLocale: "de" })).toBe("de");
++    expect(resolveLocale({ browserLocales: ["it-IT", "es-ES"] })).toBe("es");
++    expect(resolveLocale({ geoLocale: "pt" })).toBe("en");
++  });
++});
++
++describe("getLocaleFromUrl", () => {
++  it("reads lang query and path segment", () => {
++    expect(getLocaleFromUrl("https://x.test/app?lang=de")).toBe("de");
++    expect(getLocaleFromUrl("https://x.test/es/list")).toBe("es");
++  });
++});
+diff --git a/apps/web/src/i18n/resolveLocale.ts b/apps/web/src/i18n/resolveLocale.ts
+new file mode 100644
+index 0000000..3a47093
+--- /dev/null
++++ b/apps/web/src/i18n/resolveLocale.ts
+@@ -0,0 +1,47 @@
++import { defaultLocale, type Locale, supportedLocales } from "./config";
++
++type ResolveLocaleOptions = {
++  userPreference?: string | null;
++  urlLocale?: string | null;
++  storedLocale?: string | null;
++  browserLocales?: readonly string[];
++  geoLocale?: string | null;
++};
++
++const normalizeLocale = (value?: string | null): Locale | null => {
++  if (!value) {return null;}
++  const lower = value.toLowerCase();
++  const base = lower.split(/[-_]/)[0];
++  return supportedLocales.find((locale) => locale === base) ?? null;
++};
++
++export const resolveLocale = ({
++  userPreference,
++  urlLocale,
++  storedLocale,
++  browserLocales,
++  geoLocale,
++}: ResolveLocaleOptions): Locale => {
++  const fromBrowser = browserLocales?.map((entry) => normalizeLocale(entry)).find(Boolean) ?? null;
++
++  return (
++    normalizeLocale(userPreference) ??
++    normalizeLocale(urlLocale) ??
++    normalizeLocale(storedLocale) ??
++    fromBrowser ??
++    normalizeLocale(geoLocale) ??
++    defaultLocale
++  );
++};
++
++export const getLocaleFromUrl = (url: string): Locale | null => {
++  try {
++    const parsed = new URL(url);
++    const fromQuery = normalizeLocale(parsed.searchParams.get("lang"));
++    if (fromQuery) {return fromQuery;}
++    const firstPathSegment = parsed.pathname.split("/").filter(Boolean)[0];
++    return normalizeLocale(firstPathSegment);
++  } catch {
++    return null;
++  }
++};
+diff --git a/apps/web/src/i18n/resources.test.ts b/apps/web/src/i18n/resources.test.ts
+new file mode 100644
+index 0000000..ad4123e
+--- /dev/null
++++ b/apps/web/src/i18n/resources.test.ts
+@@ -0,0 +1,11 @@
++import { describe, expect, it } from "vitest";
++import { resources } from "./resources";
++
++describe("i18n resources", () => {
++  it("keeps key parity with English baseline", () => {
++    const englishKeys = Object.keys(resources.en).sort();
++    Object.entries(resources).forEach(([, dictionary]) => {
++      expect(Object.keys(dictionary).sort()).toEqual(englishKeys);
++    });
++  });
++});
+diff --git a/apps/web/src/i18n/resources.ts b/apps/web/src/i18n/resources.ts
+new file mode 100644
+index 0000000..058fe6e
+--- /dev/null
++++ b/apps/web/src/i18n/resources.ts
+@@ -0,0 +1,124 @@
++import type { Locale } from "./config";
++
++export const resources: Record<Locale, Record<string, string>> = {
++  en: {
++    "app.title": "GoList",
++    "list.defaultName": "Shopping list",
++    "header.activeList": "Active list",
++    "header.editListName": "Edit list name",
++    "common.save": "Save",
++    "common.cancel": "Cancel",
++    "common.close": "Close",
++    "common.name": "Name",
++    "common.create": "Create",
++    "common.ok": "OK",
++    "common.language": "Language",
++    "settings.open": "Settings",
++    "settings.title": "Settings",
++    "list.openItems": "{{count}} open",
++    "list.updated": "updated {{time}}",
++    "header.backendSyncing": "Backend syncing",
++    "bottom.openListMenu": "Open list menu",
++    "bottom.addItem": "Add item",
++    "bottom.shareList": "Share list",
++    "add.placeholder": "What do you want to buy?",
++    "add.itemName": "Item name",
++    "drawer.myLists": "My lists",
++    "drawer.createList": "Create new list",
++    "drawer.delete": "Delete: {{name}}",
++    "drawer.deleteConfirm": "Confirm delete: {{name}}",
++    "drawer.deleteHint": "Tap again to delete “{{name}}”.",
++    "createList.title": "Create new list",
++    "createList.placeholder": "List name",
++    "editItem.title": "Edit item",
++    "editItem.quantity": "Quantity",
++    "share.systemText": "Share this shopping list",
++    "toast.shareSuccess": "Link shared successfully.",
++    "toast.shareCopied": "Share link copied to clipboard.",
++    "toast.shareUnavailable": "Sharing is currently unavailable.",
++    "toast.deleted": "“{{name}}” deleted.",
++    "toast.undo": "Undo",
++    "debug.backendLogs": "Backend logs",
++    "debug.noLogs": "No backend calls logged yet.",
++  },
++  de: {
++    "app.title": "GoList",
++    "list.defaultName": "Einkaufsliste",
++    "header.activeList": "Aktive Liste",
++    "header.editListName": "Listenname bearbeiten",
++    "common.save": "Speichern",
++    "common.cancel": "Abbrechen",
++    "common.close": "Schließen",
++    "common.name": "Name",
++    "common.create": "Erstellen",
++    "common.ok": "OK",
++    "common.language": "Sprache",
++    "settings.open": "Einstellungen",
++    "settings.title": "Einstellungen",
++    "list.openItems": "{{count}} offen",
++    "list.updated": "aktualisiert {{time}}",
++    "header.backendSyncing": "Backend synchronisiert gerade",
++    "bottom.openListMenu": "Listenmenü öffnen",
++    "bottom.addItem": "Eintrag hinzufügen",
++    "bottom.shareList": "Liste teilen",
++    "add.placeholder": "Was möchtest du einkaufen?",
++    "add.itemName": "Item name",
++    "drawer.myLists": "Meine Listen",
++    "drawer.createList": "Neue Liste erstellen",
++    "drawer.delete": "Löschen: {{name}}",
++    "drawer.deleteConfirm": "Löschen bestätigen: {{name}}",
++    "drawer.deleteHint": "Erneut tippen, um „{{name}}“ zu löschen.",
++    "createList.title": "Neue Liste erstellen",
++    "createList.placeholder": "Listenname",
++    "editItem.title": "Eintrag bearbeiten",
++    "editItem.quantity": "Menge",
++    "share.systemText": "Teile diese Einkaufsliste",
++    "toast.shareSuccess": "Link erfolgreich geteilt.",
++    "toast.shareCopied": "Teilen-Link wurde in die Zwischenablage kopiert.",
++    "toast.shareUnavailable": "Teilen ist derzeit nicht verfügbar.",
++    "toast.deleted": "„{{name}}“ gelöscht.",
++    "toast.undo": "Rückgängig",
++    "debug.backendLogs": "Backend-Logs",
++    "debug.noLogs": "Noch keine Backend-Aufrufe protokolliert.",
++  },
++  es: {
++    "app.title": "GoList",
++    "list.defaultName": "Lista de compras",
++    "header.activeList": "Lista activa",
++    "header.editListName": "Editar nombre de lista",
++    "common.save": "Guardar",
++    "common.cancel": "Cancelar",
++    "common.close": "Cerrar",
++    "common.name": "Nombre",
++    "common.create": "Crear",
++    "common.ok": "OK",
++    "common.language": "Idioma",
++    "settings.open": "Ajustes",
++    "settings.title": "Ajustes",
++    "list.openItems": "{{count}} abiertos",
++    "list.updated": "actualizado {{time}}",
++    "header.backendSyncing": "Sincronizando backend",
++    "bottom.openListMenu": "Abrir menú de listas",
++    "bottom.addItem": "Añadir artículo",
++    "bottom.shareList": "Compartir lista",
++    "add.placeholder": "¿Qué quieres comprar?",
++    "add.itemName": "Nombre del artículo",
++    "drawer.myLists": "Mis listas",
++    "drawer.createList": "Crear nueva lista",
++    "drawer.delete": "Eliminar: {{name}}",
++    "drawer.deleteConfirm": "Confirmar eliminación: {{name}}",
++    "drawer.deleteHint": "Toca de nuevo para eliminar «{{name}}».",
++    "createList.title": "Crear nueva lista",
++    "createList.placeholder": "Nombre de la lista",
++    "editItem.title": "Editar artículo",
++    "editItem.quantity": "Cantidad",
++    "share.systemText": "Comparte esta lista de compras",
++    "toast.shareSuccess": "Enlace compartido correctamente.",
++    "toast.shareCopied": "Enlace copiado al portapapeles.",
++    "toast.shareUnavailable": "Compartir no está disponible ahora.",
++    "toast.deleted": "Se eliminó «{{name}}».",
++    "toast.undo": "Deshacer",
++    "debug.backendLogs": "Registros del backend",
++    "debug.noLogs": "Aún no hay llamadas registradas.",
++  },
++};
+diff --git a/apps/web/src/i18n/runtime.ts b/apps/web/src/i18n/runtime.ts
+new file mode 100644
+index 0000000..019718b
+--- /dev/null
++++ b/apps/web/src/i18n/runtime.ts
+@@ -0,0 +1,42 @@
++import { defaultLocale, localeStorageKey, type Locale } from "./config";
++import { resources } from "./resources";
++import { getLocaleFromUrl, resolveLocale } from "./resolveLocale";
++
++let currentLocale: Locale = defaultLocale;
++const listeners = new Set<() => void>();
++
++const emit = () => listeners.forEach((listener) => listener());
++
++const interpolate = (template: string, params?: Record<string, string | number>): string => {
++  if (!params) {return template;}
++  return template.replace(/\{\{(\w+)\}\}/g, (_, key: string) => String(params[key] ?? ""));
++};
++
++export const t = (key: string, params?: Record<string, string | number>): string => {
++  const value = resources[currentLocale][key] ?? resources.en[key] ?? key;
++  return interpolate(value, params);
++};
++
++export const getCurrentLocale = (): Locale => currentLocale;
++
++export const subscribeToLocale = (listener: () => void) => {
++  listeners.add(listener);
++  return () => listeners.delete(listener);
++};
++
++export const setLocale = (locale: Locale, persist = true) => {
++  currentLocale = locale;
++  if (persist) {
++    localStorage.setItem(localeStorageKey, locale);
++  }
++  emit();
++};
++
++export const initializeLocale = () => {
++  const resolved = resolveLocale({
++    urlLocale: getLocaleFromUrl(window.location.href),
++    storedLocale: localStorage.getItem(localeStorageKey),
++    browserLocales: navigator.languages,
++  });
++  currentLocale = resolved;
++};
+diff --git a/apps/web/src/i18n/useI18n.ts b/apps/web/src/i18n/useI18n.ts
+new file mode 100644
+index 0000000..753d46a
+--- /dev/null
++++ b/apps/web/src/i18n/useI18n.ts
+@@ -0,0 +1,11 @@
++import { useContext } from "react";
++import { supportedLocales } from "./config";
++import { I18nContext } from "./context";
++
++export const useI18n = () => {
++  const context = useContext(I18nContext);
++  if (!context) {
++    throw new Error("useI18n must be used inside I18nProvider");
++  }
++  return { ...context, supportedLocales };
++};
+diff --git a/apps/web/src/main.tsx b/apps/web/src/main.tsx
+index 3589701..3e25d5f 100644
+--- a/apps/web/src/main.tsx
++++ b/apps/web/src/main.tsx
+@@ -2,9 +2,14 @@ import React from "react";
+ import ReactDOM from "react-dom/client";
+ import App from "./App";
+ import "./styles.css";
++import { I18nProvider, initializeLocale } from "./i18n";
++
++initializeLocale();
+ 
+ ReactDOM.createRoot(document.getElementById("root")!).render(
+   <React.StrictMode>
+-    <App />
++    <I18nProvider>
++      <App />
++    </I18nProvider>
+   </React.StrictMode>,
+ );
+diff --git a/docs/i18n-multilanguage-plan.md b/docs/i18n-multilanguage-plan.md
+deleted file mode 100644
+index fcde537..0000000
+--- a/docs/i18n-multilanguage-plan.md
++++ /dev/null
+@@ -1,117 +0,0 @@
+-# Multi-language implementation plan (EN default, DE + ES)
+-
+-## Goal
+-Implement complete multi-language support for the web app with the locale priority order:
+-
+-1. Explicit user choice
+-2. URL locale
+-3. Persisted local locale (cookie/localStorage)
+-4. `Accept-Language` (browser)
+-5. Geo guess (optional fallback)
+-6. Default locale (`en`)
+-
+-Scope includes:
+-- Translating **all user-facing text**.
+-- Adapting input parsing so quantity/unit detection works for English, German, and Spanish.
+-- Reusing translation keys and parsing behavior from the previous app version (`daniel17903/golist`) and only adding missing keys/logic required by the current app.
+-
+-## Reference baseline from previous app
+-Reuse these as source of truth where applicable:
+-- Old app repository: https://github.com/daniel17903/golist
+-- Language defaults/support (`en`, `de`, `es`; `en` default).
+-- Existing UI strings: save/cancel/edit/list/settings/language/about/version/privacy/source/offline/etc.
+-- Quantity parsing behavior and unit coverage currently used in the old regex/parser approach (including decimal separators and flour type exclusion `typ 630`).
+-
+-## Current-state gap assessment (high level)
+-1. No centralized i18n layer in web app yet.
+-2. User-facing strings are still hardcoded in React components.
+-3. Quantity parser is German-centric and not locale-aware.
+-4. Locale detection/persistence order is not implemented.
+-5. No locale-focused tests for UI text resolution and detection priority.
+-
+-## Implementation plan (priority-ordered)
+-
+-### Phase 1 — i18n foundation + locale resolution order
+-1. Introduce an i18n runtime for React (e.g. `i18next` + `react-i18next`) with static JSON dictionaries.
+-2. Add locale constants and resolution function implementing the agreed order:
+-   - `userPreference` (explicit in app settings)
+-   - `urlLocale` (e.g. `/en`, `/de`, `/es` or query parameter fallback)
+-   - `storedLocale`
+-   - `browserLocale` (from `navigator.languages`/`Accept-Language` equivalent)
+-   - `geoLocale` (only if already available from an existing API/source; otherwise skip and go to default)
+-   - fallback `en`
+-3. Ensure all candidates are normalized to supported language codes (`en`, `de`, `es`) and unsupported codes degrade to `en`.
+-4. Persist explicit language changes and make explicit choice sticky across sessions.
+-
+-### Phase 2 — migrate translations from old app first
+-1. Create translation namespaces/files for `en`, `de`, `es`.
+-2. Port all keys that already exist in old app first (same semantic keys when possible).
+-3. Add only missing keys required by the current React app UI (multi-list drawer labels, dialogs, sharing labels, etc.).
+-4. Keep `en` as canonical fallback; missing DE/ES keys should safely fallback to EN during migration.
+-
+-### Phase 3 — replace hardcoded text in UI
+-1. Replace every hardcoded user-visible string in `apps/web/src/components`, `App.tsx`, and relevant hooks with `t(...)` lookups.
+-2. Include dynamic/pluralized strings where needed (e.g., shared devices count) using ICU/plural rules.
+-3. Keep interaction design unchanged (especially inline list rename and existing sorting/suggestion behavior).
+-
+-### Phase 4 — locale-aware quantity parsing
+-1. Split parser into locale-aware config while retaining old tested behavior:
+-   - Keep the old amount-matching baseline units from prior app.
+-   - Add EN/ES unit aliases and plural forms missing from old logic (only where current app UX needs it).
+-2. Keep cross-locale numeric support (`2.5`, `2,5`) and retain flour-type exclusion behavior (`typ 630` and locale variants if needed).
+-3. Expose parser entrypoint as `parseItemInput(input, locale)` with default resolved locale.
+-4. Guarantee backward compatibility: existing German examples must continue to pass.
+-
+-### Phase 5 — tests and validation
+-1. Add unit tests for locale resolution priority order, including tie-break and unsupported language fallback.
+-2. Add translation coverage checks (at least key parity against EN baseline).
+-3. Extend parser tests with EN/DE/ES quantity cases.
+-4. Run required checks before merge:
+-   - `npm run typecheck`
+-   - `npm run lint`
+-   - `npm run test`
+-   - `npm run build` (because runtime config and user-facing assets/strings are touched)
+-
+-## Concrete work breakdown
+-
+-### A. Locale infrastructure
+-- `apps/web/src/i18n/`:
+-  - `config.ts` (supported locales, default locale)
+-  - `resolveLocale.ts` (priority logic)
+-  - `resources/en.json`, `resources/de.json`, `resources/es.json`
+-  - `index.ts` (i18n initialization)
+-- App bootstrap update in `main.tsx`.
+-
+-### B. Settings and persistence
+-- Extend store to persist `languagePreference`.
+-- Add language switch UI wiring (existing Settings surface) to update explicit preference.
+-
+-### C. UI migration
+-- Incremental component migration with no behavior change.
+-- Add temporary fallback monitoring (console warning in dev for missing keys).
+-
+-### D. Parser migration
+-- Refactor `apps/web/src/domain/inputParser.ts` into language-aware unit dictionaries + regex builder.
+-- Preserve existing tests and add locale matrix tests.
+-
+-## Reuse-first rule for this migration
+-To satisfy "reuse old app first":
+-1. Import old-app keys and parser behavior as baseline.
+-2. Diff against current UI text and features.
+-3. Add only net-new keys and parser units required by the current app that are absent in old app.
+-4. Document every net-new addition in the PR notes (key name + reason).
+-
+-## Risks and mitigations
+-- **Risk:** Missing translations block UI labels.
+-  - **Mitigation:** EN fallback + CI check for missing key parity.
+-- **Risk:** Quantity regex regressions.
+-  - **Mitigation:** Preserve old DE test vectors and add locale-specific snapshots.
+-- **Risk:** Locale flicker on first load.
+-  - **Mitigation:** Resolve locale before initial render and initialize i18n synchronously from cached preference.
+-
+-## Acceptance criteria
+-- App supports `en`, `de`, `es` with `en` default.
+-- Effective locale follows exact priority order defined above.
+-- All user-facing text in current web UI is translatable.
+-- Quantity detection works in EN/DE/ES and keeps existing DE behavior intact.
+-- Only missing translation keys/logic beyond old app baseline are newly authored.
+diff --git a/package-lock.json b/package-lock.json
+index 259c6ad..c0b9267 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -32,7 +32,7 @@
+       "name": "@golist/backend",
+       "version": "0.1.0",
+       "dependencies": {
+-        "@fastify/cors": "^11.2.0",
++        "@fastify/cors": "11.2.0",
+         "fastify": "5.7.4",
+         "pg": "8.18.0",
+         "zod": "4.3.6"
+-- 
+2.43.0
+
