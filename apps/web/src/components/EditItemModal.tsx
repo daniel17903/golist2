@@ -1,3 +1,5 @@
+import { useI18n } from "../i18n";
+
 type EditItemModalProps = {
   isOpen: boolean;
   name: string;
@@ -17,6 +19,8 @@ const EditItemModal = ({
   onCancel,
   onSave,
 }: EditItemModalProps) => {
+  const { t } = useI18n();
+
   if (!isOpen) {return null;}
 
   return (
@@ -27,34 +31,34 @@ const EditItemModal = ({
         }}
       >
         <div className="modal__header">
-          <h2>Eintrag bearbeiten</h2>
+          <h2>{t("modal.editItem")}</h2>
         </div>
         <div className="modal__body">
           <div className="modal__field">
-            <label htmlFor="item-name">Name</label>
+            <label htmlFor="item-name">{t("common.name")}</label>
             <input
               id="item-name"
               value={name}
               onChange={(event) => onNameChange(event.target.value)}
-              placeholder="Name"
+              placeholder={t("common.name")}
             />
           </div>
           <div className="modal__field">
-            <label htmlFor="item-quantity">Menge</label>
+            <label htmlFor="item-quantity">{t("common.quantity")}</label>
             <input
               id="item-quantity"
               value={quantity}
               onChange={(event) => onQuantityChange(event.target.value)}
-              placeholder="Menge"
+              placeholder={t("common.quantity")}
             />
           </div>
         </div>
         <div className="modal__actions">
           <button type="button" className="text-button" onClick={onCancel}>
-            Abbrechen
+            {t("common.cancel")}
           </button>
           <button type="button" className="text-button" onClick={onSave}>
-            Speichern
+            {t("common.save")}
           </button>
         </div>
       </div>

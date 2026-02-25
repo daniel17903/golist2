@@ -1,3 +1,5 @@
+import { getLocale } from "../i18n";
+import type { Locale } from "../i18n/config";
 export type Category = {
   id: string;
   label: string;
@@ -772,20 +774,56 @@ categoryEntries.forEach((entry) => {
   });
 });
 
-export const getCategoryForItem = (name: string): Category | undefined => {
+const localeSpecificNames: Record<Locale, Set<string>> = {
+  en: new Set(["apple"]),
+  de: new Set(["apfel"]),
+  es: new Set(["manzana"]),
+};
+
+const localeSpecificAssets: Record<string, string> = {
+  apple: "apple",
+  apfel: "apple",
+  manzana: "apple",
+};
+
+const localeSpecificCategory: Record<string, string> = {
+  apple: "fruitsVegetables",
+  apfel: "fruitsVegetables",
+  manzana: "fruitsVegetables",
+};
+
+const resolveLocaleAwareCategory = (key: string, locale: Locale): string | undefined => {
+  const isLocaleSpecificName = Object.values(localeSpecificNames).some((names) => names.has(key));
+  if (!isLocaleSpecificName) {
+    return itemCategoryMap.get(key);
+  }
+
+  if (localeSpecificNames[locale].has(key)) {
+    return localeSpecificCategory[key];
+  }
+
+  return undefined;
+};
+
+export const getCategoryForItem = (name: string, locale: Locale = getLocale()): Category | undefined => {
   const key = name.trim().toLowerCase();
-  const categoryId = itemCategoryMap.get(key);
+  const categoryId = resolveLocaleAwareCategory(key, locale);
   return categories.find((category) => category.id === categoryId);
 };
 
-export const getCategoryOrder = (name: string): number | undefined => {
-  const category = getCategoryForItem(name);
+export const getCategoryOrder = (name: string, locale: Locale = getLocale()): number | undefined => {
+  const category = getCategoryForItem(name, locale);
   return category?.order;
 };
 
-export const getItemIcon = (name: string): string => {
+export const getItemIcon = (name: string, locale: Locale = getLocale()): string => {
   const key = name.trim().toLowerCase();
-  const asset = itemAssetMap.get(key);
+  const isLocaleSpecificName = Object.values(localeSpecificNames).some((names) => names.has(key));
+  if (isLocaleSpecificName && !localeSpecificNames[locale].has(key)) {
+    return buildIconPath(defaultIconName);
+  }
+
+  const asset = localeSpecificAssets[key] ?? itemAssetMap.get(key);
   if (asset) {
     return buildIconPath(asset);
   }

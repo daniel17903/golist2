@@ -1,5 +1,6 @@
 import type { MouseEvent } from "react";
 import { getItemIcon } from "../domain/categories";
+import { useI18n } from "../i18n";
 import type { Item } from "@golist/shared/domain/types";
 
 type ItemCardProps = {
@@ -23,6 +24,8 @@ const ItemCard = ({
   onPointerCancel,
   onClick,
 }: ItemCardProps) => {
+  const { locale } = useI18n();
+
   return (
     <button
       type="button"
@@ -39,7 +42,7 @@ const ItemCard = ({
       onClick={onClick}
     >
       <span className="item-icon" aria-hidden="true">
-        <img src={getItemIcon(item.name)} alt="" />
+        <img src={getItemIcon(item.name, locale)} alt="" />
       </span>
       <div className="item-text">
         <span className="item-name">{item.name}</span>

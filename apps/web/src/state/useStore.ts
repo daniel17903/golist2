@@ -2,6 +2,7 @@ import { create } from "zustand";
 import type { AppMetadata, Item, List } from "@golist/shared/domain/types";
 import { getCategoryForItem } from "../domain/categories";
 import { db } from "../storage/db";
+import { t } from "../i18n";
 import {
   extractShareToken,
   setBackendCallLogger,
@@ -157,8 +158,8 @@ const runBackendSyncInBackground = (action: () => Promise<void>, message: string
     const details = describeSyncError(error);
     reportSyncError(
       details
-        ? `${message} (${details}). Änderungen bleiben lokal und werden später synchronisiert.`
-        : `${message}. Änderungen bleiben lokal und werden später synchronisiert.`,
+        ? `${message} (${details}). ${t("sync.pending")}`
+        : `${message}. ${t("sync.pending")}`,
     );
   });
 };
@@ -220,7 +221,7 @@ export const useStore = create<StoreState>((set, get) => ({
 
     runBackendSyncInBackground(
       () => syncListNameImmediately(list.id, list.name),
-      "Backend-Verbindung fehlgeschlagen",
+      t("sync.offline"),
     );
 
     triggerSyncInBackground(list.id);
@@ -235,7 +236,7 @@ export const useStore = create<StoreState>((set, get) => ({
     }));
     runBackendSyncInBackground(
       () => syncListNameImmediately(listId, name),
-      "Backend-Verbindung fehlgeschlagen",
+      t("sync.offline"),
     );
 
     triggerSyncInBackground(listId);
@@ -277,7 +278,7 @@ export const useStore = create<StoreState>((set, get) => ({
     };
     await db.items.add(item);
     set((state) => ({ items: [...state.items, item] }));
-    runBackendSyncInBackground(() => syncItemImmediately(item), "Backend-Verbindung fehlgeschlagen");
+    runBackendSyncInBackground(() => syncItemImmediately(item), t("sync.offline"));
 
     triggerSyncInBackground(listId);
   },
@@ -297,7 +298,7 @@ export const useStore = create<StoreState>((set, get) => ({
 
     runBackendSyncInBackground(
       () => syncItemImmediately(updated),
-      "Backend-Verbindung fehlgeschlagen",
+      t("sync.offline"),
     );
 
     triggerSyncInBackground(updated.listId);
@@ -320,7 +321,7 @@ export const useStore = create<StoreState>((set, get) => ({
 
     runBackendSyncInBackground(
       () => syncItemImmediately(updated),
-      "Backend-Verbindung fehlgeschlagen",
+      t("sync.offline"),
     );
 
     triggerSyncInBackground(updated.listId);
