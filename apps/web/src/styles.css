@@ -1,7 +1,7 @@
 :root {
   font-family: "Inter", system-ui, -apple-system, sans-serif;
   color: #0b1f2a;
-  --item-size: 130px;
+  --item-size: 120px;
   background: radial-gradient(
     circle at bottom,
     #e4b2d2 0%,
@@ -228,7 +228,7 @@ body {
   background: rgba(2, 68, 97, 0.58);
   border: none;
   border-radius: 12px;
-  padding: 8px 4px 8px 4px;
+  padding: 4px 4px 2px 4px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -256,6 +256,7 @@ body {
   align-self: center;
   justify-content: center;
   flex-grow: 1;
+  flex-shrink: 1;
 }
 
 .item-icon img {
