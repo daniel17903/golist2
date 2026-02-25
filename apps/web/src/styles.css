@@ -677,6 +677,10 @@ body {
   font-size: 16px;
 }
 
+.drawer__settings .drawer__item-icon {
+  color: #ffffff;
+}
+
 .add-dialog {
   align-items: flex-start;
   padding-top: 60px;
