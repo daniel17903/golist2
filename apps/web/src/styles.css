@@ -21,6 +21,20 @@ body {
   margin: 0;
 }
 
+@media (hover: hover) and (pointer: fine) {
+  button,
+  [role="button"],
+  a[href],
+  input[type="button"],
+  input[type="submit"],
+  input[type="reset"],
+  summary,
+  .modal-backdrop,
+  .drawer-backdrop {
+    cursor: pointer;
+  }
+}
+
 .app {
   min-height: 100vh;
   display: flex;
