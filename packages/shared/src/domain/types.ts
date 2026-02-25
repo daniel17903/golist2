@@ -1,3 +1,5 @@
+import type { CategoryLanguage } from './item-category-mapping';
+
 export type SharedList = {
   id: string;
   name: string;
@@ -72,7 +74,8 @@ export type ApiShareTokenRedeemResponse = {
 export type ApiItemUpsertRequest = {
   name: string;
   quantityOrUnit?: string;
-  category: string;
+  category?: string;
+  language?: CategoryLanguage;
   deleted: boolean;
   updatedAt: string;
 };
