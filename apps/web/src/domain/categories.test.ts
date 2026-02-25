@@ -1,26 +1,20 @@
 import { describe, expect, it } from "vitest";
-import { getCategoryForItem, getCategoryOrder, getItemIcon, getItemIconForCategory } from "./categories";
+import { getCategoryIdForItem, getItemIcon, getItemIconForCategory } from "./categories";
 
 describe("categories helpers", () => {
   it("returns the category for known items regardless of case", () => {
-    const category = getCategoryForItem("  ApPlE  ", "en");
-    expect(category?.id).toBe("fruitsVegetables");
-    expect(category?.label).toBe("Fruits & Vegetables");
-  });
-
-  it("returns the category order for items that map to a known category", () => {
-    expect(getCategoryOrder("bread", "en")).toBe(2);
+    expect(getCategoryIdForItem("  ApPlE  ", "en")).toBe("fruitsVegetables");
   });
 
   it("returns a locale-aware icon and category for apple variants", () => {
     expect(getItemIcon("apfel", "de")).toBe("/icons/apple.svg");
-    expect(getCategoryForItem("apfel", "de")?.id).toBe("fruitsVegetables");
-    expect(getCategoryForItem("apfel", "en")).toBeUndefined();
+    expect(getCategoryIdForItem("apfel", "de")).toBe("fruitsVegetables");
+    expect(getCategoryIdForItem("apfel", "en")).toBeUndefined();
   });
 
 
   it("uses translated locale entries for spanish", () => {
-    expect(getCategoryForItem("manzana", "es")?.id).toBe("fruitsVegetables");
+    expect(getCategoryIdForItem("manzana", "es")).toBe("fruitsVegetables");
     expect(getItemIcon("manzana", "es")).toBe("/icons/apple.svg");
   });
 

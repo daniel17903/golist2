@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import type { AppMetadata, Item, List } from "@golist/shared/domain/types";
-import { getCategoryForItem } from "../domain/categories";
+import { getCategoryIdForItem } from "../domain/categories";
 import { db } from "../storage/db";
 import { t } from "../i18n";
 import {
@@ -271,7 +271,7 @@ export const useStore = create<StoreState>((set, get) => ({
       listId,
       name,
       quantityOrUnit,
-      category: getCategoryForItem(name)?.id ?? "other",
+      category: getCategoryIdForItem(name) ?? "other",
       deleted: false,
       createdAt: now,
       updatedAt: now,
@@ -311,7 +311,7 @@ export const useStore = create<StoreState>((set, get) => ({
       ...item,
       name,
       quantityOrUnit,
-      category: getCategoryForItem(name)?.id ?? "other",
+      category: getCategoryIdForItem(name) ?? "other",
       updatedAt: Date.now(),
     };
     await db.items.put(updated);

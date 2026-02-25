@@ -1,25 +1,19 @@
 import { getLocale } from "../i18n";
 import type { Locale } from "../i18n/config";
-export type Category = {
-  id: string;
-  label: string;
-  icon: string;
-  order: number;
-};
 
-export const categories: Category[] = [
-  { id: "fruitsVegetables", label: "Fruits & Vegetables", icon: "🥕", order: 1 },
-  { id: "bread", label: "Bread", icon: "🥖", order: 2 },
-  { id: "milkCheese", label: "Milk & Cheese", icon: "🥛", order: 3 },
-  { id: "meatFish", label: "Meat & Fish", icon: "🥩", order: 4 },
-  { id: "cereals", label: "Cereals", icon: "🥣", order: 5 },
-  { id: "spicesCanned", label: "Spices & Canned", icon: "🫙", order: 6 },
-  { id: "sweetsSnacks", label: "Sweets & Snacks", icon: "🍪", order: 7 },
-  { id: "beverages", label: "Beverages", icon: "🧃", order: 8 },
-  { id: "household", label: "Household", icon: "🧽", order: 9 },
-  { id: "convenienceProductFrozen", label: "Convenience & Frozen", icon: "🍕", order: 10 },
-  { id: "other", label: "Other", icon: "🛒", order: 11 },
-];
+export const categoryOrderById: Record<string, number> = {
+  fruitsVegetables: 1,
+  bread: 2,
+  milkCheese: 3,
+  meatFish: 4,
+  cereals: 5,
+  spicesCanned: 6,
+  sweetsSnacks: 7,
+  beverages: 8,
+  household: 9,
+  convenienceProductFrozen: 10,
+  other: 11,
+};
 
 type CategoryEntry = {
   assetFileName: string;
@@ -2642,20 +2636,6 @@ const iconBasePath = "/icons";
 const defaultIconName = "default";
 const buildIconPath = (iconName: string) => `${iconBasePath}/${iconName}.svg`;
 
-const categoryIconById: Record<string, string> = {
-  fruitsVegetables: "apple",
-  bread: "bread",
-  milkCheese: "cup",
-  meatFish: "dead_cow",
-  cereals: "corn",
-  spicesCanned: "can",
-  sweetsSnacks: "cookie",
-  beverages: "bottle",
-  household: "sponge",
-  convenienceProductFrozen: "pizza_cake",
-  other: defaultIconName,
-};
-
 (["en", "de", "es"] as const).forEach((locale) => {
   categoryEntriesByLocale[locale].forEach((entry) => {
     entry.matchingNames.forEach((name) => {
@@ -2671,19 +2651,24 @@ const categoryIconById: Record<string, string> = {
   });
 });
 
-export const getCategoryForItem = (name: string, locale: Locale = getLocale()): Category | undefined => {
+export const getCategoryIdForItem = (name: string, locale: Locale = getLocale()): string | undefined => {
   const key = name.trim().toLowerCase();
-  const categoryId = itemCategoryMapByLocale[locale].get(key);
-  return categories.find((category) => category.id === categoryId);
+  return itemCategoryMapByLocale[locale].get(key);
 };
 
-export const getCategoryOrder = (name: string, locale: Locale = getLocale()): number | undefined => {
-  const category = getCategoryForItem(name, locale);
-  return category?.order;
-};
+const categoryIconById = (() => {
+  const map = new Map<string, string>();
+  categoryEntriesDe.forEach((entry) => {
+    if (!map.has(entry.category)) {
+      map.set(entry.category, entry.assetFileName);
+    }
+  });
+
+  return map;
+})();
 
 export const getItemIconForCategory = (categoryId: string): string => {
-  const iconName = categoryIconById[categoryId] ?? defaultIconName;
+  const iconName = categoryIconById.get(categoryId) ?? defaultIconName;
   return buildIconPath(iconName);
 };
 
