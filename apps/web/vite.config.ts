@@ -27,7 +27,7 @@ export default defineConfig({
         description: "Smart grocery lists with list-specific suggestions and category sorting.",
         categories: ["shopping", "productivity", "utilities"],
         theme_color: "#0b3d5c",
-        background_color: "#cfe8d6",
+        background_color: "#404e55",
         display: "standalone",
         start_url: "/",
         id: "/",
