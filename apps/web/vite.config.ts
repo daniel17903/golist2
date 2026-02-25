@@ -20,7 +20,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: "autoUpdate",
-      includeAssets: ["favicon.svg", "icons/*.svg"],
+      includeAssets: ["favicon.png", "icons/*.svg", "icons/icon.png"],
       manifest: {
         name: "GoList",
         short_name: "GoList",
@@ -34,15 +34,15 @@ export default defineConfig({
         scope: "/",
         icons: [
           {
-            src: "/favicon.svg",
-            sizes: "any",
-            type: "image/svg+xml",
+            src: "/favicon.png",
+            sizes: "512x512",
+            type: "image/png",
             purpose: "any maskable",
           },
           {
-            src: "/icons/icon_new.svg",
-            sizes: "any",
-            type: "image/svg+xml",
+            src: "/icons/icon.png",
+            sizes: "512x512",
+            type: "image/png",
             purpose: "any maskable",
           },
         ],
