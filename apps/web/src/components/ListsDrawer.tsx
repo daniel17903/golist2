@@ -88,6 +88,7 @@ const ListsDrawer = ({
   );
 
   const handleDragStart = (event: PointerEvent<HTMLElement>, mode: DragMode) => {
+    if (event.pointerType !== "touch") {return;}
     dragStateRef.current = { pointerId: event.pointerId, startX: event.clientX, mode };
     event.currentTarget.setPointerCapture(event.pointerId);
   };
