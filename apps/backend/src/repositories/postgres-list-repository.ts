@@ -40,6 +40,7 @@ function toItemRecord(item: {
   id: string
   list_id: string
   name: string
+  icon_name: string
   quantity_or_unit: string | null
   category: string
   deleted: boolean
@@ -50,6 +51,7 @@ function toItemRecord(item: {
     id: item.id,
     listId: item.list_id,
     name: item.name,
+    iconName: item.icon_name,
     quantityOrUnit: item.quantity_or_unit ?? undefined,
     category: item.category,
     deleted: item.deleted,
@@ -63,7 +65,7 @@ async function touchListUpdatedAt(client: Queryable, listId: string, updatedAt: 
 }
 
 function computeItemTieBreakValue(item: ItemUpsertInput): string {
-  return `${item.name}${itemUpdateTieBreakDelimiter}${item.quantityOrUnit ?? ''}${itemUpdateTieBreakDelimiter}${item.category}${itemUpdateTieBreakDelimiter}${item.deleted}`
+  return `${item.name}${itemUpdateTieBreakDelimiter}${item.iconName}${itemUpdateTieBreakDelimiter}${item.quantityOrUnit ?? ''}${itemUpdateTieBreakDelimiter}${item.category}${itemUpdateTieBreakDelimiter}${item.deleted}`
 }
 
 async function hasListAccessWithClient(client: Queryable, listId: string, deviceId: string): Promise<boolean> {
@@ -157,13 +159,14 @@ export class PostgresListRepository implements ListRepository {
       id: string
       list_id: string
       name: string
+      icon_name: string
       quantity_or_unit: string | null
       category: string
       deleted: boolean
       created_at: string
       updated_at: string
     }>(
-      `SELECT id, list_id, name, quantity_or_unit, category, deleted, created_at, updated_at
+      `SELECT id, list_id, name, icon_name, quantity_or_unit, category, deleted, created_at, updated_at
          FROM list_items
         WHERE list_id = $1
         ORDER BY created_at ASC, id ASC`,
@@ -178,13 +181,14 @@ export class PostgresListRepository implements ListRepository {
       id: string
       list_id: string
       name: string
+      icon_name: string
       quantity_or_unit: string | null
       category: string
       deleted: boolean
       created_at: string
       updated_at: string
     }>(
-      `SELECT id, list_id, name, quantity_or_unit, category, deleted, created_at, updated_at
+      `SELECT id, list_id, name, icon_name, quantity_or_unit, category, deleted, created_at, updated_at
          FROM list_items
         WHERE list_id = $1 AND updated_at > $2
         ORDER BY updated_at ASC, id ASC`,
@@ -199,13 +203,14 @@ export class PostgresListRepository implements ListRepository {
       id: string
       list_id: string
       name: string
+      icon_name: string
       quantity_or_unit: string | null
       category: string
       deleted: boolean
       created_at: string
       updated_at: string
     }>(
-      `SELECT id, list_id, name, quantity_or_unit, category, deleted, created_at, updated_at
+      `SELECT id, list_id, name, icon_name, quantity_or_unit, category, deleted, created_at, updated_at
          FROM list_items
         WHERE id = $1 AND list_id = $2
         LIMIT 1`,
@@ -234,9 +239,9 @@ export class PostgresListRepository implements ListRepository {
 
       if (!existingItemResult.rowCount) {
         await client.query(
-          `INSERT INTO list_items(id, list_id, name, quantity_or_unit, category, deleted, created_by_device_id, created_at, updated_at, deleted_at)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), $8, CASE WHEN $6 THEN NOW() ELSE NULL END)`,
-          [itemId, listId, input.name, input.quantityOrUnit ?? null, input.category, input.deleted, deviceId, input.updatedAt],
+          `INSERT INTO list_items(id, list_id, name, icon_name, quantity_or_unit, category, deleted, created_by_device_id, created_at, updated_at, deleted_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), $9, CASE WHEN $7 THEN NOW() ELSE NULL END)`,
+          [itemId, listId, input.name, input.iconName, input.quantityOrUnit ?? null, input.category, input.deleted, deviceId, input.updatedAt],
         )
 
         await touchListUpdatedAt(client, listId, input.updatedAt)
@@ -251,21 +256,22 @@ export class PostgresListRepository implements ListRepository {
       const updateResult = await client.query(
         `UPDATE list_items
             SET name = $1,
-                quantity_or_unit = $2,
-                category = $3,
-                deleted = $4,
-                updated_at = $5,
-                deleted_at = CASE WHEN $4 THEN NOW() ELSE NULL END
-          WHERE id = $6
-            AND list_id = $7
+                icon_name = $2,
+                quantity_or_unit = $3,
+                category = $4,
+                deleted = $5,
+                updated_at = $6,
+                deleted_at = CASE WHEN $5 THEN NOW() ELSE NULL END
+          WHERE id = $7
+            AND list_id = $8
             AND (
-              updated_at < $5
+              updated_at < $6
               OR (
-                updated_at = $5
-                AND CONCAT_WS($9, name, COALESCE(quantity_or_unit, ''), category, deleted::text) < $8
+                updated_at = $6
+                AND CONCAT_WS($10, name, icon_name, COALESCE(quantity_or_unit, ''), category, deleted::text) < $9
               )
             )`,
-        [input.name, input.quantityOrUnit ?? null, input.category, input.deleted, input.updatedAt, itemId, listId, tieBreakValue, itemUpdateTieBreakDelimiter],
+        [input.name, input.iconName, input.quantityOrUnit ?? null, input.category, input.deleted, input.updatedAt, itemId, listId, tieBreakValue, itemUpdateTieBreakDelimiter],
       )
 
       if (updateResult.rowCount) {

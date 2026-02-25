@@ -173,7 +173,7 @@ describe('sharing API contract basics', () => {
     })
 
     expect(itemResponse.statusCode).toBe(200)
-    expect(itemResponse.json()).toEqual(expect.objectContaining({ category: 'milkCheese' }))
+    expect(itemResponse.json()).toEqual(expect.objectContaining({ category: 'milkCheese', iconName: 'tetrapack' }))
 
     await app.close()
   })
@@ -214,7 +214,7 @@ describe('sharing API contract basics', () => {
     })
 
     expect(itemResponse.statusCode).toBe(200)
-    expect(itemResponse.json()).toEqual(expect.objectContaining({ category: 'fruitsVegetables' }))
+    expect(itemResponse.json()).toEqual(expect.objectContaining({ category: 'fruitsVegetables', iconName: 'apple' }))
 
     await app.close()
   })

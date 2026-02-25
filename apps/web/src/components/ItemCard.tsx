@@ -39,7 +39,7 @@ const ItemCard = ({
       onClick={onClick}
     >
       <span className="item-icon" aria-hidden="true">
-        <img src={getListItemIcon(item.name, item.category)} alt="" />
+        <img src={getListItemIcon(item.iconName)} alt="" />
       </span>
       <div className="item-text">
         <span className="item-name">{item.name}</span>
