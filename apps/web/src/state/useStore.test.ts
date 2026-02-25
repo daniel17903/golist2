@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Item, List } from "@golist/shared/domain/types";
 
 vi.stubGlobal("__APP_VERSION__", "test-version");
+vi.stubGlobal("__DEVICE_ID__", "build-device-id");
 
 
 const createMemoryStorage = () => {
@@ -202,11 +203,21 @@ describe("useStore", () => {
     expect(state.items).toHaveLength(1);
     expect(state.activeListId).toBe("a");
     expect(state.metadata?.appVersion).toBe("test-version");
-    expect(state.metadata?.deviceId).toBeTypeOf("string");
+    expect(state.metadata?.deviceId).toBe("build-device-id");
+    expect(globalThis.localStorage.getItem("golist.deviceId")).toBe("build-device-id");
     expect(state.isLoaded).toBe(true);
     expect(metadataPut).toHaveBeenCalledTimes(1);
   });
 
+
+  it("prefers the build-time device id over a previously stored value", async () => {
+    globalThis.localStorage.setItem("golist.deviceId", "old-device-id");
+
+    await useStore.getState().load();
+
+    expect(useStore.getState().metadata?.deviceId).toBe("build-device-id");
+    expect(globalThis.localStorage.getItem("golist.deviceId")).toBe("build-device-id");
+  });
 
   it("restores a previously selected list from localStorage", async () => {
     listsData = [
