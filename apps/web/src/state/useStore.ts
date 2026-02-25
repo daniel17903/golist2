@@ -127,6 +127,9 @@ const describeSyncError = (error: unknown) => {
   return null;
 };
 
+const isFetchListForbiddenError = (error: unknown) =>
+  error instanceof Error && /fetch list failed:\s*403\b/i.test(error.message);
+
 const reportSyncError = (message: string) => {
   useStore.setState({
     backendConnection: "offline",
@@ -421,7 +424,22 @@ export const useStore = create<StoreState>((set, get) => ({
     }
 
     const deviceId = state.metadata.deviceId;
-    const remoteList = await sharingApiClient.fetchList({ deviceId, listId });
+    let remoteList;
+
+    try {
+      remoteList = await sharingApiClient.fetchList({ deviceId, listId });
+    } catch (error) {
+      if (!isFetchListForbiddenError(error)) {
+        throw error;
+      }
+
+      await sharingApiClient.upsertList({
+        deviceId,
+        listId,
+        body: { name: localList.name },
+      });
+      remoteList = await sharingApiClient.fetchList({ deviceId, listId });
+    }
 
     const remoteListUpdatedAt = toMillis(remoteList.updatedAt);
     if (localList.updatedAt > remoteListUpdatedAt || localList.name !== remoteList.name) {

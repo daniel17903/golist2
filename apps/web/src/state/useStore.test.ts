@@ -50,6 +50,14 @@ const listUpdate = vi.fn(async (id: string, updates: Partial<List>) => {
 const listDelete = vi.fn(async (id: string) => {
   listsData = listsData.filter((list) => list.id !== id);
 });
+const listPut = vi.fn(async (list: List) => {
+  const index = listsData.findIndex((entry) => entry.id === list.id);
+  if (index >= 0) {
+    listsData[index] = list;
+    return;
+  }
+  listsData.push(list);
+});
 const itemAdd = vi.fn(async (item: Item) => {
   itemsData.push(item);
   return item.id;
@@ -89,6 +97,7 @@ vi.mock("../storage/db", () => ({
       add: listAdd,
       update: listUpdate,
       delete: listDelete,
+      put: listPut,
     },
     items: {
       toArray: vi.fn(async () => [...itemsData]),
@@ -149,6 +158,7 @@ describe("useStore", () => {
     listAdd.mockClear();
     listUpdate.mockClear();
     listDelete.mockClear();
+    listPut.mockClear();
     itemAdd.mockClear();
     itemPut.mockClear();
     itemBulkPut.mockClear();
@@ -448,4 +458,46 @@ describe("useStore", () => {
     });
     expect(upsertItemMock).toHaveBeenCalled();
   });
+
+  it("syncList creates the remote list when initial fetch returns 403", async () => {
+    useStore.setState({
+      lists: [{ id: "list-1", name: "Groceries", createdAt: 1, updatedAt: 1 }],
+      items: [],
+      metadata: {
+        id: "app",
+        deviceId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        appVersion: "test-version",
+        lastOpenedAt: 1,
+      },
+      listShareTokens: {},
+    });
+
+    fetchListMock
+      .mockRejectedValueOnce(new Error('fetch list failed: 403 {"message":"Forbidden"}'))
+      .mockResolvedValueOnce({
+        listId: "list-1",
+        name: "Groceries",
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+        items: [],
+      })
+      .mockResolvedValueOnce({
+        listId: "list-1",
+        name: "Groceries",
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+        items: [],
+      });
+
+    await useStore.getState().syncList("list-1");
+
+    expect(upsertListMock).toHaveBeenCalledWith({
+      deviceId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      listId: "list-1",
+      body: { name: "Groceries" },
+    });
+    expect(fetchListMock).toHaveBeenCalledTimes(3);
+    expect(useStore.getState().backendConnection).toBe("online");
+  });
+
 });
