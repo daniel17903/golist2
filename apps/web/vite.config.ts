@@ -20,7 +20,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: "autoUpdate",
-      includeAssets: ["favicon.svg", "icons/*.svg", "icons/*.png"],
+      includeAssets: ["favicon.svg", "favicon.ico", "favicon-96x96.png", "apple-touch-icon.png", "web-app-manifest-192x192.png", "web-app-manifest-512x512.png", "icons/*.svg", "icons/*.png"],
       manifest: {
         name: "GoList",
         short_name: "GoList",
