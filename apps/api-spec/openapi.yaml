@@ -174,7 +174,7 @@ paths:
       - $ref: "#/components/parameters/ListId"
       - $ref: "#/components/parameters/DeviceIdHeader"
     put:
-      summary: Create list (idempotent) or update existing list when caller has access
+      summary: Upsert list
       security: []
       requestBody:
         required: true
@@ -243,7 +243,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ListItem"
     put:
-      summary: Upsert item in list (create or update by client-provided itemId)
+      summary: Upsert item in list
       requestBody:
         required: true
         content:
