@@ -27,20 +27,26 @@ type CategoryEntry = {
   category: string;
 };
 
-const mixedCategoryEntries: CategoryEntry[] = [
+const categoryEntriesDe: CategoryEntry[] = [
   {
-    assetFileName: "apple",
-    matchingNames: ["fruit", "apples", "apple"],
-    category: "fruitsVegetables",
+    "assetFileName": "apple",
+    "matchingNames": [
+      "fruit",
+      "apples",
+      "apple",
+    ],
+    "category": "fruitsVegetables",
   },
   {
-    assetFileName: "banana",
-    matchingNames: ["banana"],
-    category: "fruitsVegetables",
+    "assetFileName": "banana",
+    "matchingNames": [
+      "banana",
+    ],
+    "category": "fruitsVegetables",
   },
   {
-    assetFileName: "bottle",
-    matchingNames: [
+    "assetFileName": "bottle",
+    "matchingNames": [
       "beer",
       "wine",
       "sprite",
@@ -63,16 +69,24 @@ const mixedCategoryEntries: CategoryEntry[] = [
       "red bull",
       "fanta",
     ],
-    category: "beverages",
+    "category": "beverages",
   },
   {
-    assetFileName: "bottle",
-    matchingNames: ["mayonnaise", "oil", "mayo", "vinegar", "ketchup", "soy sauce", "remoulade"],
-    category: "convenienceProductFrozen",
+    "assetFileName": "bottle",
+    "matchingNames": [
+      "mayonnaise",
+      "oil",
+      "mayo",
+      "vinegar",
+      "ketchup",
+      "soy sauce",
+      "remoulade",
+    ],
+    "category": "convenienceProductFrozen",
   },
   {
-    assetFileName: "box",
-    matchingNames: [
+    "assetFileName": "box",
+    "matchingNames": [
       "dishwasher salt",
       "handkerchiefs",
       "dishwashing soaps",
@@ -91,16 +105,18 @@ const mixedCategoryEntries: CategoryEntry[] = [
       "muesli",
       "box",
     ],
-    category: "household",
+    "category": "household",
   },
   {
-    assetFileName: "flour",
-    matchingNames: ["flour"],
-    category: "cereals",
+    "assetFileName": "flour",
+    "matchingNames": [
+      "flour",
+    ],
+    "category": "cereals",
   },
   {
-    assetFileName: "bread",
-    matchingNames: [
+    "assetFileName": "bread",
+    "matchingNames": [
       "lye rod",
       "lye bar",
       "semmel",
@@ -112,16 +128,22 @@ const mixedCategoryEntries: CategoryEntry[] = [
       "bun",
       "baguette",
     ],
-    category: "bread",
+    "category": "bread",
   },
   {
-    assetFileName: "can",
-    matchingNames: ["tomato can", "can", "beans", "canned tomatoes", "chickpeas"],
-    category: "spicesCanned",
+    "assetFileName": "can",
+    "matchingNames": [
+      "tomato can",
+      "can",
+      "beans",
+      "canned tomatoes",
+      "chickpeas",
+    ],
+    "category": "spicesCanned",
   },
   {
-    assetFileName: "carrot",
-    matchingNames: [
+    "assetFileName": "carrot",
+    "matchingNames": [
       "carrot",
       "radish",
       "rettich",
@@ -131,16 +153,26 @@ const mixedCategoryEntries: CategoryEntry[] = [
       "ruebe",
       "parsnip",
     ],
-    category: "fruitsVegetables",
+    "category": "fruitsVegetables",
   },
   {
-    assetFileName: "corn",
-    matchingNames: ["lenses", "millet", "quinoa", "seed", "seeds", "peas", "bulgur", "oatmeal", "grains"],
-    category: "cereals",
+    "assetFileName": "corn",
+    "matchingNames": [
+      "lenses",
+      "millet",
+      "quinoa",
+      "seed",
+      "seeds",
+      "peas",
+      "bulgur",
+      "oatmeal",
+      "grains",
+    ],
+    "category": "cereals",
   },
   {
-    assetFileName: "cup",
-    matchingNames: [
+    "assetFileName": "cup",
+    "matchingNames": [
       "yogurt",
       "pudding",
       "whipped cream",
@@ -151,11 +183,11 @@ const mixedCategoryEntries: CategoryEntry[] = [
       "yoghurt",
       "cups",
     ],
-    category: "milkCheese",
+    "category": "milkCheese",
   },
   {
-    assetFileName: "glas",
-    matchingNames: [
+    "assetFileName": "glas",
+    "matchingNames": [
       "nutella",
       "pesto",
       "hummus",
@@ -171,28 +203,59 @@ const mixedCategoryEntries: CategoryEntry[] = [
       "honey",
       "glasses",
     ],
-    category: "spicesCanned",
-  },
-  { assetFileName: "leek", matchingNames: ["leek"], category: "fruitsVegetables" },
-  {
-    assetFileName: "peanut",
-    matchingNames: ["pistachios", "nut", "cashews", "nuts"],
-    category: "cereals",
-  },
-  { assetFileName: "almonds", matchingNames: ["almond"], category: "cereals" },
-  {
-    assetFileName: "round_fruit",
-    matchingNames: ["tangerine", "nectarine", "peach", "tomato", "orange", "mango"],
-    category: "fruitsVegetables",
+    "category": "spicesCanned",
   },
   {
-    assetFileName: "dead_cow",
-    matchingNames: ["flesh", "minced meat", "steak", "cattle", "meat", "bovine"],
-    category: "meatFish",
+    "assetFileName": "leek",
+    "matchingNames": [
+      "leek",
+    ],
+    "category": "fruitsVegetables",
   },
   {
-    assetFileName: "dead_pig",
-    matchingNames: [
+    "assetFileName": "peanut",
+    "matchingNames": [
+      "pistachios",
+      "nut",
+      "cashews",
+      "nuts",
+    ],
+    "category": "cereals",
+  },
+  {
+    "assetFileName": "almonds",
+    "matchingNames": [
+      "almond",
+    ],
+    "category": "cereals",
+  },
+  {
+    "assetFileName": "round_fruit",
+    "matchingNames": [
+      "tangerine",
+      "nectarine",
+      "peach",
+      "tomato",
+      "orange",
+      "mango",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "dead_cow",
+    "matchingNames": [
+      "flesh",
+      "minced meat",
+      "steak",
+      "cattle",
+      "meat",
+      "bovine",
+    ],
+    "category": "meatFish",
+  },
+  {
+    "assetFileName": "dead_pig",
+    "matchingNames": [
       "bacon",
       "salami",
       "cold cuts",
@@ -210,12 +273,20 @@ const mixedCategoryEntries: CategoryEntry[] = [
       "sausages",
       "mead",
     ],
-    category: "meatFish",
+    "category": "meatFish",
   },
-  { assetFileName: "dead_chicken", matchingNames: ["chicken", "turkey", "chickens"], category: "meatFish" },
   {
-    assetFileName: "fish",
-    matchingNames: [
+    "assetFileName": "dead_chicken",
+    "matchingNames": [
+      "chicken",
+      "turkey",
+      "chickens",
+    ],
+    "category": "meatFish",
+  },
+  {
+    "assetFileName": "fish",
+    "matchingNames": [
       "cod",
       "perch",
       "fish sticks",
@@ -228,56 +299,167 @@ const mixedCategoryEntries: CategoryEntry[] = [
       "fish",
       "pike",
     ],
-    category: "meatFish",
+    "category": "meatFish",
   },
   {
-    assetFileName: "cookie",
-    matchingNames: ["cookie", "biscuit", "sweets", "cookies"],
-    category: "sweetsSnacks",
-  },
-  { assetFileName: "pepper", matchingNames: ["paprika"], category: "fruitsVegetables" },
-  { assetFileName: "onion", matchingNames: ["onion", "shell", "shallot"], category: "fruitsVegetables" },
-  { assetFileName: "pear", matchingNames: ["pear"], category: "fruitsVegetables" },
-  {
-    assetFileName: "cabbage",
-    matchingNames: ["savoy", "kohl", "cabbage", "savoy cabbage"],
-    category: "fruitsVegetables",
-  },
-  { assetFileName: "broccoli", matchingNames: ["broccoli"], category: "fruitsVegetables" },
-  { assetFileName: "eggplant", matchingNames: ["aubergine", "eggplant"], category: "fruitsVegetables" },
-  {
-    assetFileName: "salad",
-    matchingNames: ["salad", "pak choy", "spinach", "pak choi", "mangold", "chard", "arugula"],
-    category: "fruitsVegetables",
+    "assetFileName": "cookie",
+    "matchingNames": [
+      "cookie",
+      "biscuit",
+      "sweets",
+      "cookies",
+    ],
+    "category": "sweetsSnacks",
   },
   {
-    assetFileName: "chocolate",
-    matchingNames: ["chocolate shavings", "chocolate sprinkles", "chocolate rasps", "chocolate"],
-    category: "sweetsSnacks",
-  },
-  { assetFileName: "ice", matchingNames: ["magnum", "ice"], category: "sweetsSnacks" },
-  {
-    assetFileName: "berries",
-    matchingNames: ["berries", "grapes", "currants", "raspberries", "blueberries", "berry"],
-    category: "fruitsVegetables",
-  },
-  { assetFileName: "strawberry", matchingNames: ["strawberry"], category: "fruitsVegetables" },
-  { assetFileName: "block", matchingNames: ["margarine", "tofu", "ram", "butter", "rama"], category: "milkCheese" },
-  { assetFileName: "burger", matchingNames: ["citizens", "burger"], category: "convenienceProductFrozen" },
-  {
-    assetFileName: "herbs",
-    matchingNames: ["parsley", "coriander", "herbs", "mint", "basil", "dill"],
-    category: "spicesCanned",
+    "assetFileName": "pepper",
+    "matchingNames": [
+      "paprika",
+    ],
+    "category": "fruitsVegetables",
   },
   {
-    assetFileName: "pizza_cake",
-    matchingNames: ["pizza", "tarte", "cake", "tarte flambée"],
-    category: "convenienceProductFrozen",
+    "assetFileName": "onion",
+    "matchingNames": [
+      "onion",
+      "shell",
+      "shallot",
+    ],
+    "category": "fruitsVegetables",
   },
-  { assetFileName: "yeast", matchingNames: ["yeast"], category: "milkCheese" },
   {
-    assetFileName: "package",
-    matchingNames: [
+    "assetFileName": "pear",
+    "matchingNames": [
+      "pear",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "cabbage",
+    "matchingNames": [
+      "savoy",
+      "kohl",
+      "cabbage",
+      "savoy cabbage",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "broccoli",
+    "matchingNames": [
+      "broccoli",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "eggplant",
+    "matchingNames": [
+      "aubergine",
+      "eggplant",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "salad",
+    "matchingNames": [
+      "salad",
+      "pak choy",
+      "spinach",
+      "pak choi",
+      "mangold",
+      "chard",
+      "arugula",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "chocolate",
+    "matchingNames": [
+      "chocolate shavings",
+      "chocolate sprinkles",
+      "chocolate rasps",
+      "chocolate",
+    ],
+    "category": "sweetsSnacks",
+  },
+  {
+    "assetFileName": "ice",
+    "matchingNames": [
+      "magnum",
+      "ice",
+    ],
+    "category": "sweetsSnacks",
+  },
+  {
+    "assetFileName": "berries",
+    "matchingNames": [
+      "berries",
+      "grapes",
+      "currants",
+      "raspberries",
+      "blueberries",
+      "berry",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "strawberry",
+    "matchingNames": [
+      "strawberry",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "block",
+    "matchingNames": [
+      "margarine",
+      "tofu",
+      "ram",
+      "butter",
+      "rama",
+    ],
+    "category": "milkCheese",
+  },
+  {
+    "assetFileName": "burger",
+    "matchingNames": [
+      "citizens",
+      "burger",
+    ],
+    "category": "convenienceProductFrozen",
+  },
+  {
+    "assetFileName": "herbs",
+    "matchingNames": [
+      "parsley",
+      "coriander",
+      "herbs",
+      "mint",
+      "basil",
+      "dill",
+    ],
+    "category": "spicesCanned",
+  },
+  {
+    "assetFileName": "pizza_cake",
+    "matchingNames": [
+      "pizza",
+      "tarte",
+      "cake",
+      "tarte flambée",
+    ],
+    "category": "convenienceProductFrozen",
+  },
+  {
+    "assetFileName": "yeast",
+    "matchingNames": [
+      "yeast",
+    ],
+    "category": "milkCheese",
+  },
+  {
+    "assetFileName": "package",
+    "matchingNames": [
       "natron",
       "agar agar",
       "dry yeast",
@@ -289,15 +471,41 @@ const mixedCategoryEntries: CategoryEntry[] = [
       "jam sugar",
       "vanilla sugar",
     ],
-    category: "spicesCanned",
+    "category": "spicesCanned",
   },
-  { assetFileName: "pasta", matchingNames: ["noodles", "pasta", "spaghetti"], category: "cereals" },
-  { assetFileName: "lemon", matchingNames: ["lemon"], category: "fruitsVegetables" },
-  { assetFileName: "potatos", matchingNames: ["potato"], category: "fruitsVegetables" },
-  { assetFileName: "garlic", matchingNames: ["garlic"], category: "fruitsVegetables" },
   {
-    assetFileName: "spice",
-    matchingNames: [
+    "assetFileName": "pasta",
+    "matchingNames": [
+      "noodles",
+      "pasta",
+      "spaghetti",
+    ],
+    "category": "cereals",
+  },
+  {
+    "assetFileName": "lemon",
+    "matchingNames": [
+      "lemon",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "potatos",
+    "matchingNames": [
+      "potato",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "garlic",
+    "matchingNames": [
+      "garlic",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "spice",
+    "matchingNames": [
       "salt",
       "caraway",
       "seasoning",
@@ -310,22 +518,66 @@ const mixedCategoryEntries: CategoryEntry[] = [
       "curry",
       "turmeric",
     ],
-    category: "spicesCanned",
+    "category": "spicesCanned",
   },
-  { assetFileName: "rice", matchingNames: ["rice"], category: "cereals" },
-  { assetFileName: "paper_towel", matchingNames: ["kitchen roll", "zewa"], category: "household" },
-  { assetFileName: "toilet_paper", matchingNames: ["toilet paper", "loo paper"], category: "household" },
   {
-    assetFileName: "baking_paper",
-    matchingNames: ["baking paper", "cling film", "parchment paper", "back paper"],
-    category: "household",
+    "assetFileName": "rice",
+    "matchingNames": [
+      "rice",
+    ],
+    "category": "cereals",
   },
-  { assetFileName: "mushroom", matchingNames: ["mushroom", "fungus"], category: "fruitsVegetables" },
-  { assetFileName: "papaya", matchingNames: ["papaya"], category: "fruitsVegetables" },
-  { assetFileName: "rhubarb", matchingNames: ["rhubarb"], category: "fruitsVegetables" },
   {
-    assetFileName: "tetrapack",
-    matchingNames: [
+    "assetFileName": "paper_towel",
+    "matchingNames": [
+      "kitchen roll",
+      "zewa",
+    ],
+    "category": "household",
+  },
+  {
+    "assetFileName": "toilet_paper",
+    "matchingNames": [
+      "toilet paper",
+      "loo paper",
+    ],
+    "category": "household",
+  },
+  {
+    "assetFileName": "baking_paper",
+    "matchingNames": [
+      "baking paper",
+      "cling film",
+      "parchment paper",
+      "back paper",
+    ],
+    "category": "household",
+  },
+  {
+    "assetFileName": "mushroom",
+    "matchingNames": [
+      "mushroom",
+      "fungus",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "papaya",
+    "matchingNames": [
+      "papaya",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "rhubarb",
+    "matchingNames": [
+      "rhubarb",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "tetrapack",
+    "matchingNames": [
       "iced tea",
       "juice",
       "oat drink",
@@ -335,15 +587,40 @@ const mixedCategoryEntries: CategoryEntry[] = [
       "rice drink",
       "milk",
     ],
-    category: "milkCheese",
+    "category": "milkCheese",
   },
-  { assetFileName: "egg", matchingNames: ["eggs"], category: "milkCheese" },
-  { assetFileName: "coffee_beans", matchingNames: ["coffee", "espresso"], category: "beverages" },
-  { assetFileName: "tea", matchingNames: ["tea"], category: "beverages" },
-  { assetFileName: "sugar", matchingNames: ["sugar"], category: "spicesCanned" },
   {
-    assetFileName: "cheese",
-    matchingNames: [
+    "assetFileName": "egg",
+    "matchingNames": [
+      "eggs",
+    ],
+    "category": "milkCheese",
+  },
+  {
+    "assetFileName": "coffee_beans",
+    "matchingNames": [
+      "coffee",
+      "espresso",
+    ],
+    "category": "beverages",
+  },
+  {
+    "assetFileName": "tea",
+    "matchingNames": [
+      "tea",
+    ],
+    "category": "beverages",
+  },
+  {
+    "assetFileName": "sugar",
+    "matchingNames": [
+      "sugar",
+    ],
+    "category": "spicesCanned",
+  },
+  {
+    "assetFileName": "cheese",
+    "matchingNames": [
       "edamer",
       "goood",
       "gauda",
@@ -368,37 +645,152 @@ const mixedCategoryEntries: CategoryEntry[] = [
       "mozarella",
       "tilsit",
     ],
-    category: "milkCheese",
+    "category": "milkCheese",
   },
-  { assetFileName: "asparagus", matchingNames: ["asparagus"], category: "fruitsVegetables" },
-  { assetFileName: "gnocchi", matchingNames: ["gnocchi"], category: "cereals" },
-  { assetFileName: "pumpkin", matchingNames: ["pumpkin", "hokkaido"], category: "fruitsVegetables" },
   {
-    assetFileName: "beetroot",
-    matchingNames: ["yellow turnip", "yellow beets", "beet", "red beet", "beetroot", "yellow beet"],
-    category: "fruitsVegetables",
+    "assetFileName": "asparagus",
+    "matchingNames": [
+      "asparagus",
+    ],
+    "category": "fruitsVegetables",
   },
-  { assetFileName: "radish", matchingNames: ["radishes", "radish"], category: "fruitsVegetables" },
-  { assetFileName: "cucumber", matchingNames: ["cucumber"], category: "fruitsVegetables" },
-  { assetFileName: "dates", matchingNames: ["date"], category: "fruitsVegetables" },
-  { assetFileName: "lime", matchingNames: ["lime"], category: "fruitsVegetables" },
-  { assetFileName: "paper_bag", matchingNames: ["bag", "tuete"], category: "household" },
-  { assetFileName: "raisins", matchingNames: ["raisin"], category: "cereals" },
   {
-    assetFileName: "round_fruit_small",
-    matchingNames: ["kiwi", "apricot", "mirabelle", "plum"],
-    category: "fruitsVegetables",
+    "assetFileName": "gnocchi",
+    "matchingNames": [
+      "gnocchi",
+    ],
+    "category": "cereals",
   },
-  { assetFileName: "seeds", matchingNames: ["flakes", "cores"], category: "cereals" },
-  { assetFileName: "sponge", matchingNames: ["schwaemme", "sponge", "sponges"], category: "household" },
-  { assetFileName: "zucchini", matchingNames: ["zuchini", "zucchini"], category: "fruitsVegetables" },
-  { assetFileName: "avocado", matchingNames: ["avocado"], category: "fruitsVegetables" },
-  { assetFileName: "melon", matchingNames: ["melon"], category: "fruitsVegetables" },
-  { assetFileName: "tampon", matchingNames: ["tampon"], category: "other" },
-  { assetFileName: "pineapple", matchingNames: ["pineapple"], category: "fruitsVegetables" },
   {
-    assetFileName: "sweets",
-    matchingNames: [
+    "assetFileName": "pumpkin",
+    "matchingNames": [
+      "pumpkin",
+      "hokkaido",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "beetroot",
+    "matchingNames": [
+      "yellow turnip",
+      "yellow beets",
+      "beet",
+      "red beet",
+      "beetroot",
+      "yellow beet",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "radish",
+    "matchingNames": [
+      "radishes",
+      "radish",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "cucumber",
+    "matchingNames": [
+      "cucumber",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "dates",
+    "matchingNames": [
+      "date",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "lime",
+    "matchingNames": [
+      "lime",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "paper_bag",
+    "matchingNames": [
+      "bag",
+      "tuete",
+    ],
+    "category": "household",
+  },
+  {
+    "assetFileName": "raisins",
+    "matchingNames": [
+      "raisin",
+    ],
+    "category": "cereals",
+  },
+  {
+    "assetFileName": "round_fruit_small",
+    "matchingNames": [
+      "kiwi",
+      "apricot",
+      "mirabelle",
+      "plum",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "seeds",
+    "matchingNames": [
+      "flakes",
+      "cores",
+    ],
+    "category": "cereals",
+  },
+  {
+    "assetFileName": "sponge",
+    "matchingNames": [
+      "schwaemme",
+      "sponge",
+      "sponges",
+    ],
+    "category": "household",
+  },
+  {
+    "assetFileName": "zucchini",
+    "matchingNames": [
+      "zuchini",
+      "zucchini",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "avocado",
+    "matchingNames": [
+      "avocado",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "melon",
+    "matchingNames": [
+      "melon",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "tampon",
+    "matchingNames": [
+      "tampon",
+    ],
+    "category": "other",
+  },
+  {
+    "assetFileName": "pineapple",
+    "matchingNames": [
+      "pineapple",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "sweets",
+    "matchingNames": [
       "chips",
       "crisps",
       "liquorice",
@@ -410,13 +802,26 @@ const mixedCategoryEntries: CategoryEntry[] = [
       "sweets",
       "licorice",
     ],
-    category: "fruitsVegetables",
+    "category": "fruitsVegetables",
   },
-  { assetFileName: "cream", matchingNames: ["hair gel"], category: "household" },
-  { assetFileName: "shower_gel", matchingNames: ["shampoo", "shower gel"], category: "household" },
   {
-    assetFileName: "dish_soap",
-    matchingNames: [
+    "assetFileName": "cream",
+    "matchingNames": [
+      "hair gel",
+    ],
+    "category": "household",
+  },
+  {
+    "assetFileName": "shower_gel",
+    "matchingNames": [
+      "shampoo",
+      "shower gel",
+    ],
+    "category": "household",
+  },
+  {
+    "assetFileName": "dish_soap",
+    "matchingNames": [
       "dishwashing liquid",
       "cleaning supplies",
       "cleaning agent",
@@ -426,21 +831,28 @@ const mixedCategoryEntries: CategoryEntry[] = [
       "dishwashing",
       "dishwashing detergent",
     ],
-    category: "household",
+    "category": "household",
   },
   {
-    assetFileName: "apple",
-    matchingNames: ["apfel", "äpfel", "aepfel", "obst"],
-    category: "fruitsVegetables",
+    "assetFileName": "apple",
+    "matchingNames": [
+      "apfel",
+      "äpfel",
+      "aepfel",
+      "obst",
+    ],
+    "category": "fruitsVegetables",
   },
   {
-    assetFileName: "banana",
-    matchingNames: ["banane"],
-    category: "fruitsVegetables",
+    "assetFileName": "banana",
+    "matchingNames": [
+      "banane",
+    ],
+    "category": "fruitsVegetables",
   },
   {
-    assetFileName: "bottle",
-    matchingNames: [
+    "assetFileName": "bottle",
+    "matchingNames": [
       "flasche",
       "getränke",
       "wasser",
@@ -458,11 +870,11 @@ const mixedCategoryEntries: CategoryEntry[] = [
       "red bull",
       "trinken",
     ],
-    category: "beverages",
+    "category": "beverages",
   },
   {
-    assetFileName: "bottle",
-    matchingNames: [
+    "assetFileName": "bottle",
+    "matchingNames": [
       "öl",
       "oel",
       "essig",
@@ -475,11 +887,11 @@ const mixedCategoryEntries: CategoryEntry[] = [
       "ketchup",
       "remoulade",
     ],
-    category: "convenienceProductFrozen",
+    "category": "convenienceProductFrozen",
   },
   {
-    assetFileName: "box",
-    matchingNames: [
+    "assetFileName": "box",
+    "matchingNames": [
       "box",
       "spülmaschinen tabs",
       "spülmaschinen-tabs",
@@ -497,41 +909,84 @@ const mixedCategoryEntries: CategoryEntry[] = [
       "zwieback",
       "caotina",
     ],
-    category: "household",
+    "category": "household",
   },
   {
-    assetFileName: "flour",
-    matchingNames: ["mehl"],
-    category: "cereals",
+    "assetFileName": "flour",
+    "matchingNames": [
+      "mehl",
+    ],
+    "category": "cereals",
   },
   {
-    assetFileName: "bread",
-    matchingNames: ["brot", "brötchen", "laugenstange", "brezel", "semmel", "baguette", "ekmek"],
-    category: "bread",
+    "assetFileName": "bread",
+    "matchingNames": [
+      "brot",
+      "brötchen",
+      "laugenstange",
+      "brezel",
+      "semmel",
+      "baguette",
+      "ekmek",
+    ],
+    "category": "bread",
   },
   {
-    assetFileName: "can",
-    matchingNames: ["bohnen", "dose", "kichererbsen", "dosentomaten", "tomatendose"],
-    category: "spicesCanned",
+    "assetFileName": "can",
+    "matchingNames": [
+      "bohnen",
+      "dose",
+      "kichererbsen",
+      "dosentomaten",
+      "tomatendose",
+    ],
+    "category": "spicesCanned",
   },
   {
-    assetFileName: "carrot",
-    matchingNames: ["karotte", "pastinake", "rübe", "ruebe", "rettich", "möhre", "gemüse", "gemuese"],
-    category: "fruitsVegetables",
+    "assetFileName": "carrot",
+    "matchingNames": [
+      "karotte",
+      "pastinake",
+      "rübe",
+      "ruebe",
+      "rettich",
+      "möhre",
+      "gemüse",
+      "gemuese",
+    ],
+    "category": "fruitsVegetables",
   },
   {
-    assetFileName: "corn",
-    matchingNames: ["samen", "körner", "linsen", "erbsen", "hirse", "haferflocken", "quinoa", "bulgur"],
-    category: "cereals",
+    "assetFileName": "corn",
+    "matchingNames": [
+      "samen",
+      "körner",
+      "linsen",
+      "erbsen",
+      "hirse",
+      "haferflocken",
+      "quinoa",
+      "bulgur",
+    ],
+    "category": "cereals",
   },
   {
-    assetFileName: "cup",
-    matchingNames: ["becher", "yoghurt", "joghurt", "quark", "saure sahne", "schlagsahne", "sahne", "pudding"],
-    category: "milkCheese",
+    "assetFileName": "cup",
+    "matchingNames": [
+      "becher",
+      "yoghurt",
+      "joghurt",
+      "quark",
+      "saure sahne",
+      "schlagsahne",
+      "sahne",
+      "pudding",
+    ],
+    "category": "milkCheese",
   },
   {
-    assetFileName: "glas",
-    matchingNames: [
+    "assetFileName": "glas",
+    "matchingNames": [
       "glas",
       "marmelade",
       "gläser",
@@ -547,36 +1002,59 @@ const mixedCategoryEntries: CategoryEntry[] = [
       "tahini",
       "oliven",
     ],
-    category: "spicesCanned",
+    "category": "spicesCanned",
   },
   {
-    assetFileName: "leek",
-    matchingNames: ["lauch", "porree"],
-    category: "fruitsVegetables",
+    "assetFileName": "leek",
+    "matchingNames": [
+      "lauch",
+      "porree",
+    ],
+    "category": "fruitsVegetables",
   },
   {
-    assetFileName: "peanut",
-    matchingNames: ["nuss", "nüsse", "cashews", "cashewkerne", "pistazien"],
-    category: "cereals",
+    "assetFileName": "peanut",
+    "matchingNames": [
+      "nuss",
+      "nüsse",
+      "cashews",
+      "cashewkerne",
+      "pistazien",
+    ],
+    "category": "cereals",
   },
   {
-    assetFileName: "almonds",
-    matchingNames: ["mandel"],
-    category: "cereals",
+    "assetFileName": "almonds",
+    "matchingNames": [
+      "mandel",
+    ],
+    "category": "cereals",
   },
   {
-    assetFileName: "round_fruit",
-    matchingNames: ["tomate", "orange", "mandarine", "mango", "nektarine", "pfirsich"],
-    category: "fruitsVegetables",
+    "assetFileName": "round_fruit",
+    "matchingNames": [
+      "tomate",
+      "orange",
+      "mandarine",
+      "mango",
+      "nektarine",
+      "pfirsich",
+    ],
+    "category": "fruitsVegetables",
   },
   {
-    assetFileName: "dead_cow",
-    matchingNames: ["fleisch", "hackfleisch", "steak", "rinder"],
-    category: "meatFish",
+    "assetFileName": "dead_cow",
+    "matchingNames": [
+      "fleisch",
+      "hackfleisch",
+      "steak",
+      "rinder",
+    ],
+    "category": "meatFish",
   },
   {
-    assetFileName: "dead_pig",
-    matchingNames: [
+    "assetFileName": "dead_pig",
+    "matchingNames": [
       "wurst",
       "schinken",
       "speck",
@@ -592,16 +1070,21 @@ const mixedCategoryEntries: CategoryEntry[] = [
       "schweine",
       "mett",
     ],
-    category: "meatFish",
+    "category": "meatFish",
   },
   {
-    assetFileName: "dead_chicken",
-    matchingNames: ["hühnchen", "pute", "chicken", "hühner"],
-    category: "meatFish",
+    "assetFileName": "dead_chicken",
+    "matchingNames": [
+      "hühnchen",
+      "pute",
+      "chicken",
+      "hühner",
+    ],
+    "category": "meatFish",
   },
   {
-    assetFileName: "fish",
-    matchingNames: [
+    "assetFileName": "fish",
+    "matchingNames": [
       "fisch",
       "lachs",
       "forelle",
@@ -614,69 +1097,276 @@ const mixedCategoryEntries: CategoryEntry[] = [
       "karpfen",
       "fischstäbchen",
     ],
-    category: "meatFish",
-  },
-  { assetFileName: "cookie", matchingNames: ["keks", "kekse", "süssigkeiten"], category: "sweetsSnacks" },
-  { assetFileName: "pepper", matchingNames: ["paprika"], category: "fruitsVegetables" },
-  { assetFileName: "onion", matchingNames: ["zwiebel", "schalotte"], category: "fruitsVegetables" },
-  { assetFileName: "pear", matchingNames: ["birne"], category: "fruitsVegetables" },
-  { assetFileName: "cabbage", matchingNames: ["kohl", "wirsing"], category: "fruitsVegetables" },
-  { assetFileName: "broccoli", matchingNames: ["brokkoli", "broccoli", "brokoli"], category: "fruitsVegetables" },
-  { assetFileName: "eggplant", matchingNames: ["aubergine"], category: "fruitsVegetables" },
-  {
-    assetFileName: "salad",
-    matchingNames: ["salat", "rucola", "spinat", "mangold", "pak choi", "pak choy"],
-    category: "fruitsVegetables",
+    "category": "meatFish",
   },
   {
-    assetFileName: "chocolate",
-    matchingNames: ["schokolade", "schokostreusel", "schokoraspel"],
-    category: "sweetsSnacks",
-  },
-  { assetFileName: "ice", matchingNames: ["eis", "magnum"], category: "sweetsSnacks" },
-  {
-    assetFileName: "berries",
-    matchingNames: ["beeren", "himbeeren", "johannisbeeren", "heidelbeeren", "blaubeeren", "trauben"],
-    category: "fruitsVegetables",
-  },
-  { assetFileName: "strawberry", matchingNames: ["erdbeere"], category: "fruitsVegetables" },
-  { assetFileName: "block", matchingNames: ["tofu", "butter", "margarine", "rama"], category: "milkCheese" },
-  { assetFileName: "burger", matchingNames: ["burger"], category: "convenienceProductFrozen" },
-  {
-    assetFileName: "herbs",
-    matchingNames: ["kräuter", "petersilie", "basilikum", "koriander", "dill", "minze"],
-    category: "spicesCanned",
+    "assetFileName": "cookie",
+    "matchingNames": [
+      "keks",
+      "kekse",
+      "süssigkeiten",
+    ],
+    "category": "sweetsSnacks",
   },
   {
-    assetFileName: "pizza_cake",
-    matchingNames: ["pizza", "kuchen", "torte", "flammkuchen"],
-    category: "convenienceProductFrozen",
+    "assetFileName": "pepper",
+    "matchingNames": [
+      "paprika",
+    ],
+    "category": "fruitsVegetables",
   },
-  { assetFileName: "yeast", matchingNames: ["hefe"], category: "milkCheese" },
   {
-    assetFileName: "package",
-    matchingNames: ["backpulver", "natron", "vanillezucker", "trockenhefe", "agar-agar", "agar agar", "puddingpulver", "gelierzucker"],
-    category: "spicesCanned",
+    "assetFileName": "onion",
+    "matchingNames": [
+      "zwiebel",
+      "schalotte",
+    ],
+    "category": "fruitsVegetables",
   },
-  { assetFileName: "pasta", matchingNames: ["nudeln", "spaghetti", "pasta"], category: "cereals" },
-  { assetFileName: "lemon", matchingNames: ["zitrone"], category: "fruitsVegetables" },
-  { assetFileName: "potatos", matchingNames: ["kartoffel"], category: "fruitsVegetables" },
-  { assetFileName: "garlic", matchingNames: ["knoblauch"], category: "fruitsVegetables" },
   {
-    assetFileName: "spice",
-    matchingNames: ["salz", "pfeffer", "gewürz", "gewuerz", "curry", "kurkuma", "zimt", "kümmel", "kuemmel"],
-    category: "spicesCanned",
+    "assetFileName": "pear",
+    "matchingNames": [
+      "birne",
+    ],
+    "category": "fruitsVegetables",
   },
-  { assetFileName: "rice", matchingNames: ["reis"], category: "cereals" },
-  { assetFileName: "paper_towel", matchingNames: ["küchenrolle", "kuechenrolle", "zewa"], category: "household" },
-  { assetFileName: "toilet_paper", matchingNames: ["klopapier", "klo papier", "toilettenpapier", "toiletten papier"], category: "household" },
-  { assetFileName: "baking_paper", matchingNames: ["backpapier", "back papier", "frischhaltefolie"], category: "household" },
-  { assetFileName: "mushroom", matchingNames: ["pilz", "champignon"], category: "fruitsVegetables" },
-  { assetFileName: "papaya", matchingNames: ["papaya"], category: "fruitsVegetables" },
-  { assetFileName: "rhubarb", matchingNames: ["rhabarber"], category: "fruitsVegetables" },
   {
-    assetFileName: "tetrapack",
-    matchingNames: [
+    "assetFileName": "cabbage",
+    "matchingNames": [
+      "kohl",
+      "wirsing",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "broccoli",
+    "matchingNames": [
+      "brokkoli",
+      "broccoli",
+      "brokoli",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "eggplant",
+    "matchingNames": [
+      "aubergine",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "salad",
+    "matchingNames": [
+      "salat",
+      "rucola",
+      "spinat",
+      "mangold",
+      "pak choi",
+      "pak choy",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "chocolate",
+    "matchingNames": [
+      "schokolade",
+      "schokostreusel",
+      "schokoraspel",
+    ],
+    "category": "sweetsSnacks",
+  },
+  {
+    "assetFileName": "ice",
+    "matchingNames": [
+      "eis",
+      "magnum",
+    ],
+    "category": "sweetsSnacks",
+  },
+  {
+    "assetFileName": "berries",
+    "matchingNames": [
+      "beeren",
+      "himbeeren",
+      "johannisbeeren",
+      "heidelbeeren",
+      "blaubeeren",
+      "trauben",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "strawberry",
+    "matchingNames": [
+      "erdbeere",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "block",
+    "matchingNames": [
+      "tofu",
+      "butter",
+      "margarine",
+      "rama",
+    ],
+    "category": "milkCheese",
+  },
+  {
+    "assetFileName": "burger",
+    "matchingNames": [
+      "burger",
+    ],
+    "category": "convenienceProductFrozen",
+  },
+  {
+    "assetFileName": "herbs",
+    "matchingNames": [
+      "kräuter",
+      "petersilie",
+      "basilikum",
+      "koriander",
+      "dill",
+      "minze",
+    ],
+    "category": "spicesCanned",
+  },
+  {
+    "assetFileName": "pizza_cake",
+    "matchingNames": [
+      "pizza",
+      "kuchen",
+      "torte",
+      "flammkuchen",
+    ],
+    "category": "convenienceProductFrozen",
+  },
+  {
+    "assetFileName": "yeast",
+    "matchingNames": [
+      "hefe",
+    ],
+    "category": "milkCheese",
+  },
+  {
+    "assetFileName": "package",
+    "matchingNames": [
+      "backpulver",
+      "natron",
+      "vanillezucker",
+      "trockenhefe",
+      "agar-agar",
+      "agar agar",
+      "puddingpulver",
+      "gelierzucker",
+    ],
+    "category": "spicesCanned",
+  },
+  {
+    "assetFileName": "pasta",
+    "matchingNames": [
+      "nudeln",
+      "spaghetti",
+      "pasta",
+    ],
+    "category": "cereals",
+  },
+  {
+    "assetFileName": "lemon",
+    "matchingNames": [
+      "zitrone",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "potatos",
+    "matchingNames": [
+      "kartoffel",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "garlic",
+    "matchingNames": [
+      "knoblauch",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "spice",
+    "matchingNames": [
+      "salz",
+      "pfeffer",
+      "gewürz",
+      "gewuerz",
+      "curry",
+      "kurkuma",
+      "zimt",
+      "kümmel",
+      "kuemmel",
+    ],
+    "category": "spicesCanned",
+  },
+  {
+    "assetFileName": "rice",
+    "matchingNames": [
+      "reis",
+    ],
+    "category": "cereals",
+  },
+  {
+    "assetFileName": "paper_towel",
+    "matchingNames": [
+      "küchenrolle",
+      "kuechenrolle",
+      "zewa",
+    ],
+    "category": "household",
+  },
+  {
+    "assetFileName": "toilet_paper",
+    "matchingNames": [
+      "klopapier",
+      "klo papier",
+      "toilettenpapier",
+      "toiletten papier",
+    ],
+    "category": "household",
+  },
+  {
+    "assetFileName": "baking_paper",
+    "matchingNames": [
+      "backpapier",
+      "back papier",
+      "frischhaltefolie",
+    ],
+    "category": "household",
+  },
+  {
+    "assetFileName": "mushroom",
+    "matchingNames": [
+      "pilz",
+      "champignon",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "papaya",
+    "matchingNames": [
+      "papaya",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "rhubarb",
+    "matchingNames": [
+      "rhabarber",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "tetrapack",
+    "matchingNames": [
       "milch",
       "saft",
       "haferdrink",
@@ -689,15 +1379,40 @@ const mixedCategoryEntries: CategoryEntry[] = [
       "reis drink",
       "eistee",
     ],
-    category: "milkCheese",
+    "category": "milkCheese",
   },
-  { assetFileName: "egg", matchingNames: ["eier"], category: "milkCheese" },
-  { assetFileName: "coffee_beans", matchingNames: ["kaffee", "espresso"], category: "beverages" },
-  { assetFileName: "tea", matchingNames: ["tee"], category: "beverages" },
-  { assetFileName: "sugar", matchingNames: ["zucker"], category: "spicesCanned" },
   {
-    assetFileName: "cheese",
-    matchingNames: [
+    "assetFileName": "egg",
+    "matchingNames": [
+      "eier",
+    ],
+    "category": "milkCheese",
+  },
+  {
+    "assetFileName": "coffee_beans",
+    "matchingNames": [
+      "kaffee",
+      "espresso",
+    ],
+    "category": "beverages",
+  },
+  {
+    "assetFileName": "tea",
+    "matchingNames": [
+      "tee",
+    ],
+    "category": "beverages",
+  },
+  {
+    "assetFileName": "sugar",
+    "matchingNames": [
+      "zucker",
+    ],
+    "category": "spicesCanned",
+  },
+  {
+    "assetFileName": "cheese",
+    "matchingNames": [
       "käse",
       "kaese",
       "mozarella",
@@ -717,228 +1432,3286 @@ const mixedCategoryEntries: CategoryEntry[] = [
       "caprice dieux",
       "mozzarella",
     ],
-    category: "milkCheese",
+    "category": "milkCheese",
   },
-  { assetFileName: "asparagus", matchingNames: ["spargel"], category: "fruitsVegetables" },
-  { assetFileName: "gnocchi", matchingNames: ["gnocchi"], category: "cereals" },
-  { assetFileName: "pumpkin", matchingNames: ["kürbis", "kuerbis", "hokkaido"], category: "fruitsVegetables" },
-  { assetFileName: "beetroot", matchingNames: ["rote bete", "gelbe bete", "rote rübe", "gelbe rübe"], category: "fruitsVegetables" },
-  { assetFileName: "radish", matchingNames: ["radieschen", "radieserl"], category: "fruitsVegetables" },
-  { assetFileName: "cucumber", matchingNames: ["gurke"], category: "fruitsVegetables" },
-  { assetFileName: "dates", matchingNames: ["dattel"], category: "fruitsVegetables" },
-  { assetFileName: "lime", matchingNames: ["limette"], category: "fruitsVegetables" },
-  { assetFileName: "paper_bag", matchingNames: ["tüte", "tuete"], category: "household" },
-  { assetFileName: "raisins", matchingNames: ["rosine"], category: "cereals" },
   {
-    assetFileName: "round_fruit_small",
-    matchingNames: ["pflaume", "aprikose", "zwetschge", "mirabelle", "marille", "kiwi"],
-    category: "fruitsVegetables",
+    "assetFileName": "asparagus",
+    "matchingNames": [
+      "spargel",
+    ],
+    "category": "fruitsVegetables",
   },
-  { assetFileName: "seeds", matchingNames: ["kerne", "flocken"], category: "cereals" },
-  { assetFileName: "sponge", matchingNames: ["schwamm", "schwämme", "schwaemme"], category: "household" },
-  { assetFileName: "zucchini", matchingNames: ["zucchini", "zuchini"], category: "fruitsVegetables" },
-  { assetFileName: "avocado", matchingNames: ["avocado"], category: "fruitsVegetables" },
-  { assetFileName: "melon", matchingNames: ["melone"], category: "fruitsVegetables" },
-  { assetFileName: "tampon", matchingNames: ["tampon"], category: "other" },
-  { assetFileName: "pineapple", matchingNames: ["ananas"], category: "fruitsVegetables" },
   {
-    assetFileName: "sweets",
-    matchingNames: ["chips", "gummibärchen", "süssigkeiten", "süßigkeiten", "lakritze", "cantuccini", "cracker", "snacks"],
-    category: "fruitsVegetables",
+    "assetFileName": "gnocchi",
+    "matchingNames": [
+      "gnocchi",
+    ],
+    "category": "cereals",
   },
-  { assetFileName: "cream", matchingNames: ["haargel", "creme"], category: "household" },
-  { assetFileName: "shower_gel", matchingNames: ["duschgel", "shampoo"], category: "household" },
   {
-    assetFileName: "dish_soap",
-    matchingNames: ["badreiniger", "spüli", "spülmittel", "putzmittel", "neutralreiniger"],
-    category: "household",
+    "assetFileName": "pumpkin",
+    "matchingNames": [
+      "kürbis",
+      "kuerbis",
+      "hokkaido",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "beetroot",
+    "matchingNames": [
+      "rote bete",
+      "gelbe bete",
+      "rote rübe",
+      "gelbe rübe",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "radish",
+    "matchingNames": [
+      "radieschen",
+      "radieserl",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "cucumber",
+    "matchingNames": [
+      "gurke",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "dates",
+    "matchingNames": [
+      "dattel",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "lime",
+    "matchingNames": [
+      "limette",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "paper_bag",
+    "matchingNames": [
+      "tüte",
+      "tuete",
+    ],
+    "category": "household",
+  },
+  {
+    "assetFileName": "raisins",
+    "matchingNames": [
+      "rosine",
+    ],
+    "category": "cereals",
+  },
+  {
+    "assetFileName": "round_fruit_small",
+    "matchingNames": [
+      "pflaume",
+      "aprikose",
+      "zwetschge",
+      "mirabelle",
+      "marille",
+      "kiwi",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "seeds",
+    "matchingNames": [
+      "kerne",
+      "flocken",
+    ],
+    "category": "cereals",
+  },
+  {
+    "assetFileName": "sponge",
+    "matchingNames": [
+      "schwamm",
+      "schwämme",
+      "schwaemme",
+    ],
+    "category": "household",
+  },
+  {
+    "assetFileName": "zucchini",
+    "matchingNames": [
+      "zucchini",
+      "zuchini",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "avocado",
+    "matchingNames": [
+      "avocado",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "melon",
+    "matchingNames": [
+      "melone",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "tampon",
+    "matchingNames": [
+      "tampon",
+    ],
+    "category": "other",
+  },
+  {
+    "assetFileName": "pineapple",
+    "matchingNames": [
+      "ananas",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "sweets",
+    "matchingNames": [
+      "chips",
+      "gummibärchen",
+      "süssigkeiten",
+      "süßigkeiten",
+      "lakritze",
+      "cantuccini",
+      "cracker",
+      "snacks",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "cream",
+    "matchingNames": [
+      "haargel",
+      "creme",
+    ],
+    "category": "household",
+  },
+  {
+    "assetFileName": "shower_gel",
+    "matchingNames": [
+      "duschgel",
+      "shampoo",
+    ],
+    "category": "household",
+  },
+  {
+    "assetFileName": "dish_soap",
+    "matchingNames": [
+      "badreiniger",
+      "spüli",
+      "spülmittel",
+      "putzmittel",
+      "neutralreiniger",
+    ],
+    "category": "household",
   },
 ];
 
-const deToEn: Record<string, string> = {
-  apfel: "apple",
-  birne: "pear",
-  zitrone: "lemon",
-  limette: "lime",
-  banane: "banana",
-  orange: "orange",
-  tomate: "tomato",
-  kartoffel: "potato",
-  kartoffeln: "potatoes",
-  zwiebel: "onion",
-  knoblauch: "garlic",
-  gurke: "cucumber",
-  paprika: "pepper",
-  salat: "salad",
-  spinat: "spinach",
-  kohl: "cabbage",
-  brokkoli: "broccoli",
-  aubergine: "eggplant",
-  kürbis: "pumpkin",
-  kuerbis: "pumpkin",
-  melone: "melon",
-  ananas: "pineapple",
-  beeren: "berries",
-  erdbeere: "strawberry",
-  himbeeren: "raspberries",
-  blaubeeren: "blueberries",
-  milch: "milk",
-  käse: "cheese",
-  kaese: "cheese",
-  eier: "eggs",
-  butter: "butter",
-  joghurt: "yogurt",
-  quark: "quark",
-  sahne: "cream",
-  brot: "bread",
-  brötchen: "bread roll",
-  broetchen: "bread roll",
-  baguette: "baguette",
-  semmel: "bread roll",
-  nudeln: "pasta",
-  reis: "rice",
-  mehl: "flour",
-  haferflocken: "oats",
-  zucker: "sugar",
-  salz: "salt",
-  pfeffer: "pepper",
-  öl: "oil",
-  oel: "oil",
-  essig: "vinegar",
-  wasser: "water",
-  saft: "juice",
-  tee: "tea",
-  kaffee: "coffee",
-  keks: "cookie",
-  kekse: "cookies",
-  chips: "chips",
-  schokolade: "chocolate",
-  eis: "ice cream",
-  putzmittel: "cleaner",
-  spülmittel: "dish soap",
-  spuelmittel: "dish soap",
-  toilettenpapier: "toilet paper",
-  küchenrolle: "paper towels",
-  kuechenrolle: "paper towels",
-  shampoo: "shampoo",
-  duschgel: "shower gel",
-  schwamm: "sponge",
-  tüte: "bag",
-  tuete: "bag",
-  beutel: "bag",
+const categoryEntriesEn: CategoryEntry[] = [
+  {
+    "assetFileName": "apple",
+    "matchingNames": [
+      "fruit",
+      "apples",
+      "apple",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "banana",
+    "matchingNames": [
+      "banana",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "bottle",
+    "matchingNames": [
+      "beer",
+      "wine",
+      "sprite",
+      "limo",
+      "fantastic",
+      "cola",
+      "water",
+      "lemonade",
+      "pils",
+      "hefeweizen",
+      "bubble",
+      "soda",
+      "redbull",
+      "drink",
+      "sparkling water",
+      "apple spritzer",
+      "beverages",
+      "bottle",
+      "sprites",
+      "red bull",
+      "fanta",
+    ],
+    "category": "beverages",
+  },
+  {
+    "assetFileName": "bottle",
+    "matchingNames": [
+      "mayonnaise",
+      "oil",
+      "mayo",
+      "vinegar",
+      "ketchup",
+      "soy sauce",
+      "remoulade",
+    ],
+    "category": "convenienceProductFrozen",
+  },
+  {
+    "assetFileName": "box",
+    "matchingNames": [
+      "dishwasher salt",
+      "handkerchiefs",
+      "dishwashing soaps",
+      "zwieback",
+      "caotina",
+      "food starch",
+      "dishwasher tabs",
+      "cocoa powder",
+      "cereal",
+      "starch",
+      "tempos",
+      "chewing gum",
+      "cocoa",
+      "dishwasher taps",
+      "muesli",
+      "box",
+    ],
+    "category": "household",
+  },
+  {
+    "assetFileName": "flour",
+    "matchingNames": [
+      "flour",
+    ],
+    "category": "cereals",
+  },
+  {
+    "assetFileName": "bread",
+    "matchingNames": [
+      "lye rod",
+      "lye bar",
+      "bread roll",
+      "pretzel",
+      "loaf",
+      "ekmek",
+      "bread",
+      "roll",
+      "bun",
+      "baguette",
+    ],
+    "category": "bread",
+  },
+  {
+    "assetFileName": "can",
+    "matchingNames": [
+      "tomato can",
+      "can",
+      "beans",
+      "canned tomatoes",
+      "chickpeas",
+    ],
+    "category": "spicesCanned",
+  },
+  {
+    "assetFileName": "carrot",
+    "matchingNames": [
+      "carrot",
+      "radish",
+      "rettich",
+      "beet",
+      "turnip",
+      "vegetables",
+      "ruebe",
+      "parsnip",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "corn",
+    "matchingNames": [
+      "lenses",
+      "millet",
+      "quinoa",
+      "seed",
+      "seeds",
+      "peas",
+      "bulgur",
+      "oatmeal",
+      "grains",
+    ],
+    "category": "cereals",
+  },
+  {
+    "assetFileName": "cup",
+    "matchingNames": [
+      "yogurt",
+      "pudding",
+      "whipped cream",
+      "mug",
+      "quark",
+      "sour cream",
+      "cream",
+      "yoghurt",
+      "cups",
+    ],
+    "category": "milkCheese",
+  },
+  {
+    "assetFileName": "glas",
+    "matchingNames": [
+      "nutella",
+      "pesto",
+      "hummus",
+      "olives",
+      "spread",
+      "glass",
+      "morello cherries",
+      "tahini",
+      "sauerkraut",
+      "mustard",
+      "jam",
+      "guacamole",
+      "honey",
+      "glasses",
+    ],
+    "category": "spicesCanned",
+  },
+  {
+    "assetFileName": "leek",
+    "matchingNames": [
+      "leek",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "peanut",
+    "matchingNames": [
+      "pistachios",
+      "nut",
+      "cashews",
+      "nuts",
+    ],
+    "category": "cereals",
+  },
+  {
+    "assetFileName": "almonds",
+    "matchingNames": [
+      "almond",
+    ],
+    "category": "cereals",
+  },
+  {
+    "assetFileName": "round_fruit",
+    "matchingNames": [
+      "tangerine",
+      "nectarine",
+      "peach",
+      "tomato",
+      "orange",
+      "mango",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "dead_cow",
+    "matchingNames": [
+      "flesh",
+      "minced meat",
+      "steak",
+      "cattle",
+      "meat",
+      "bovine",
+    ],
+    "category": "meatFish",
+  },
+  {
+    "assetFileName": "dead_pig",
+    "matchingNames": [
+      "bacon",
+      "salami",
+      "cold cuts",
+      "hot dog",
+      "meat cheese",
+      "vienna",
+      "pigs",
+      "ham",
+      "viennese",
+      "lyon",
+      "met",
+      "liver cheese",
+      "meatloaf",
+      "sausage",
+      "sausages",
+      "mead",
+    ],
+    "category": "meatFish",
+  },
+  {
+    "assetFileName": "dead_chicken",
+    "matchingNames": [
+      "chicken",
+      "turkey",
+      "chickens",
+    ],
+    "category": "meatFish",
+  },
+  {
+    "assetFileName": "fish",
+    "matchingNames": [
+      "cod",
+      "perch",
+      "fish sticks",
+      "salmon",
+      "herring",
+      "carp",
+      "sea ​​bream",
+      "dorade",
+      "trout",
+      "fish",
+      "pike",
+    ],
+    "category": "meatFish",
+  },
+  {
+    "assetFileName": "cookie",
+    "matchingNames": [
+      "cookie",
+      "biscuit",
+      "sweets",
+      "cookies",
+    ],
+    "category": "sweetsSnacks",
+  },
+  {
+    "assetFileName": "pepper",
+    "matchingNames": [
+      "pepper",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "onion",
+    "matchingNames": [
+      "onion",
+      "shell",
+      "shallot",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "pear",
+    "matchingNames": [
+      "pear",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "cabbage",
+    "matchingNames": [
+      "savoy",
+      "cabbage",
+      "savoy cabbage",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "broccoli",
+    "matchingNames": [
+      "broccoli",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "eggplant",
+    "matchingNames": [
+      "eggplant",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "salad",
+    "matchingNames": [
+      "salad",
+      "pak choy",
+      "spinach",
+      "pak choi",
+      "mangold",
+      "chard",
+      "arugula",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "chocolate",
+    "matchingNames": [
+      "chocolate shavings",
+      "chocolate sprinkles",
+      "chocolate rasps",
+      "chocolate",
+    ],
+    "category": "sweetsSnacks",
+  },
+  {
+    "assetFileName": "ice",
+    "matchingNames": [
+      "magnum",
+      "ice",
+    ],
+    "category": "sweetsSnacks",
+  },
+  {
+    "assetFileName": "berries",
+    "matchingNames": [
+      "berries",
+      "grapes",
+      "currants",
+      "raspberries",
+      "blueberries",
+      "berry",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "strawberry",
+    "matchingNames": [
+      "strawberry",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "block",
+    "matchingNames": [
+      "margarine",
+      "tofu",
+      "ram",
+      "butter",
+      "rama",
+    ],
+    "category": "milkCheese",
+  },
+  {
+    "assetFileName": "burger",
+    "matchingNames": [
+      "citizens",
+      "burger",
+    ],
+    "category": "convenienceProductFrozen",
+  },
+  {
+    "assetFileName": "herbs",
+    "matchingNames": [
+      "parsley",
+      "coriander",
+      "herbs",
+      "mint",
+      "basil",
+      "dill",
+    ],
+    "category": "spicesCanned",
+  },
+  {
+    "assetFileName": "pizza_cake",
+    "matchingNames": [
+      "pizza",
+      "tarte",
+      "cake",
+      "tarte flambée",
+    ],
+    "category": "convenienceProductFrozen",
+  },
+  {
+    "assetFileName": "yeast",
+    "matchingNames": [
+      "yeast",
+    ],
+    "category": "milkCheese",
+  },
+  {
+    "assetFileName": "package",
+    "matchingNames": [
+      "natron",
+      "agar agar",
+      "dry yeast",
+      "jelling sugar",
+      "agar-agar",
+      "soda",
+      "baking powder",
+      "pudding powder",
+      "jam sugar",
+      "vanilla sugar",
+    ],
+    "category": "spicesCanned",
+  },
+  {
+    "assetFileName": "pasta",
+    "matchingNames": [
+      "noodles",
+      "pasta",
+      "spaghetti",
+    ],
+    "category": "cereals",
+  },
+  {
+    "assetFileName": "lemon",
+    "matchingNames": [
+      "lemon",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "potatos",
+    "matchingNames": [
+      "potato",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "garlic",
+    "matchingNames": [
+      "garlic",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "spice",
+    "matchingNames": [
+      "salt",
+      "caraway",
+      "seasoning",
+      "cinnamon",
+      "cinammon",
+      "kuemmel",
+      "caraway seed",
+      "pepper",
+      "spice",
+      "curry",
+      "turmeric",
+    ],
+    "category": "spicesCanned",
+  },
+  {
+    "assetFileName": "rice",
+    "matchingNames": [
+      "rice",
+    ],
+    "category": "cereals",
+  },
+  {
+    "assetFileName": "paper_towel",
+    "matchingNames": [
+      "kitchen roll",
+      "zewa",
+    ],
+    "category": "household",
+  },
+  {
+    "assetFileName": "toilet_paper",
+    "matchingNames": [
+      "toilet paper",
+      "loo paper",
+    ],
+    "category": "household",
+  },
+  {
+    "assetFileName": "baking_paper",
+    "matchingNames": [
+      "baking paper",
+      "cling film",
+      "parchment paper",
+      "back paper",
+    ],
+    "category": "household",
+  },
+  {
+    "assetFileName": "mushroom",
+    "matchingNames": [
+      "mushroom",
+      "fungus",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "papaya",
+    "matchingNames": [
+      "papaya",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "rhubarb",
+    "matchingNames": [
+      "rhubarb",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "tetrapack",
+    "matchingNames": [
+      "iced tea",
+      "juice",
+      "oat drink",
+      "almond drink",
+      "soy drink",
+      "icetea",
+      "rice drink",
+      "milk",
+    ],
+    "category": "milkCheese",
+  },
+  {
+    "assetFileName": "egg",
+    "matchingNames": [
+      "eggs",
+    ],
+    "category": "milkCheese",
+  },
+  {
+    "assetFileName": "coffee_beans",
+    "matchingNames": [
+      "coffee",
+      "espresso",
+    ],
+    "category": "beverages",
+  },
+  {
+    "assetFileName": "tea",
+    "matchingNames": [
+      "tea",
+    ],
+    "category": "beverages",
+  },
+  {
+    "assetFileName": "sugar",
+    "matchingNames": [
+      "sugar",
+    ],
+    "category": "spicesCanned",
+  },
+  {
+    "assetFileName": "cheese",
+    "matchingNames": [
+      "edamer",
+      "goood",
+      "gauda",
+      "parmesan",
+      "mangego",
+      "helloumi",
+      "appenzell",
+      "camembert",
+      "appenzeller",
+      "emmental",
+      "manchego",
+      "caprice dieux",
+      "tilliter",
+      "brie",
+      "cheddar",
+      "mozzarella",
+      "feta",
+      "halloumi",
+      "edam",
+      "cheese",
+      "ricotta",
+      "mozarella",
+      "tilsit",
+    ],
+    "category": "milkCheese",
+  },
+  {
+    "assetFileName": "asparagus",
+    "matchingNames": [
+      "asparagus",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "gnocchi",
+    "matchingNames": [
+      "gnocchi",
+    ],
+    "category": "cereals",
+  },
+  {
+    "assetFileName": "pumpkin",
+    "matchingNames": [
+      "pumpkin",
+      "hokkaido",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "beetroot",
+    "matchingNames": [
+      "yellow turnip",
+      "yellow beets",
+      "beet",
+      "red beet",
+      "beetroot",
+      "yellow beet",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "radish",
+    "matchingNames": [
+      "radishes",
+      "radish",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "cucumber",
+    "matchingNames": [
+      "cucumber",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "dates",
+    "matchingNames": [
+      "date",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "lime",
+    "matchingNames": [
+      "lime",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "paper_bag",
+    "matchingNames": [
+      "bag",
+    ],
+    "category": "household",
+  },
+  {
+    "assetFileName": "raisins",
+    "matchingNames": [
+      "raisin",
+    ],
+    "category": "cereals",
+  },
+  {
+    "assetFileName": "round_fruit_small",
+    "matchingNames": [
+      "kiwi",
+      "apricot",
+      "mirabelle",
+      "plum",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "seeds",
+    "matchingNames": [
+      "flakes",
+      "cores",
+    ],
+    "category": "cereals",
+  },
+  {
+    "assetFileName": "sponge",
+    "matchingNames": [
+      "sponge",
+      "sponges",
+    ],
+    "category": "household",
+  },
+  {
+    "assetFileName": "zucchini",
+    "matchingNames": [
+      "zuchini",
+      "zucchini",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "avocado",
+    "matchingNames": [
+      "avocado",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "melon",
+    "matchingNames": [
+      "melon",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "tampon",
+    "matchingNames": [
+      "tampon",
+    ],
+    "category": "other",
+  },
+  {
+    "assetFileName": "pineapple",
+    "matchingNames": [
+      "pineapple",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "sweets",
+    "matchingNames": [
+      "chips",
+      "crisps",
+      "liquorice",
+      "gummy bear",
+      "cracker",
+      "gummy bears",
+      "cantuccini",
+      "snacks",
+      "sweets",
+      "licorice",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "cream",
+    "matchingNames": [
+      "hair gel",
+    ],
+    "category": "household",
+  },
+  {
+    "assetFileName": "shower_gel",
+    "matchingNames": [
+      "shampoo",
+      "shower gel",
+    ],
+    "category": "household",
+  },
+  {
+    "assetFileName": "dish_soap",
+    "matchingNames": [
+      "dishwashing liquid",
+      "cleaning supplies",
+      "cleaning agent",
+      "detergent",
+      "bathroom cleaner",
+      "neutral cleaner",
+      "dishwashing",
+      "dishwashing detergent",
+    ],
+    "category": "household",
+  },
+  {
+    "assetFileName": "apple",
+    "matchingNames": [
+      "apple",
+      "aepfel",
+      "obst",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "banana",
+    "matchingNames": [
+      "banana",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "bottle",
+    "matchingNames": [
+      "flasche",
+      "water",
+      "sprudel",
+      "bier",
+      "wein",
+      "cola",
+      "fanta",
+      "limo",
+      "limonade",
+      "sprite",
+      "apfelschorle",
+      "pils",
+      "hefeweizen",
+      "red bull",
+      "trinken",
+    ],
+    "category": "beverages",
+  },
+  {
+    "assetFileName": "bottle",
+    "matchingNames": [
+      "oil",
+      "vinegar",
+      "sojasosse",
+      "soja sosse",
+      "mayonnaise",
+      "mayo",
+      "ketchup",
+      "remoulade",
+    ],
+    "category": "convenienceProductFrozen",
+  },
+  {
+    "assetFileName": "box",
+    "matchingNames": [
+      "box",
+      "muesli",
+      "tempos",
+      "kaugummi",
+      "kakao",
+      "kakaopulver",
+      "zwieback",
+      "caotina",
+    ],
+    "category": "household",
+  },
+  {
+    "assetFileName": "flour",
+    "matchingNames": [
+      "flour",
+    ],
+    "category": "cereals",
+  },
+  {
+    "assetFileName": "bread",
+    "matchingNames": [
+      "bread",
+      "bread roll",
+      "laugenstange",
+      "brezel",
+      "baguette",
+      "ekmek",
+    ],
+    "category": "bread",
+  },
+  {
+    "assetFileName": "can",
+    "matchingNames": [
+      "bohnen",
+      "dose",
+      "kichererbsen",
+      "dosentomaten",
+      "tomatendose",
+    ],
+    "category": "spicesCanned",
+  },
+  {
+    "assetFileName": "carrot",
+    "matchingNames": [
+      "karotte",
+      "pastinake",
+      "ruebe",
+      "rettich",
+      "gemuese",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "corn",
+    "matchingNames": [
+      "samen",
+      "linsen",
+      "erbsen",
+      "hirse",
+      "oats",
+      "quinoa",
+      "bulgur",
+    ],
+    "category": "cereals",
+  },
+  {
+    "assetFileName": "cup",
+    "matchingNames": [
+      "becher",
+      "yoghurt",
+      "yogurt",
+      "quark",
+      "saure sahne",
+      "schlagsahne",
+      "cream",
+      "pudding",
+    ],
+    "category": "milkCheese",
+  },
+  {
+    "assetFileName": "glas",
+    "matchingNames": [
+      "glas",
+      "marmelade",
+      "honig",
+      "aufstrich",
+      "sauerkraut",
+      "schattenmorellen",
+      "nutella",
+      "hummus",
+      "guacamole",
+      "senf",
+      "pesto",
+      "tahini",
+      "oliven",
+    ],
+    "category": "spicesCanned",
+  },
+  {
+    "assetFileName": "leek",
+    "matchingNames": [
+      "lauch",
+      "porree",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "peanut",
+    "matchingNames": [
+      "nuss",
+      "cashews",
+      "cashewkerne",
+      "pistazien",
+    ],
+    "category": "cereals",
+  },
+  {
+    "assetFileName": "almonds",
+    "matchingNames": [
+      "mandel",
+    ],
+    "category": "cereals",
+  },
+  {
+    "assetFileName": "round_fruit",
+    "matchingNames": [
+      "tomato",
+      "orange",
+      "mandarine",
+      "mango",
+      "nektarine",
+      "pfirsich",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "dead_cow",
+    "matchingNames": [
+      "fleisch",
+      "hackfleisch",
+      "steak",
+      "rinder",
+    ],
+    "category": "meatFish",
+  },
+  {
+    "assetFileName": "dead_pig",
+    "matchingNames": [
+      "wurst",
+      "schinken",
+      "speck",
+      "bacon",
+      "salami",
+      "lyoner",
+      "wiener",
+      "aufschnitt",
+      "schweine",
+      "mett",
+    ],
+    "category": "meatFish",
+  },
+  {
+    "assetFileName": "dead_chicken",
+    "matchingNames": [
+      "pute",
+      "chicken",
+    ],
+    "category": "meatFish",
+  },
+  {
+    "assetFileName": "fish",
+    "matchingNames": [
+      "fisch",
+      "lachs",
+      "forelle",
+      "barsch",
+      "hecht",
+      "dorade",
+      "hering",
+      "kabeljau",
+      "dorsch",
+      "karpfen",
+    ],
+    "category": "meatFish",
+  },
+  {
+    "assetFileName": "cookie",
+    "matchingNames": [
+      "cookie",
+      "cookies",
+    ],
+    "category": "sweetsSnacks",
+  },
+  {
+    "assetFileName": "pepper",
+    "matchingNames": [
+      "pepper",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "onion",
+    "matchingNames": [
+      "onion",
+      "schalotte",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "pear",
+    "matchingNames": [
+      "pear",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "cabbage",
+    "matchingNames": [
+      "cabbage",
+      "wirsing",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "broccoli",
+    "matchingNames": [
+      "broccoli",
+      "brokoli",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "eggplant",
+    "matchingNames": [
+      "eggplant",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "salad",
+    "matchingNames": [
+      "salad",
+      "rucola",
+      "spinach",
+      "mangold",
+      "pak choi",
+      "pak choy",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "chocolate",
+    "matchingNames": [
+      "chocolate",
+      "schokostreusel",
+      "schokoraspel",
+    ],
+    "category": "sweetsSnacks",
+  },
+  {
+    "assetFileName": "ice",
+    "matchingNames": [
+      "ice cream",
+      "magnum",
+    ],
+    "category": "sweetsSnacks",
+  },
+  {
+    "assetFileName": "berries",
+    "matchingNames": [
+      "berries",
+      "raspberries",
+      "johannisbeeren",
+      "heidelbeeren",
+      "blueberries",
+      "trauben",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "strawberry",
+    "matchingNames": [
+      "strawberry",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "block",
+    "matchingNames": [
+      "tofu",
+      "butter",
+      "margarine",
+      "rama",
+    ],
+    "category": "milkCheese",
+  },
+  {
+    "assetFileName": "burger",
+    "matchingNames": [
+      "burger",
+    ],
+    "category": "convenienceProductFrozen",
+  },
+  {
+    "assetFileName": "herbs",
+    "matchingNames": [
+      "petersilie",
+      "basilikum",
+      "koriander",
+      "dill",
+      "minze",
+    ],
+    "category": "spicesCanned",
+  },
+  {
+    "assetFileName": "pizza_cake",
+    "matchingNames": [
+      "pizza",
+      "kuchen",
+      "torte",
+      "flammkuchen",
+    ],
+    "category": "convenienceProductFrozen",
+  },
+  {
+    "assetFileName": "yeast",
+    "matchingNames": [
+      "hefe",
+    ],
+    "category": "milkCheese",
+  },
+  {
+    "assetFileName": "package",
+    "matchingNames": [
+      "backpulver",
+      "natron",
+      "vanillezucker",
+      "trockenhefe",
+      "agar-agar",
+      "agar agar",
+      "puddingpulver",
+      "gelierzucker",
+    ],
+    "category": "spicesCanned",
+  },
+  {
+    "assetFileName": "pasta",
+    "matchingNames": [
+      "pasta",
+      "spaghetti",
+    ],
+    "category": "cereals",
+  },
+  {
+    "assetFileName": "lemon",
+    "matchingNames": [
+      "lemon",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "potatos",
+    "matchingNames": [
+      "potato",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "garlic",
+    "matchingNames": [
+      "garlic",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "spice",
+    "matchingNames": [
+      "salt",
+      "pepper",
+      "gewuerz",
+      "curry",
+      "kurkuma",
+      "zimt",
+      "kuemmel",
+    ],
+    "category": "spicesCanned",
+  },
+  {
+    "assetFileName": "rice",
+    "matchingNames": [
+      "rice",
+    ],
+    "category": "cereals",
+  },
+  {
+    "assetFileName": "paper_towel",
+    "matchingNames": [
+      "paper towels",
+      "zewa",
+    ],
+    "category": "household",
+  },
+  {
+    "assetFileName": "toilet_paper",
+    "matchingNames": [
+      "klopapier",
+      "klo papier",
+      "toilet paper",
+      "toiletten papier",
+    ],
+    "category": "household",
+  },
+  {
+    "assetFileName": "baking_paper",
+    "matchingNames": [
+      "backpapier",
+      "back papier",
+      "frischhaltefolie",
+    ],
+    "category": "household",
+  },
+  {
+    "assetFileName": "mushroom",
+    "matchingNames": [
+      "pilz",
+      "champignon",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "papaya",
+    "matchingNames": [
+      "papaya",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "rhubarb",
+    "matchingNames": [
+      "rhabarber",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "tetrapack",
+    "matchingNames": [
+      "milk",
+      "juice",
+      "haferdrink",
+      "hafer drink",
+      "soja drink",
+      "sojadrink",
+      "mandeldrink",
+      "mandel drink",
+      "reisdrink",
+      "reis drink",
+      "eistee",
+    ],
+    "category": "milkCheese",
+  },
+  {
+    "assetFileName": "egg",
+    "matchingNames": [
+      "eggs",
+    ],
+    "category": "milkCheese",
+  },
+  {
+    "assetFileName": "coffee_beans",
+    "matchingNames": [
+      "coffee",
+      "espresso",
+    ],
+    "category": "beverages",
+  },
+  {
+    "assetFileName": "tea",
+    "matchingNames": [
+      "tea",
+    ],
+    "category": "beverages",
+  },
+  {
+    "assetFileName": "sugar",
+    "matchingNames": [
+      "sugar",
+    ],
+    "category": "spicesCanned",
+  },
+  {
+    "assetFileName": "cheese",
+    "matchingNames": [
+      "cheese",
+      "mozarella",
+      "parmesan",
+      "gauda",
+      "edamer",
+      "feta",
+      "emmentaler",
+      "cheddar",
+      "brie",
+      "camembert",
+      "appenzeller",
+      "halloumi",
+      "manchego",
+      "tilsiter",
+      "ricotta",
+      "caprice dieux",
+      "mozzarella",
+    ],
+    "category": "milkCheese",
+  },
+  {
+    "assetFileName": "asparagus",
+    "matchingNames": [
+      "spargel",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "gnocchi",
+    "matchingNames": [
+      "gnocchi",
+    ],
+    "category": "cereals",
+  },
+  {
+    "assetFileName": "pumpkin",
+    "matchingNames": [
+      "pumpkin",
+      "hokkaido",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "beetroot",
+    "matchingNames": [
+      "rote bete",
+      "gelbe bete",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "radish",
+    "matchingNames": [
+      "radieschen",
+      "radieserl",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "cucumber",
+    "matchingNames": [
+      "cucumber",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "dates",
+    "matchingNames": [
+      "dattel",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "lime",
+    "matchingNames": [
+      "lime",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "paper_bag",
+    "matchingNames": [
+      "bag",
+    ],
+    "category": "household",
+  },
+  {
+    "assetFileName": "raisins",
+    "matchingNames": [
+      "rosine",
+    ],
+    "category": "cereals",
+  },
+  {
+    "assetFileName": "round_fruit_small",
+    "matchingNames": [
+      "pflaume",
+      "aprikose",
+      "zwetschge",
+      "mirabelle",
+      "marille",
+      "kiwi",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "seeds",
+    "matchingNames": [
+      "kerne",
+      "flocken",
+    ],
+    "category": "cereals",
+  },
+  {
+    "assetFileName": "sponge",
+    "matchingNames": [
+      "sponge",
+    ],
+    "category": "household",
+  },
+  {
+    "assetFileName": "zucchini",
+    "matchingNames": [
+      "zucchini",
+      "zuchini",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "avocado",
+    "matchingNames": [
+      "avocado",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "melon",
+    "matchingNames": [
+      "melon",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "tampon",
+    "matchingNames": [
+      "tampon",
+    ],
+    "category": "other",
+  },
+  {
+    "assetFileName": "pineapple",
+    "matchingNames": [
+      "pineapple",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "sweets",
+    "matchingNames": [
+      "chips",
+      "lakritze",
+      "cantuccini",
+      "cracker",
+      "snacks",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "cream",
+    "matchingNames": [
+      "haargel",
+      "creme",
+    ],
+    "category": "household",
+  },
+  {
+    "assetFileName": "shower_gel",
+    "matchingNames": [
+      "shower gel",
+      "shampoo",
+    ],
+    "category": "household",
+  },
+  {
+    "assetFileName": "dish_soap",
+    "matchingNames": [
+      "badreiniger",
+      "dish soap",
+      "cleaner",
+      "neutralreiniger",
+    ],
+    "category": "household",
+  },
+];
+
+const categoryEntriesEs: CategoryEntry[] = [
+  {
+    "assetFileName": "apple",
+    "matchingNames": [
+      "fruit",
+      "apples",
+      "apple",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "banana",
+    "matchingNames": [
+      "banana",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "bottle",
+    "matchingNames": [
+      "beer",
+      "wine",
+      "sprite",
+      "limo",
+      "fantastic",
+      "cola",
+      "water",
+      "lemonade",
+      "pils",
+      "hefeweizen",
+      "bubble",
+      "soda",
+      "redbull",
+      "drink",
+      "sparkling water",
+      "apple spritzer",
+      "beverages",
+      "bottle",
+      "sprites",
+      "red bull",
+      "fanta",
+    ],
+    "category": "beverages",
+  },
+  {
+    "assetFileName": "bottle",
+    "matchingNames": [
+      "mayonnaise",
+      "oil",
+      "mayo",
+      "vinegar",
+      "ketchup",
+      "soy sauce",
+      "remoulade",
+    ],
+    "category": "convenienceProductFrozen",
+  },
+  {
+    "assetFileName": "box",
+    "matchingNames": [
+      "dishwasher salt",
+      "handkerchiefs",
+      "dishwashing soaps",
+      "zwieback",
+      "caotina",
+      "food starch",
+      "dishwasher tabs",
+      "cocoa powder",
+      "cereal",
+      "starch",
+      "tempos",
+      "chewing gum",
+      "cocoa",
+      "dishwasher taps",
+      "muesli",
+      "box",
+    ],
+    "category": "household",
+  },
+  {
+    "assetFileName": "flour",
+    "matchingNames": [
+      "flour",
+    ],
+    "category": "cereals",
+  },
+  {
+    "assetFileName": "bread",
+    "matchingNames": [
+      "lye rod",
+      "lye bar",
+      "panecillo",
+      "pretzel",
+      "loaf",
+      "ekmek",
+      "bread",
+      "roll",
+      "bun",
+      "baguette",
+    ],
+    "category": "bread",
+  },
+  {
+    "assetFileName": "can",
+    "matchingNames": [
+      "tomato can",
+      "can",
+      "beans",
+      "canned tomatoes",
+      "chickpeas",
+    ],
+    "category": "spicesCanned",
+  },
+  {
+    "assetFileName": "carrot",
+    "matchingNames": [
+      "carrot",
+      "radish",
+      "rettich",
+      "beet",
+      "turnip",
+      "vegetables",
+      "ruebe",
+      "parsnip",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "corn",
+    "matchingNames": [
+      "lenses",
+      "millet",
+      "quinoa",
+      "seed",
+      "seeds",
+      "peas",
+      "bulgur",
+      "oatmeal",
+      "grains",
+    ],
+    "category": "cereals",
+  },
+  {
+    "assetFileName": "cup",
+    "matchingNames": [
+      "yogurt",
+      "pudding",
+      "whipped cream",
+      "mug",
+      "requesón",
+      "sour cream",
+      "cream",
+      "yoghurt",
+      "cups",
+    ],
+    "category": "milkCheese",
+  },
+  {
+    "assetFileName": "glas",
+    "matchingNames": [
+      "nutella",
+      "pesto",
+      "hummus",
+      "olives",
+      "spread",
+      "glass",
+      "morello cherries",
+      "tahini",
+      "sauerkraut",
+      "mustard",
+      "jam",
+      "guacamole",
+      "honey",
+      "glasses",
+    ],
+    "category": "spicesCanned",
+  },
+  {
+    "assetFileName": "leek",
+    "matchingNames": [
+      "leek",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "peanut",
+    "matchingNames": [
+      "pistachios",
+      "nut",
+      "cashews",
+      "nuts",
+    ],
+    "category": "cereals",
+  },
+  {
+    "assetFileName": "almonds",
+    "matchingNames": [
+      "almond",
+    ],
+    "category": "cereals",
+  },
+  {
+    "assetFileName": "round_fruit",
+    "matchingNames": [
+      "tangerine",
+      "nectarine",
+      "peach",
+      "tomato",
+      "naranja",
+      "mango",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "dead_cow",
+    "matchingNames": [
+      "flesh",
+      "minced meat",
+      "steak",
+      "cattle",
+      "meat",
+      "bovine",
+    ],
+    "category": "meatFish",
+  },
+  {
+    "assetFileName": "dead_pig",
+    "matchingNames": [
+      "bacon",
+      "salami",
+      "cold cuts",
+      "hot dog",
+      "meat cheese",
+      "vienna",
+      "pigs",
+      "ham",
+      "viennese",
+      "lyon",
+      "met",
+      "liver cheese",
+      "meatloaf",
+      "sausage",
+      "sausages",
+      "mead",
+    ],
+    "category": "meatFish",
+  },
+  {
+    "assetFileName": "dead_chicken",
+    "matchingNames": [
+      "chicken",
+      "turkey",
+      "chickens",
+    ],
+    "category": "meatFish",
+  },
+  {
+    "assetFileName": "fish",
+    "matchingNames": [
+      "cod",
+      "perch",
+      "fish sticks",
+      "salmon",
+      "herring",
+      "carp",
+      "sea ​​bream",
+      "dorade",
+      "trout",
+      "fish",
+      "pike",
+    ],
+    "category": "meatFish",
+  },
+  {
+    "assetFileName": "cookie",
+    "matchingNames": [
+      "cookie",
+      "biscuit",
+      "sweets",
+      "cookies",
+    ],
+    "category": "sweetsSnacks",
+  },
+  {
+    "assetFileName": "pepper",
+    "matchingNames": [
+      "pimiento",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "onion",
+    "matchingNames": [
+      "onion",
+      "shell",
+      "shallot",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "pear",
+    "matchingNames": [
+      "pear",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "cabbage",
+    "matchingNames": [
+      "savoy",
+      "col",
+      "cabbage",
+      "savoy cabbage",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "broccoli",
+    "matchingNames": [
+      "broccoli",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "eggplant",
+    "matchingNames": [
+      "berenjena",
+      "eggplant",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "salad",
+    "matchingNames": [
+      "salad",
+      "pak choy",
+      "spinach",
+      "pak choi",
+      "mangold",
+      "chard",
+      "arugula",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "chocolate",
+    "matchingNames": [
+      "chocolate shavings",
+      "chocolate sprinkles",
+      "chocolate rasps",
+      "chocolate",
+    ],
+    "category": "sweetsSnacks",
+  },
+  {
+    "assetFileName": "ice",
+    "matchingNames": [
+      "magnum",
+      "ice",
+    ],
+    "category": "sweetsSnacks",
+  },
+  {
+    "assetFileName": "berries",
+    "matchingNames": [
+      "berries",
+      "grapes",
+      "currants",
+      "raspberries",
+      "blueberries",
+      "berry",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "strawberry",
+    "matchingNames": [
+      "strawberry",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "block",
+    "matchingNames": [
+      "margarine",
+      "tofu",
+      "ram",
+      "mantequilla",
+      "rama",
+    ],
+    "category": "milkCheese",
+  },
+  {
+    "assetFileName": "burger",
+    "matchingNames": [
+      "citizens",
+      "burger",
+    ],
+    "category": "convenienceProductFrozen",
+  },
+  {
+    "assetFileName": "herbs",
+    "matchingNames": [
+      "parsley",
+      "coriander",
+      "herbs",
+      "mint",
+      "basil",
+      "dill",
+    ],
+    "category": "spicesCanned",
+  },
+  {
+    "assetFileName": "pizza_cake",
+    "matchingNames": [
+      "pizza",
+      "tarte",
+      "cake",
+      "tarte flambée",
+    ],
+    "category": "convenienceProductFrozen",
+  },
+  {
+    "assetFileName": "yeast",
+    "matchingNames": [
+      "yeast",
+    ],
+    "category": "milkCheese",
+  },
+  {
+    "assetFileName": "package",
+    "matchingNames": [
+      "natron",
+      "agar agar",
+      "dry yeast",
+      "jelling sugar",
+      "agar-agar",
+      "soda",
+      "baking powder",
+      "pudding powder",
+      "jam sugar",
+      "vanilla sugar",
+    ],
+    "category": "spicesCanned",
+  },
+  {
+    "assetFileName": "pasta",
+    "matchingNames": [
+      "noodles",
+      "pasta",
+      "spaghetti",
+    ],
+    "category": "cereals",
+  },
+  {
+    "assetFileName": "lemon",
+    "matchingNames": [
+      "lemon",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "potatos",
+    "matchingNames": [
+      "potato",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "garlic",
+    "matchingNames": [
+      "garlic",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "spice",
+    "matchingNames": [
+      "salt",
+      "caraway",
+      "seasoning",
+      "cinnamon",
+      "cinammon",
+      "kuemmel",
+      "caraway seed",
+      "pepper",
+      "spice",
+      "curry",
+      "turmeric",
+    ],
+    "category": "spicesCanned",
+  },
+  {
+    "assetFileName": "rice",
+    "matchingNames": [
+      "rice",
+    ],
+    "category": "cereals",
+  },
+  {
+    "assetFileName": "paper_towel",
+    "matchingNames": [
+      "kitchen roll",
+      "zewa",
+    ],
+    "category": "household",
+  },
+  {
+    "assetFileName": "toilet_paper",
+    "matchingNames": [
+      "toilet paper",
+      "loo paper",
+    ],
+    "category": "household",
+  },
+  {
+    "assetFileName": "baking_paper",
+    "matchingNames": [
+      "baking paper",
+      "cling film",
+      "parchment paper",
+      "back paper",
+    ],
+    "category": "household",
+  },
+  {
+    "assetFileName": "mushroom",
+    "matchingNames": [
+      "mushroom",
+      "fungus",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "papaya",
+    "matchingNames": [
+      "papaya",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "rhubarb",
+    "matchingNames": [
+      "rhubarb",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "tetrapack",
+    "matchingNames": [
+      "iced tea",
+      "juice",
+      "oat drink",
+      "almond drink",
+      "soy drink",
+      "icetea",
+      "rice drink",
+      "milk",
+    ],
+    "category": "milkCheese",
+  },
+  {
+    "assetFileName": "egg",
+    "matchingNames": [
+      "eggs",
+    ],
+    "category": "milkCheese",
+  },
+  {
+    "assetFileName": "coffee_beans",
+    "matchingNames": [
+      "coffee",
+      "espresso",
+    ],
+    "category": "beverages",
+  },
+  {
+    "assetFileName": "tea",
+    "matchingNames": [
+      "tea",
+    ],
+    "category": "beverages",
+  },
+  {
+    "assetFileName": "sugar",
+    "matchingNames": [
+      "sugar",
+    ],
+    "category": "spicesCanned",
+  },
+  {
+    "assetFileName": "cheese",
+    "matchingNames": [
+      "edamer",
+      "goood",
+      "gauda",
+      "parmesan",
+      "mangego",
+      "helloumi",
+      "appenzell",
+      "camembert",
+      "appenzeller",
+      "emmental",
+      "manchego",
+      "caprice dieux",
+      "tilliter",
+      "brie",
+      "cheddar",
+      "mozzarella",
+      "feta",
+      "halloumi",
+      "edam",
+      "cheese",
+      "ricotta",
+      "mozarella",
+      "tilsit",
+    ],
+    "category": "milkCheese",
+  },
+  {
+    "assetFileName": "asparagus",
+    "matchingNames": [
+      "asparagus",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "gnocchi",
+    "matchingNames": [
+      "gnocchi",
+    ],
+    "category": "cereals",
+  },
+  {
+    "assetFileName": "pumpkin",
+    "matchingNames": [
+      "pumpkin",
+      "hokkaido",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "beetroot",
+    "matchingNames": [
+      "yellow turnip",
+      "yellow beets",
+      "beet",
+      "red beet",
+      "beetroot",
+      "yellow beet",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "radish",
+    "matchingNames": [
+      "radishes",
+      "radish",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "cucumber",
+    "matchingNames": [
+      "cucumber",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "dates",
+    "matchingNames": [
+      "date",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "lime",
+    "matchingNames": [
+      "lime",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "paper_bag",
+    "matchingNames": [
+      "bag",
+      "bolsa",
+    ],
+    "category": "household",
+  },
+  {
+    "assetFileName": "raisins",
+    "matchingNames": [
+      "raisin",
+    ],
+    "category": "cereals",
+  },
+  {
+    "assetFileName": "round_fruit_small",
+    "matchingNames": [
+      "kiwi",
+      "apricot",
+      "mirabelle",
+      "plum",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "seeds",
+    "matchingNames": [
+      "flakes",
+      "cores",
+    ],
+    "category": "cereals",
+  },
+  {
+    "assetFileName": "sponge",
+    "matchingNames": [
+      "sponge",
+      "sponges",
+    ],
+    "category": "household",
+  },
+  {
+    "assetFileName": "zucchini",
+    "matchingNames": [
+      "zuchini",
+      "zucchini",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "avocado",
+    "matchingNames": [
+      "avocado",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "melon",
+    "matchingNames": [
+      "melon",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "tampon",
+    "matchingNames": [
+      "tampon",
+    ],
+    "category": "other",
+  },
+  {
+    "assetFileName": "pineapple",
+    "matchingNames": [
+      "pineapple",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "sweets",
+    "matchingNames": [
+      "patatas fritas",
+      "crisps",
+      "liquorice",
+      "gummy bear",
+      "cracker",
+      "gummy bears",
+      "cantuccini",
+      "snacks",
+      "sweets",
+      "licorice",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "cream",
+    "matchingNames": [
+      "hair gel",
+    ],
+    "category": "household",
+  },
+  {
+    "assetFileName": "shower_gel",
+    "matchingNames": [
+      "champú",
+      "shower gel",
+    ],
+    "category": "household",
+  },
+  {
+    "assetFileName": "dish_soap",
+    "matchingNames": [
+      "dishwashing liquid",
+      "cleaning supplies",
+      "cleaning agent",
+      "detergent",
+      "bathroom cleaner",
+      "neutral cleaner",
+      "dishwashing",
+      "dishwashing detergent",
+    ],
+    "category": "household",
+  },
+  {
+    "assetFileName": "apple",
+    "matchingNames": [
+      "manzana",
+      "aepfel",
+      "obst",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "banana",
+    "matchingNames": [
+      "plátano",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "bottle",
+    "matchingNames": [
+      "flasche",
+      "agua",
+      "sprudel",
+      "bier",
+      "wein",
+      "cola",
+      "fanta",
+      "limo",
+      "limonade",
+      "sprite",
+      "apfelschorle",
+      "pils",
+      "hefeweizen",
+      "red bull",
+      "trinken",
+    ],
+    "category": "beverages",
+  },
+  {
+    "assetFileName": "bottle",
+    "matchingNames": [
+      "aceite",
+      "vinagre",
+      "sojasosse",
+      "soja sosse",
+      "mayonnaise",
+      "mayo",
+      "ketchup",
+      "remoulade",
+    ],
+    "category": "convenienceProductFrozen",
+  },
+  {
+    "assetFileName": "box",
+    "matchingNames": [
+      "box",
+      "muesli",
+      "tempos",
+      "kaugummi",
+      "kakao",
+      "kakaopulver",
+      "zwieback",
+      "caotina",
+    ],
+    "category": "household",
+  },
+  {
+    "assetFileName": "flour",
+    "matchingNames": [
+      "harina",
+    ],
+    "category": "cereals",
+  },
+  {
+    "assetFileName": "bread",
+    "matchingNames": [
+      "pan",
+      "panecillo",
+      "laugenstange",
+      "brezel",
+      "baguette",
+      "ekmek",
+    ],
+    "category": "bread",
+  },
+  {
+    "assetFileName": "can",
+    "matchingNames": [
+      "bohnen",
+      "dose",
+      "kichererbsen",
+      "dosentomaten",
+      "tomatendose",
+    ],
+    "category": "spicesCanned",
+  },
+  {
+    "assetFileName": "carrot",
+    "matchingNames": [
+      "karotte",
+      "pastinake",
+      "ruebe",
+      "rettich",
+      "gemuese",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "corn",
+    "matchingNames": [
+      "samen",
+      "linsen",
+      "erbsen",
+      "hirse",
+      "copos de avena",
+      "quinoa",
+      "bulgur",
+    ],
+    "category": "cereals",
+  },
+  {
+    "assetFileName": "cup",
+    "matchingNames": [
+      "becher",
+      "yoghurt",
+      "yogur",
+      "requesón",
+      "saure sahne",
+      "schlagsahne",
+      "nata",
+      "pudding",
+    ],
+    "category": "milkCheese",
+  },
+  {
+    "assetFileName": "glas",
+    "matchingNames": [
+      "glas",
+      "marmelade",
+      "honig",
+      "aufstrich",
+      "sauerkraut",
+      "schattenmorellen",
+      "nutella",
+      "hummus",
+      "guacamole",
+      "senf",
+      "pesto",
+      "tahini",
+      "oliven",
+    ],
+    "category": "spicesCanned",
+  },
+  {
+    "assetFileName": "leek",
+    "matchingNames": [
+      "lauch",
+      "porree",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "peanut",
+    "matchingNames": [
+      "nuss",
+      "cashews",
+      "cashewkerne",
+      "pistazien",
+    ],
+    "category": "cereals",
+  },
+  {
+    "assetFileName": "almonds",
+    "matchingNames": [
+      "mandel",
+    ],
+    "category": "cereals",
+  },
+  {
+    "assetFileName": "round_fruit",
+    "matchingNames": [
+      "tomate",
+      "naranja",
+      "mandarine",
+      "mango",
+      "nektarine",
+      "pfirsich",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "dead_cow",
+    "matchingNames": [
+      "fleisch",
+      "hackfleisch",
+      "steak",
+      "rinder",
+    ],
+    "category": "meatFish",
+  },
+  {
+    "assetFileName": "dead_pig",
+    "matchingNames": [
+      "wurst",
+      "schinken",
+      "speck",
+      "bacon",
+      "salami",
+      "lyoner",
+      "wiener",
+      "aufschnitt",
+      "schweine",
+      "mett",
+    ],
+    "category": "meatFish",
+  },
+  {
+    "assetFileName": "dead_chicken",
+    "matchingNames": [
+      "pute",
+      "chicken",
+    ],
+    "category": "meatFish",
+  },
+  {
+    "assetFileName": "fish",
+    "matchingNames": [
+      "fisch",
+      "lachs",
+      "forelle",
+      "barsch",
+      "hecht",
+      "dorade",
+      "hering",
+      "kabeljau",
+      "dorsch",
+      "karpfen",
+    ],
+    "category": "meatFish",
+  },
+  {
+    "assetFileName": "cookie",
+    "matchingNames": [
+      "galleta",
+      "galletas",
+    ],
+    "category": "sweetsSnacks",
+  },
+  {
+    "assetFileName": "pepper",
+    "matchingNames": [
+      "pimiento",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "onion",
+    "matchingNames": [
+      "cebolla",
+      "schalotte",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "pear",
+    "matchingNames": [
+      "pera",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "cabbage",
+    "matchingNames": [
+      "col",
+      "wirsing",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "broccoli",
+    "matchingNames": [
+      "brócoli",
+      "broccoli",
+      "brokoli",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "eggplant",
+    "matchingNames": [
+      "berenjena",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "salad",
+    "matchingNames": [
+      "ensalada",
+      "rucola",
+      "espinaca",
+      "mangold",
+      "pak choi",
+      "pak choy",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "chocolate",
+    "matchingNames": [
+      "chocolate",
+      "schokostreusel",
+      "schokoraspel",
+    ],
+    "category": "sweetsSnacks",
+  },
+  {
+    "assetFileName": "ice",
+    "matchingNames": [
+      "helado",
+      "magnum",
+    ],
+    "category": "sweetsSnacks",
+  },
+  {
+    "assetFileName": "berries",
+    "matchingNames": [
+      "bayas",
+      "frambuesas",
+      "johannisbeeren",
+      "heidelbeeren",
+      "arándanos",
+      "trauben",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "strawberry",
+    "matchingNames": [
+      "fresa",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "block",
+    "matchingNames": [
+      "tofu",
+      "mantequilla",
+      "margarine",
+      "rama",
+    ],
+    "category": "milkCheese",
+  },
+  {
+    "assetFileName": "burger",
+    "matchingNames": [
+      "burger",
+    ],
+    "category": "convenienceProductFrozen",
+  },
+  {
+    "assetFileName": "herbs",
+    "matchingNames": [
+      "petersilie",
+      "basilikum",
+      "koriander",
+      "dill",
+      "minze",
+    ],
+    "category": "spicesCanned",
+  },
+  {
+    "assetFileName": "pizza_cake",
+    "matchingNames": [
+      "pizza",
+      "kuchen",
+      "torte",
+      "flammkuchen",
+    ],
+    "category": "convenienceProductFrozen",
+  },
+  {
+    "assetFileName": "yeast",
+    "matchingNames": [
+      "hefe",
+    ],
+    "category": "milkCheese",
+  },
+  {
+    "assetFileName": "package",
+    "matchingNames": [
+      "backpulver",
+      "natron",
+      "vanillezucker",
+      "trockenhefe",
+      "agar-agar",
+      "agar agar",
+      "puddingpulver",
+      "gelierzucker",
+    ],
+    "category": "spicesCanned",
+  },
+  {
+    "assetFileName": "pasta",
+    "matchingNames": [
+      "pasta",
+      "spaghetti",
+    ],
+    "category": "cereals",
+  },
+  {
+    "assetFileName": "lemon",
+    "matchingNames": [
+      "limón",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "potatos",
+    "matchingNames": [
+      "patata",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "garlic",
+    "matchingNames": [
+      "ajo",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "spice",
+    "matchingNames": [
+      "sal",
+      "pimienta",
+      "gewuerz",
+      "curry",
+      "kurkuma",
+      "zimt",
+      "kuemmel",
+    ],
+    "category": "spicesCanned",
+  },
+  {
+    "assetFileName": "rice",
+    "matchingNames": [
+      "arroz",
+    ],
+    "category": "cereals",
+  },
+  {
+    "assetFileName": "paper_towel",
+    "matchingNames": [
+      "papel de cocina",
+      "zewa",
+    ],
+    "category": "household",
+  },
+  {
+    "assetFileName": "toilet_paper",
+    "matchingNames": [
+      "klopapier",
+      "klo papier",
+      "papel higiénico",
+      "toiletten papier",
+    ],
+    "category": "household",
+  },
+  {
+    "assetFileName": "baking_paper",
+    "matchingNames": [
+      "backpapier",
+      "back papier",
+      "frischhaltefolie",
+    ],
+    "category": "household",
+  },
+  {
+    "assetFileName": "mushroom",
+    "matchingNames": [
+      "pilz",
+      "champignon",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "papaya",
+    "matchingNames": [
+      "papaya",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "rhubarb",
+    "matchingNames": [
+      "rhabarber",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "tetrapack",
+    "matchingNames": [
+      "leche",
+      "zumo",
+      "haferdrink",
+      "hafer drink",
+      "soja drink",
+      "sojadrink",
+      "mandeldrink",
+      "mandel drink",
+      "reisdrink",
+      "reis drink",
+      "eistee",
+    ],
+    "category": "milkCheese",
+  },
+  {
+    "assetFileName": "egg",
+    "matchingNames": [
+      "huevos",
+    ],
+    "category": "milkCheese",
+  },
+  {
+    "assetFileName": "coffee_beans",
+    "matchingNames": [
+      "café",
+      "espresso",
+    ],
+    "category": "beverages",
+  },
+  {
+    "assetFileName": "tea",
+    "matchingNames": [
+      "té",
+    ],
+    "category": "beverages",
+  },
+  {
+    "assetFileName": "sugar",
+    "matchingNames": [
+      "azúcar",
+    ],
+    "category": "spicesCanned",
+  },
+  {
+    "assetFileName": "cheese",
+    "matchingNames": [
+      "queso",
+      "mozarella",
+      "parmesan",
+      "gauda",
+      "edamer",
+      "feta",
+      "emmentaler",
+      "cheddar",
+      "brie",
+      "camembert",
+      "appenzeller",
+      "halloumi",
+      "manchego",
+      "tilsiter",
+      "ricotta",
+      "caprice dieux",
+      "mozzarella",
+    ],
+    "category": "milkCheese",
+  },
+  {
+    "assetFileName": "asparagus",
+    "matchingNames": [
+      "spargel",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "gnocchi",
+    "matchingNames": [
+      "gnocchi",
+    ],
+    "category": "cereals",
+  },
+  {
+    "assetFileName": "pumpkin",
+    "matchingNames": [
+      "calabaza",
+      "hokkaido",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "beetroot",
+    "matchingNames": [
+      "rote bete",
+      "gelbe bete",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "radish",
+    "matchingNames": [
+      "radieschen",
+      "radieserl",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "cucumber",
+    "matchingNames": [
+      "pepino",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "dates",
+    "matchingNames": [
+      "dattel",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "lime",
+    "matchingNames": [
+      "lima",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "paper_bag",
+    "matchingNames": [
+      "bolsa",
+    ],
+    "category": "household",
+  },
+  {
+    "assetFileName": "raisins",
+    "matchingNames": [
+      "rosine",
+    ],
+    "category": "cereals",
+  },
+  {
+    "assetFileName": "round_fruit_small",
+    "matchingNames": [
+      "pflaume",
+      "aprikose",
+      "zwetschge",
+      "mirabelle",
+      "marille",
+      "kiwi",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "seeds",
+    "matchingNames": [
+      "kerne",
+      "flocken",
+    ],
+    "category": "cereals",
+  },
+  {
+    "assetFileName": "sponge",
+    "matchingNames": [
+      "esponja",
+    ],
+    "category": "household",
+  },
+  {
+    "assetFileName": "zucchini",
+    "matchingNames": [
+      "zucchini",
+      "zuchini",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "avocado",
+    "matchingNames": [
+      "avocado",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "melon",
+    "matchingNames": [
+      "melón",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "tampon",
+    "matchingNames": [
+      "tampon",
+    ],
+    "category": "other",
+  },
+  {
+    "assetFileName": "pineapple",
+    "matchingNames": [
+      "piña",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "sweets",
+    "matchingNames": [
+      "patatas fritas",
+      "lakritze",
+      "cantuccini",
+      "cracker",
+      "snacks",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "cream",
+    "matchingNames": [
+      "haargel",
+      "creme",
+    ],
+    "category": "household",
+  },
+  {
+    "assetFileName": "shower_gel",
+    "matchingNames": [
+      "gel de ducha",
+      "champú",
+    ],
+    "category": "household",
+  },
+  {
+    "assetFileName": "dish_soap",
+    "matchingNames": [
+      "badreiniger",
+      "lavavajillas",
+      "limpiador",
+      "neutralreiniger",
+    ],
+    "category": "household",
+  },
+];
+
+const categoryEntriesByLocale: Record<Locale, CategoryEntry[]> = {
+  en: categoryEntriesEn,
+  de: categoryEntriesDe,
+  es: categoryEntriesEs,
 };
-
-const deToEs: Record<string, string> = {
-  apfel: "manzana",
-  birne: "pera",
-  zitrone: "limón",
-  limette: "lima",
-  banane: "plátano",
-  orange: "naranja",
-  tomate: "tomate",
-  kartoffel: "patata",
-  kartoffeln: "patatas",
-  zwiebel: "cebolla",
-  knoblauch: "ajo",
-  gurke: "pepino",
-  paprika: "pimiento",
-  salat: "ensalada",
-  spinat: "espinaca",
-  kohl: "col",
-  brokkoli: "brócoli",
-  aubergine: "berenjena",
-  kürbis: "calabaza",
-  kuerbis: "calabaza",
-  melone: "melón",
-  ananas: "piña",
-  beeren: "bayas",
-  erdbeere: "fresa",
-  himbeeren: "frambuesas",
-  blaubeeren: "arándanos",
-  milch: "leche",
-  käse: "queso",
-  kaese: "queso",
-  eier: "huevos",
-  butter: "mantequilla",
-  joghurt: "yogur",
-  quark: "requesón",
-  sahne: "nata",
-  brot: "pan",
-  brötchen: "panecillo",
-  broetchen: "panecillo",
-  baguette: "baguette",
-  semmel: "panecillo",
-  nudeln: "pasta",
-  reis: "arroz",
-  mehl: "harina",
-  haferflocken: "copos de avena",
-  zucker: "azúcar",
-  salz: "sal",
-  pfeffer: "pimienta",
-  öl: "aceite",
-  oel: "aceite",
-  essig: "vinagre",
-  wasser: "agua",
-  saft: "zumo",
-  tee: "té",
-  kaffee: "café",
-  keks: "galleta",
-  kekse: "galletas",
-  chips: "patatas fritas",
-  schokolade: "chocolate",
-  eis: "helado",
-  putzmittel: "limpiador",
-  spülmittel: "lavavajillas",
-  spuelmittel: "lavavajillas",
-  toilettenpapier: "papel higiénico",
-  küchenrolle: "papel de cocina",
-  kuechenrolle: "papel de cocina",
-  shampoo: "champú",
-  duschgel: "gel de ducha",
-  schwamm: "esponja",
-  tüte: "bolsa",
-  tuete: "bolsa",
-  beutel: "bolsa",
-};
-
-const germanKnownTerms = new Set<string>([
-  ...Object.keys(deToEn),
-  ...Object.keys(deToEs),
-]);
-
-const isLikelyGerman = (value: string) =>
-  germanKnownTerms.has(value) || /[äöüß]/i.test(value) || /\b(kaese|spuel|tuete|broet|kuechen|schwaemme)\b/i.test(value);
-
-const translateNameForLocale = (name: string, locale: Locale): string | undefined => {
-  const key = name.trim().toLowerCase();
-  if (!key) {
-    return undefined;
-  }
-
-  if (locale === "de") {
-    return key;
-  }
-
-  if (locale === "en") {
-    return deToEn[key] ?? (isLikelyGerman(key) ? undefined : key);
-  }
-
-  return deToEs[key] ?? (isLikelyGerman(key) ? undefined : key);
-};
-
-const localizeEntries = (locale: Locale): CategoryEntry[] =>
-  mixedCategoryEntries
-    .map((entry) => ({
-      ...entry,
-      matchingNames: Array.from(
-        new Set(
-          entry.matchingNames
-            .map((name) => translateNameForLocale(name, locale))
-            .filter((name): name is string => Boolean(name)),
-        ),
-      ),
-    }))
-    .filter((entry) => entry.matchingNames.length > 0);
 
 const itemCategoryMapByLocale: Record<Locale, Map<string, string>> = {
   en: new Map(),
@@ -971,7 +4744,7 @@ const categoryIconById: Record<string, string> = {
 };
 
 (["en", "de", "es"] as const).forEach((locale) => {
-  localizeEntries(locale).forEach((entry) => {
+  categoryEntriesByLocale[locale].forEach((entry) => {
     entry.matchingNames.forEach((name) => {
       const key = name.trim().toLowerCase();
       if (!key) {return;}
