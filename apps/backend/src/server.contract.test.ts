@@ -137,6 +137,88 @@ describe('sharing API contract basics', () => {
     await app.close()
   })
 
+
+  it('auto-assigns category from item name when category is omitted and defaults language to en', async () => {
+    const repository = new InMemoryListRepository()
+    const app = buildServer({ listRepository: repository })
+
+    await app.inject({
+      method: 'PUT',
+      url: '/v1/lists/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      headers: { 'x-device-id': '11111111-1111-4111-8111-111111111111' },
+      payload: { name: 'Groceries' },
+    })
+
+    const response = await app.inject({
+      method: 'PUT',
+      url: '/v1/lists/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/items/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbc',
+      headers: {
+        'x-device-id': '11111111-1111-4111-8111-111111111111',
+      },
+      payload: {
+        name: 'Milk',
+        deleted: false,
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      },
+    })
+
+    expect(response.statusCode).toBe(201)
+
+    const itemResponse = await app.inject({
+      method: 'GET',
+      url: '/v1/lists/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/items/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbc',
+      headers: {
+        'x-device-id': '11111111-1111-4111-8111-111111111111',
+      },
+    })
+
+    expect(itemResponse.statusCode).toBe(200)
+    expect(itemResponse.json()).toEqual(expect.objectContaining({ category: 'milkCheese' }))
+
+    await app.close()
+  })
+
+  it('auto-assigns category using the provided language when category is omitted', async () => {
+    const repository = new InMemoryListRepository()
+    const app = buildServer({ listRepository: repository })
+
+    await app.inject({
+      method: 'PUT',
+      url: '/v1/lists/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      headers: { 'x-device-id': '11111111-1111-4111-8111-111111111111' },
+      payload: { name: 'Groceries' },
+    })
+
+    const response = await app.inject({
+      method: 'PUT',
+      url: '/v1/lists/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/items/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbd',
+      headers: {
+        'x-device-id': '11111111-1111-4111-8111-111111111111',
+      },
+      payload: {
+        name: 'apfel',
+        language: 'de',
+        deleted: false,
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      },
+    })
+
+    expect(response.statusCode).toBe(201)
+
+    const itemResponse = await app.inject({
+      method: 'GET',
+      url: '/v1/lists/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/items/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbd',
+      headers: {
+        'x-device-id': '11111111-1111-4111-8111-111111111111',
+      },
+    })
+
+    expect(itemResponse.statusCode).toBe(200)
+    expect(itemResponse.json()).toEqual(expect.objectContaining({ category: 'fruitsVegetables' }))
+
+    await app.close()
+  })
+
   it('allows redeem route before token redemption and records redemption', async () => {
     const repository = new InMemoryListRepository()
     const app = buildServer({ listRepository: repository })

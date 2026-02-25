@@ -1,3 +1,4 @@
+import { defaultCategoryLanguage, getCategoryIdForItemName, supportedCategoryLanguages } from '@golist/shared/domain/item-category-mapping'
 import { type FastifyInstance } from 'fastify'
 import { z } from 'zod'
 
@@ -11,7 +12,8 @@ const itemParamsSchema = z.object({ listId: z.uuid(), itemId: z.uuid() })
 const itemUpsertSchema = z.object({
   name: z.string().min(1),
   quantityOrUnit: z.string().min(1).optional(),
-  category: z.string().min(1),
+  category: z.string().min(1).optional(),
+  language: z.enum(supportedCategoryLanguages).default(defaultCategoryLanguage),
   deleted: z.boolean(),
   updatedAt: z.iso.datetime(),
 })
@@ -86,8 +88,20 @@ export function registerListRoutes(app: FastifyInstance, listRepository: ListRep
   app.put('/v1/lists/:listId/items/:itemId', { preHandler: requireListAccess }, async (request, reply) => {
     const params = itemParamsSchema.parse(request.params)
     const body = itemUpsertSchema.parse(request.body)
+    const existingItem = await listRepository.getListItem(request.auth!.listId, params.itemId)
+    const shouldAutoMapCategory = !body.category && (!existingItem || existingItem.name !== body.name)
+    const existingCategory = existingItem?.category ?? 'other'
+    const category =
+      body.category ??
+      (shouldAutoMapCategory ? getCategoryIdForItemName(body.name, body.language) ?? 'other' : existingCategory)
 
-    const result = await listRepository.upsertListItem(request.auth!.listId, params.itemId, request.auth!.deviceId, body)
+    const result = await listRepository.upsertListItem(request.auth!.listId, params.itemId, request.auth!.deviceId, {
+      name: body.name,
+      quantityOrUnit: body.quantityOrUnit,
+      category,
+      deleted: body.deleted,
+      updatedAt: body.updatedAt,
+    })
 
     if (result.outcome === 'conflict') {
       reply.code(409)

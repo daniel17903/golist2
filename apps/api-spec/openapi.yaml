@@ -59,6 +59,12 @@ components:
           type: string
         category:
           type: string
+          description: Item category id. If omitted for creates or name changes, the server derives it from item name and language.
+        language:
+          type: string
+          enum: [en, de, es]
+          default: en
+          description: Language used for server-side category mapping when category is omitted.
         deleted:
           type: boolean
         createdAt:
@@ -104,7 +110,7 @@ components:
           format: uuid
     ItemUpsertRequest:
       type: object
-      required: [name, category, deleted, updatedAt]
+      required: [name, deleted, updatedAt]
       properties:
         name:
           type: string
@@ -112,6 +118,12 @@ components:
           type: string
         category:
           type: string
+          description: Item category id. If omitted for creates or name changes, the server derives it from item name and language.
+        language:
+          type: string
+          enum: [en, de, es]
+          default: en
+          description: Language used for server-side category mapping when category is omitted.
         deleted:
           type: boolean
         updatedAt:

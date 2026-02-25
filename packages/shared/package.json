@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./domain/types": "./src/domain/types.ts"
+    "./domain/types": "./src/domain/types.ts",
+    "./domain/item-category-mapping": "./src/domain/item-category-mapping.ts"
   },
   "engines": {
     "node": ">=24.0.0"
