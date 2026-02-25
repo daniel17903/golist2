@@ -29,6 +29,7 @@ const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
           <div className="modal__field">
             <label htmlFor="language-select">{t("settings.language")}</label>
             <select
+              className="settings-language-select"
               id="language-select"
               value={locale}
               onChange={(event) => {
@@ -45,6 +46,11 @@ const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
               ))}
             </select>
           </div>
+        </div>
+        <div className="modal__actions">
+          <button type="button" className="text-button" onClick={onClose}>
+            {t("common.close")}
+          </button>
         </div>
       </div>
     </div>

@@ -470,6 +470,19 @@ body {
   outline: none;
 }
 
+.settings-language-select {
+  border: none;
+  border-bottom: 1px solid rgba(47, 36, 51, 0.4);
+  padding: 6px 2px 8px;
+  font-size: 16px;
+  background: transparent;
+  color: #2f2433;
+  outline: none;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+}
+
 .modal__actions {
   display: flex;
   justify-content: space-between;
