@@ -925,6 +925,18 @@ body {
 }
 
 @media (max-width: 420px) {
+  .list-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .list-grid .item-card {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 1 / 1;
+  }
+
   .app {
     padding-left: 10px;
     padding-right: 10px;
