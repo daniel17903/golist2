@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import type { AppMetadata, Item, List } from "@golist/shared/domain/types";
-import { getCategoryIdForItem } from "../domain/categories";
+import { getCategoryIdForItem, getItemIconName } from "../domain/categories";
 import { db } from "../storage/db";
 import { t } from "../i18n";
 import {
@@ -106,6 +106,7 @@ const syncItemImmediately = async (item: Item) => {
     itemId: item.id,
     body: {
       name: item.name,
+      iconName: item.iconName,
       quantityOrUnit: item.quantityOrUnit,
       category: item.category,
       deleted: item.deleted,
@@ -271,6 +272,7 @@ export const useStore = create<StoreState>((set, get) => ({
       listId,
       name,
       quantityOrUnit,
+      iconName: getItemIconName(name) ?? "default",
       category: getCategoryIdForItem(name) ?? "other",
       deleted: false,
       createdAt: now,
@@ -311,6 +313,7 @@ export const useStore = create<StoreState>((set, get) => ({
       ...item,
       name,
       quantityOrUnit,
+      iconName: getItemIconName(name) ?? "default",
       category: getCategoryIdForItem(name) ?? "other",
       updatedAt: Date.now(),
     };
@@ -381,6 +384,7 @@ export const useStore = create<StoreState>((set, get) => ({
         id: item.id,
         listId: remoteList.listId,
         name: item.name,
+        iconName: item.iconName,
         quantityOrUnit: item.quantityOrUnit,
         category: item.category,
         deleted: item.deleted,
@@ -479,6 +483,7 @@ export const useStore = create<StoreState>((set, get) => ({
         itemId: item.id,
         body: {
           name: item.name,
+          iconName: item.iconName,
           quantityOrUnit: item.quantityOrUnit,
           category: item.category,
           deleted: item.deleted,
@@ -498,6 +503,7 @@ export const useStore = create<StoreState>((set, get) => ({
       id: item.id,
       listId,
       name: item.name,
+      iconName: item.iconName,
       quantityOrUnit: item.quantityOrUnit,
       category: item.category,
       deleted: item.deleted,

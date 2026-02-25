@@ -1,0 +1,2 @@
+ALTER TABLE list_items
+ADD COLUMN IF NOT EXISTS icon_name TEXT NOT NULL DEFAULT 'default';

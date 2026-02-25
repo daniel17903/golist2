@@ -21,7 +21,7 @@ type ShareToken = {
 const itemUpdateTieBreakDelimiter = '\u0001'
 
 function computeItemTieBreakValue(item: ItemUpsertInput | ListItemRecord): string {
-  return `${item.name}${itemUpdateTieBreakDelimiter}${item.quantityOrUnit ?? ''}${itemUpdateTieBreakDelimiter}${item.category}${itemUpdateTieBreakDelimiter}${item.deleted}`
+  return `${item.name}${itemUpdateTieBreakDelimiter}${item.iconName}${itemUpdateTieBreakDelimiter}${item.quantityOrUnit ?? ''}${itemUpdateTieBreakDelimiter}${item.category}${itemUpdateTieBreakDelimiter}${item.deleted}`
 }
 
 export class InMemoryListRepository implements ListRepository {
@@ -158,6 +158,7 @@ export class InMemoryListRepository implements ListRepository {
         id: itemId,
         listId,
         name: input.name,
+        iconName: input.iconName,
         quantityOrUnit: input.quantityOrUnit,
         category: input.category,
         deleted: input.deleted,
@@ -180,6 +181,7 @@ export class InMemoryListRepository implements ListRepository {
       this.items.set(itemId, {
         ...existing,
         name: input.name,
+        iconName: input.iconName,
         quantityOrUnit: input.quantityOrUnit,
         category: input.category,
         deleted: input.deleted,

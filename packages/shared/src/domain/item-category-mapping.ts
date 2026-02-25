@@ -2629,6 +2629,12 @@ const itemCategoryMapByLanguage: Record<CategoryLanguage, Map<string, string>> =
   es: new Map(),
 };
 
+const itemIconMapByLanguage: Record<CategoryLanguage, Map<string, string>> = {
+  en: new Map(),
+  de: new Map(),
+  es: new Map(),
+};
+
 (["en", "de", "es"] as const).forEach((locale) => {
   categoryEntriesByLanguage[locale].forEach((entry) => {
     entry.matchingNames.forEach((name) => {
@@ -2636,6 +2642,9 @@ const itemCategoryMapByLanguage: Record<CategoryLanguage, Map<string, string>> =
       if (!key) {return;}
       if (!itemCategoryMapByLanguage[locale].has(key)) {
         itemCategoryMapByLanguage[locale].set(key, entry.category);
+      }
+      if (!itemIconMapByLanguage[locale].has(key)) {
+        itemIconMapByLanguage[locale].set(key, entry.assetFileName);
       }
     });
   });
@@ -2647,4 +2656,13 @@ export const getCategoryIdForItemName = (
 ): string | undefined => {
   const key = name.trim().toLowerCase();
   return itemCategoryMapByLanguage[language].get(key);
+};
+
+
+export const getIconNameForItemName = (
+  name: string,
+  language: CategoryLanguage = defaultCategoryLanguage,
+): string | undefined => {
+  const key = name.trim().toLowerCase();
+  return itemIconMapByLanguage[language].get(key);
 };

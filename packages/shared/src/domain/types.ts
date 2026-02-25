@@ -11,6 +11,7 @@ export type SharedItem = {
   id: string;
   listId: string;
   name: string;
+  iconName: string;
   quantityOrUnit?: string;
   category: string;
   deleted: boolean;
@@ -37,6 +38,7 @@ export type ShareTokenRecord = {
 export type ApiListItem = {
   id: string;
   name: string;
+  iconName: string;
   quantityOrUnit?: string;
   category: string;
   deleted: boolean;
@@ -73,6 +75,7 @@ export type ApiShareTokenRedeemResponse = {
 
 export type ApiItemUpsertRequest = {
   name: string;
+  iconName?: string;
   quantityOrUnit?: string;
   category?: string;
   language?: CategoryLanguage;

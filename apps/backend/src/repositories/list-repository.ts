@@ -9,6 +9,7 @@ export type ListItemRecord = {
   id: string
   listId: string
   name: string
+  iconName: string
   quantityOrUnit?: string
   category: string
   deleted: boolean
@@ -18,6 +19,7 @@ export type ListItemRecord = {
 
 export type ItemUpsertInput = {
   name: string
+  iconName: string
   quantityOrUnit?: string
   category: string
   deleted: boolean

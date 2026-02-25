@@ -148,16 +148,17 @@ const parseApiListItem = (payload: unknown): ApiListItem => {
   const id = readString(payload, "id");
   const name = readString(payload, "name");
   const category = readString(payload, "category");
+  const iconName = readString(payload, "iconName");
   const createdAt = readString(payload, "createdAt");
   const updatedAt = readString(payload, "updatedAt");
   const quantityOrUnit = readString(payload, "quantityOrUnit") ?? undefined;
   const deleted = readBoolean(payload, "deleted");
 
-  if (!id || !name || !category || !createdAt || !updatedAt || deleted === null) {
+  if (!id || !name || !iconName || !category || !createdAt || !updatedAt || deleted === null) {
     throw new Error("Invalid item payload");
   }
 
-  return { id, name, category, createdAt, updatedAt, deleted, quantityOrUnit };
+  return { id, name, iconName, category, createdAt, updatedAt, deleted, quantityOrUnit };
 };
 
 const parseListUpsertResponse = (payload: unknown): ApiListUpsertResponse => {

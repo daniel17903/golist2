@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS list_items (
   id UUID PRIMARY KEY,
   list_id UUID NOT NULL REFERENCES shared_lists(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
+  icon_name TEXT NOT NULL DEFAULT 'default',
   quantity_or_unit TEXT,
   category TEXT NOT NULL DEFAULT 'other',
   deleted BOOLEAN NOT NULL DEFAULT FALSE,
