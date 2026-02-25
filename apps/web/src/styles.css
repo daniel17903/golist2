@@ -545,17 +545,17 @@ body {
 .drawer__header {
   background: #005382;
   color: #ffffff;
-  padding: 24px 18px;
+  padding: 24px 120px 24px 18px;
   font-size: 22px;
   font-weight: 500;
-  min-height: 160px;
+  min-height: 180px;
   display: flex;
   align-items: flex-start;
   justify-content: flex-start;
-  background-image: url("/icons/icon_new.svg");
+  background-image: url("/icons/icon_foreground.png");
   background-repeat: no-repeat;
-  background-position: bottom right;
-  background-size: 180px;
+  background-position: right bottom;
+  background-size: auto 95%;
 }
 
 .drawer__section {
@@ -837,7 +837,7 @@ body {
 }
 
 .drawer__header {
-  min-height: 120px;
+  min-height: 140px;
 }
 
 .drawer__item {
