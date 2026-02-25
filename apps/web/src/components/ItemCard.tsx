@@ -24,11 +24,17 @@ const ItemCard = ({
   onClick,
 }: ItemCardProps) => {
   const hasLongText = item.name.length > 16 || (item.quantityOrUnit?.length ?? 0) > 12;
+  const hasLongTextWithQuantity = hasLongText && Boolean(item.quantityOrUnit);
 
   return (
     <button
       type="button"
-      className={`item-card ${isExiting ? "item-card--exit" : ""} ${hasLongText ? "item-card--long-text" : ""}`}
+      className={[
+        "item-card",
+        isExiting ? "item-card--exit" : "",
+        hasLongText ? "item-card--long-text" : "",
+        hasLongTextWithQuantity ? "item-card--long-text-with-quantity" : "",
+      ].filter(Boolean).join(" ")}
       onPointerDown={() => onPointerDown(item.id, item.name, item.quantityOrUnit)}
       onPointerUp={() => onPointerUp(item.id)}
       onPointerLeave={onPointerLeave}

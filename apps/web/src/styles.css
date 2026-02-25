@@ -269,6 +269,9 @@ body {
   margin-top: -4px;
 }
 
+.item-card--long-text-with-quantity .item-text {
+  justify-content: flex-end;
+}
 
 .item-text {
   display: grid;
