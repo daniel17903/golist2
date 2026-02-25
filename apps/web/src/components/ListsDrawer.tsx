@@ -23,6 +23,8 @@ type DragMode = "opening" | "closing";
 
 const EDGE_SWIPE_WIDTH = 28;
 
+const getCurrentTimestamp = () => Date.now();
+
 const ListsDrawer = ({
   isOpen,
   lists,
@@ -41,6 +43,7 @@ const ListsDrawer = ({
   const [dragOffset, setDragOffset] = useState<number | null>(null);
   const [confirmDeleteListId, setConfirmDeleteListId] = useState<string | null>(null);
 
+
   const relativeTimeFormatter = useMemo(
     () =>
       new Intl.RelativeTimeFormat(locale, {
@@ -54,7 +57,7 @@ const ListsDrawer = ({
       return t("drawer.neverUpdated");
     }
 
-    const elapsedMs = Date.now() - timestamp;
+    const elapsedMs = getCurrentTimestamp() - timestamp;
     const elapsedMinutes = Math.round(elapsedMs / 60000);
 
     if (elapsedMinutes < 1) {
