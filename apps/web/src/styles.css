@@ -1,7 +1,7 @@
 :root {
   font-family: "Inter", system-ui, -apple-system, sans-serif;
   color: #0b1f2a;
-  --item-size: 120px;
+  --item-size: 140px;
   background: radial-gradient(
     circle at bottom,
     #e4b2d2 0%,
@@ -229,13 +229,13 @@ body {
   background: rgba(2, 68, 97, 0.58);
   border: none;
   border-radius: 12px;
-  padding: 16px 12px 12px;
+  padding: 10px 4px 10px 4px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
   height: var(--item-size);
   width: var(--item-size);
+  justify-content: center;
   color: #f3f8f6;
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
   text-align: center;
@@ -251,30 +251,33 @@ body {
 
 
 .item-icon {
-  width: 44px;
-  height: 44px;
+  width: 64px;
+  height: 64px;
   display: flex;
-  align-items: center;
+  align-self: center;
   justify-content: center;
+  flex-grow: 1;
 }
 
 .item-icon img {
-  width: 42px;
-  height: 42px;
+  width: 64px;
+  height: 64px;
   object-fit: contain;
   filter: brightness(0) invert(1);
+  align-self: center;
 }
 
 .item-text {
-  display: grid;
-  grid-template-rows: minmax(0, calc(1.2em * 2)) auto;
-  gap: 4px;
+  display: flex;
   align-items: center;
   width: 100%;
-  flex: 1;
   overflow: hidden;
   min-height: 0;
   justify-content: center;
+
+  flex-direction: column;
+  align-items: center;
+  flex-grow: 1;
 }
 
 .item-name {
@@ -282,7 +285,6 @@ body {
   font-weight: 500;
   line-height: 1.2;
   max-width: 100%;
-  max-height: calc(1.2em * 2);
   overflow: hidden;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -298,6 +300,7 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  padding-top: 2px;
 }
 
 @keyframes item-pop {
