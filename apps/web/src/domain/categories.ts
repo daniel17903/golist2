@@ -956,6 +956,20 @@ const iconBasePath = "/icons";
 const defaultIconName = "default";
 const buildIconPath = (iconName: string) => `${iconBasePath}/${iconName}.svg`;
 
+const categoryIconById: Record<string, string> = {
+  fruitsVegetables: "apple",
+  bread: "bread",
+  milkCheese: "cup",
+  meatFish: "dead_cow",
+  cereals: "corn",
+  spicesCanned: "can",
+  sweetsSnacks: "cookie",
+  beverages: "bottle",
+  household: "sponge",
+  convenienceProductFrozen: "pizza_cake",
+  other: defaultIconName,
+};
+
 (["en", "de", "es"] as const).forEach((locale) => {
   localizeEntries(locale).forEach((entry) => {
     entry.matchingNames.forEach((name) => {
@@ -980,6 +994,11 @@ export const getCategoryForItem = (name: string, locale: Locale = getLocale()): 
 export const getCategoryOrder = (name: string, locale: Locale = getLocale()): number | undefined => {
   const category = getCategoryForItem(name, locale);
   return category?.order;
+};
+
+export const getItemIconForCategory = (categoryId: string): string => {
+  const iconName = categoryIconById[categoryId] ?? defaultIconName;
+  return buildIconPath(iconName);
 };
 
 export const getItemIcon = (name: string, locale: Locale = getLocale()): string => {

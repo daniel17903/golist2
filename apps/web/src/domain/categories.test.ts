@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getCategoryForItem, getCategoryOrder, getItemIcon } from "./categories";
+import { getCategoryForItem, getCategoryOrder, getItemIcon, getItemIconForCategory } from "./categories";
 
 describe("categories helpers", () => {
   it("returns the category for known items regardless of case", () => {
@@ -22,6 +22,12 @@ describe("categories helpers", () => {
   it("uses translated locale entries for spanish", () => {
     expect(getCategoryForItem("manzana", "es")?.id).toBe("fruitsVegetables");
     expect(getItemIcon("manzana", "es")).toBe("/icons/apple.svg");
+  });
+
+
+  it("returns a stable icon for a stored category", () => {
+    expect(getItemIconForCategory("fruitsVegetables")).toBe("/icons/apple.svg");
+    expect(getItemIconForCategory("unknown")).toBe("/icons/default.svg");
   });
 
   it("falls back to the default icon when no match exists", () => {
