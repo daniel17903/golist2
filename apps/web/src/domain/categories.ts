@@ -2632,6 +2632,8 @@ const itemAssetMapByLocale: Record<Locale, Map<string, string>> = {
   es: new Map(),
 };
 
+const itemAssetMapAllLocales = new Map<string, string>();
+
 const iconBasePath = "/icons";
 const defaultIconName = "default";
 const buildIconPath = (iconName: string) => `${iconBasePath}/${iconName}.svg`;
@@ -2646,6 +2648,9 @@ const buildIconPath = (iconName: string) => `${iconBasePath}/${iconName}.svg`;
       }
       if (!itemAssetMapByLocale[locale].has(key)) {
         itemAssetMapByLocale[locale].set(key, entry.assetFileName);
+      }
+      if (!itemAssetMapAllLocales.has(key)) {
+        itemAssetMapAllLocales.set(key, entry.assetFileName);
       }
     });
   });
@@ -2679,4 +2684,14 @@ export const getItemIcon = (name: string, locale: Locale = getLocale()): string 
     return buildIconPath(asset);
   }
   return buildIconPath(defaultIconName);
+};
+
+export const getListItemIcon = (name: string, categoryId: string): string => {
+  const key = name.trim().toLowerCase();
+  const asset = itemAssetMapAllLocales.get(key);
+  if (asset) {
+    return buildIconPath(asset);
+  }
+
+  return getItemIconForCategory(categoryId);
 };
