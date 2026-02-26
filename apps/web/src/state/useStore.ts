@@ -63,6 +63,7 @@ type StoreState = {
   joinSharedList: (rawShareValue: string) => Promise<string>;
   syncList: (listId: string) => Promise<void>;
   syncAllLists: () => Promise<void>;
+  syncAndConnectActiveListRealtime: () => Promise<void>;
   clearSyncNotice: () => void;
   appendBackendLog: (entry: { message: string; outcome: "success" | "error" | "skipped" }) => void;
 };
@@ -116,6 +117,125 @@ const syncItemImmediately = async (item: Item) => {
   markBackendOnline();
 };
 
+
+
+
+const realtimeWsBaseUrl = (() => {
+  const apiBaseUrl = typeof __API_BASE_URL__ === "string" ? __API_BASE_URL__.trim() : "";
+  if (!apiBaseUrl) {
+    return "ws://localhost:3000";
+  }
+
+  return apiBaseUrl.replace(/^http/i, "ws");
+})();
+
+let activeRealtimeSocket: WebSocket | null = null;
+let activeRealtimeListId: string | null = null;
+let reconnectAttempts = 0;
+let reconnectTimer: number | null = null;
+const maxRealtimeReconnectAttempts = 3;
+
+const clearReconnectTimer = () => {
+  if (reconnectTimer !== null) {
+    window.clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
+};
+
+const closeRealtimeSocket = () => {
+  clearReconnectTimer();
+  reconnectAttempts = 0;
+  if (activeRealtimeSocket) {
+    activeRealtimeSocket.onclose = null;
+    activeRealtimeSocket.onerror = null;
+    activeRealtimeSocket.onmessage = null;
+    activeRealtimeSocket.close();
+  }
+  activeRealtimeSocket = null;
+  activeRealtimeListId = null;
+};
+
+const sendRealtimeListUpdated = (listId: string) => {
+  if (!activeRealtimeSocket || activeRealtimeListId !== listId || activeRealtimeSocket.readyState !== WebSocket.OPEN) {
+    return;
+  }
+
+  activeRealtimeSocket.send(JSON.stringify({
+    type: "list-updated",
+    listId,
+  }));
+};
+
+const connectRealtimeForList = (listId: string, deviceId: string) => {
+  if (activeRealtimeSocket && activeRealtimeListId === listId && activeRealtimeSocket.readyState !== WebSocket.CLOSED) {
+    return;
+  }
+
+  if (activeRealtimeSocket && activeRealtimeListId !== listId) {
+    closeRealtimeSocket();
+  }
+
+  clearReconnectTimer();
+  const wsUrl = new URL(`${realtimeWsBaseUrl}/v1/lists/${listId}/realtime`);
+  wsUrl.searchParams.set("deviceId", deviceId);
+  const socket = new WebSocket(wsUrl.toString(), []);
+  activeRealtimeSocket = socket;
+  activeRealtimeListId = listId;
+
+  socket.onopen = () => {
+    reconnectAttempts = 0;
+    useStore.getState().appendBackendLog({
+      message: `Realtime connected for list ${listId}.`,
+      outcome: "success",
+    });
+  };
+
+  socket.onmessage = (event) => {
+    try {
+      const payload = JSON.parse(String(event.data));
+      const messageType = typeof payload === "object" && payload ? Reflect.get(payload, "type") : null;
+      const messageListId = typeof payload === "object" && payload ? Reflect.get(payload, "listId") : null;
+      const messageSourceDeviceId =
+        typeof payload === "object" && payload ? Reflect.get(payload, "sourceDeviceId") : null;
+
+      if (messageType !== "list-updated" || messageListId !== listId) {
+        return;
+      }
+
+      if (messageSourceDeviceId === deviceId) {
+        return;
+      }
+
+      triggerSyncInBackground(listId);
+    } catch {
+      return;
+    }
+  };
+
+  socket.onerror = () => {
+    socket.close();
+  };
+
+  socket.onclose = () => {
+    if (activeRealtimeListId !== listId) {
+      return;
+    }
+
+    if (reconnectAttempts >= maxRealtimeReconnectAttempts) {
+      useStore.getState().appendBackendLog({
+        message: `Realtime disconnected for list ${listId} after reconnect attempts.`,
+        outcome: "error",
+      });
+      return;
+    }
+
+    reconnectAttempts += 1;
+    const delayMs = reconnectAttempts * 1000;
+    reconnectTimer = window.setTimeout(() => {
+      connectRealtimeForList(listId, deviceId);
+    }, delayMs);
+  };
+};
 
 const markBackendOnline = () => {
   useStore.setState({ backendConnection: "online" });
@@ -200,6 +320,7 @@ export const useStore = create<StoreState>((set, get) => ({
       isLoaded: true,
     });
 
+    void get().syncAndConnectActiveListRealtime().catch(() => undefined);
     void get().syncAllLists();
   },
   addList: async (name: string) => {
@@ -237,6 +358,7 @@ export const useStore = create<StoreState>((set, get) => ({
       t("sync.offline"),
     );
 
+    sendRealtimeListUpdated(listId);
     triggerSyncInBackground(listId);
   },
   deleteList: async (listId: string) => {
@@ -258,6 +380,7 @@ export const useStore = create<StoreState>((set, get) => ({
   setActiveList: (listId: string) => {
     persistSelectedListId(listId);
     set({ activeListId: listId });
+    void get().syncAndConnectActiveListRealtime().catch(() => undefined);
   },
   addItem: async (listId: string, name: string, quantityOrUnit?: string) => {
     const now = Date.now();
@@ -297,6 +420,7 @@ export const useStore = create<StoreState>((set, get) => ({
       t("sync.offline"),
     );
 
+    sendRealtimeListUpdated(updated.listId);
     triggerSyncInBackground(updated.listId);
   },
   updateItem: async (itemId: string, name: string, quantityOrUnit?: string) => {
@@ -321,6 +445,7 @@ export const useStore = create<StoreState>((set, get) => ({
       t("sync.offline"),
     );
 
+    sendRealtimeListUpdated(updated.listId);
     triggerSyncInBackground(updated.listId);
   },
   ensureShareToken: async (listId: string) => {
@@ -557,6 +682,19 @@ export const useStore = create<StoreState>((set, get) => ({
         }
       }),
     );
+  },
+  syncAndConnectActiveListRealtime: async () => {
+    const state = get();
+    const activeListId = state.activeListId;
+    const deviceId = state.metadata?.deviceId;
+
+    if (!activeListId || !deviceId) {
+      closeRealtimeSocket();
+      return;
+    }
+
+    await get().syncList(activeListId);
+    connectRealtimeForList(activeListId, deviceId);
   },
   clearSyncNotice: () => set({ syncNotice: undefined }),
   appendBackendLog: (entry) =>

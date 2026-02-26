@@ -82,6 +82,7 @@ The API contract is maintained in `apps/api-spec/openapi.yaml` (and related file
    - equal `updatedAt` conflicts are resolved by a stable tie-break value derived from item content
 2. Write paths are guarded with transactional row locking (`SELECT ... FOR UPDATE`) before mutating list/item state.
 3. Incremental sync support is implemented via `GET /v1/lists/{listId}/items?updatedAfter=...` with deterministic ordering by `updated_at` then `id`.
+4. Realtime selected-list sync signaling is implemented via `GET /v1/lists/{listId}/realtime` websocket channel (frontend opens after initial selected-list sync, keeps connection alive, retries reconnects, and reacts to immediate update signals).
 4. Creation is idempotent with client-generated IDs: lists use `PUT /v1/lists/{listId}` and items use `PUT /v1/lists/{listId}/items/{itemId}`.
 5. Existing-list `PUT /v1/lists/{listId}` updates are access-controlled: only devices with list access (list creator or devices that redeemed the share token) may update an existing list.
 6. Protected list routes enforce creator-or-redeemed access using `X-Device-Id`: calls are allowed for the list creator or for devices that redeemed at least one valid token for that list.

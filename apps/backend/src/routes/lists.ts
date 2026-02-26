@@ -3,6 +3,7 @@ import { type FastifyInstance } from 'fastify'
 import { z } from 'zod'
 
 import { createAuthGuards } from '../auth.js'
+import { type RealtimeHub } from '../realtime-hub.js'
 import { type ListRepository } from '../repositories/list-repository.js'
 
 const listIdParamsSchema = z.object({ listId: z.uuid() })
@@ -19,7 +20,7 @@ const itemUpsertSchema = z.object({
   updatedAt: z.iso.datetime({ offset: true }),
 })
 
-export function registerListRoutes(app: FastifyInstance, listRepository: ListRepository) {
+export function registerListRoutes(app: FastifyInstance, listRepository: ListRepository, realtimeHub: RealtimeHub) {
   const { requireListAccess } = createAuthGuards(listRepository)
 
   app.put('/v1/lists/:listId', async (request, reply) => {
@@ -36,6 +37,7 @@ export function registerListRoutes(app: FastifyInstance, listRepository: ListRep
 
 
     reply.code(result.outcome === 'created' ? 201 : 200)
+    realtimeHub.notifyListUpdated({ listId: params.listId, sourceDeviceId: headers['x-device-id'] })
     return { listId: params.listId }
   })
 
@@ -117,5 +119,6 @@ export function registerListRoutes(app: FastifyInstance, listRepository: ListRep
     }
 
     reply.code(result.outcome === 'created' ? 201 : 204)
+    realtimeHub.notifyListUpdated({ listId: request.auth!.listId, sourceDeviceId: request.auth!.deviceId })
   })
 }

@@ -22,6 +22,7 @@ const uuidSchema = z.uuid()
 const deviceIdHeaderSchema = z.object({ 'x-device-id': z.uuid() })
 const shareTokenParamsSchema = z.object({ shareToken: z.uuid() })
 const listIdParamsSchema = z.object({ listId: z.uuid() })
+const deviceIdQuerySchema = z.object({ deviceId: z.uuid() })
 
 export function normalizeDeviceId(value: unknown): string {
   return typeof value === 'string' && uuidSchema.safeParse(value).success
@@ -33,6 +34,11 @@ function getDeviceId(request: FastifyRequest): string | null {
   const parsedHeaders = deviceIdHeaderSchema.safeParse(request.headers)
   if (parsedHeaders.success) {
     return parsedHeaders.data['x-device-id']
+  }
+
+  const parsedQuery = deviceIdQuerySchema.safeParse(request.query)
+  if (parsedQuery.success) {
+    return parsedQuery.data.deviceId
   }
 
   return null

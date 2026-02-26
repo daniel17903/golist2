@@ -7,7 +7,7 @@ This document explains how the web app (`apps/web`) syncs shared lists with the 
 - Keep local writes instant and available offline.
 - Push user-triggered mutations to backend immediately when possible.
 - Avoid blocking app startup or normal UI interactions when backend is slow/unreachable.
-- Converge to backend-canonical list/item state after mutations and periodic sync cycles.
+- Converge to backend-canonical list/item state after mutations, periodic sync cycles, and realtime list-update signals.
 
 ## Configuration
 
@@ -52,9 +52,14 @@ After immediate push attempt, app triggers list reconciliation in background (`s
 
 This keeps convergence behavior while avoiding full list-item downloads on every sync cycle.
 
-## Startup and periodic behavior
+## Startup, selected-list realtime, and periodic behavior
 
-- On app load, shared-list sync starts in background (`syncAllLists`) and is not awaited.
+- On app load, the app first runs sync for the currently selected list.
+- After that initial selected-list sync succeeds, frontend opens a websocket connection to `/v1/lists/{listId}/realtime?deviceId=...`.
+- This websocket remains open while the app is in use for the selected list; switching selected list rebinds the connection to the newly selected list.
+- If websocket disconnects unexpectedly, frontend retries reconnect a few times with short backoff.
+- Both sides can emit a `list-updated` signal on that channel; when frontend receives it from another device it immediately triggers `syncList` for the selected list.
+- In parallel, shared-list sync still starts in background (`syncAllLists`) and is not awaited.
 - Periodic/lifecycle triggers continue to run in app state hook:
   - interval-based sync
   - on `visibilitychange` back to foreground

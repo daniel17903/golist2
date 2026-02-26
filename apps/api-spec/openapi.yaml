@@ -45,6 +45,13 @@ components:
       schema:
         type: string
         format: uuid
+    DeviceIdQuery:
+      name: deviceId
+      in: query
+      required: true
+      schema:
+        type: string
+        format: uuid
   schemas:
     ListItem:
       type: object
@@ -169,6 +176,22 @@ components:
         listId:
           type: string
           format: uuid
+    RealtimeListUpdatedEvent:
+      type: object
+      required: [type, listId, sourceDeviceId, sentAt]
+      properties:
+        type:
+          type: string
+          enum: [list-updated]
+        listId:
+          type: string
+          format: uuid
+        sourceDeviceId:
+          type: string
+          format: uuid
+        sentAt:
+          type: string
+          format: date-time
 security:
   - BearerAuth: []
 paths:
@@ -260,6 +283,25 @@ paths:
           description: Item updated
         "409":
           description: Item id belongs to another list
+  /v1/lists/{listId}/realtime:
+    parameters:
+      - $ref: "#/components/parameters/ListId"
+      - $ref: "#/components/parameters/DeviceIdQuery"
+    get:
+      summary: Open realtime websocket channel for list updates
+      description: |
+        Upgrades to a WebSocket connection.
+
+        - Client should open this socket after initial sync of the selected list.
+        - Client may send `{ "type": "list-updated", "listId": "..." }` to signal local mutations.
+        - Server broadcasts `RealtimeListUpdatedEvent` to all connected devices with access to the list.
+      responses:
+        "101":
+          description: Switching Protocols (WebSocket established)
+        "400":
+          description: Invalid listId/deviceId
+        "403":
+          description: Device has no access to this list
   /v1/share-tokens/{shareToken}/redeem:
     parameters:
       - $ref: "#/components/parameters/ShareToken"
