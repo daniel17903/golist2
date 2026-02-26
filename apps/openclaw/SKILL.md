@@ -20,67 +20,73 @@ It does **not** support multiple lists in one session.
 6. OpenClaw must not send `iconName` or `category` unless the caller explicitly provides those exact values.
 7. Every request must include the `X-Device-Id` header.
 
-## Runtime inputs and persisted state
-Required runtime input:
-- `GOLIST_SHARE_TOKEN` (UUID share token for the target list)
+## Python CLI tool
+Use `apps/openclaw/golist_cli.py` as the operational API wrapper for this skill.
 
-Persisted state managed by the skill/runtime:
-- `GOLIST_DEVICE_ID` (generated once with a random UUID and reused as `X-Device-Id`)
-- `GOLIST_LIST_ID` (set after token redemption)
+### CLI guarantees
+- Fixed API base URL: `https://go-list.app/api`.
+- Generates and persists device id when missing.
+- Redeems and persists a single list id.
+- Automatically sends `X-Device-Id` on every request.
+- Includes `iconName`/`category` only when explicitly passed via CLI flags.
+
+### CLI state and environment
+Required runtime input:
+- `GOLIST_SHARE_TOKEN` (UUID share token for first bootstrap)
+
+Optional environment:
+- `GOLIST_DEVICE_ID` (override persisted device id)
+- `OPENCLAW_STATE_FILE` (custom path for persisted JSON state)
+
+Persisted state file (default):
+- `~/.openclaw_golist_state.json` with `device_id` and `list_id`
 
 ## Bootstrap flow
 Run this once before handling user commands:
 
-1. If `GOLIST_DEVICE_ID` is missing, generate `crypto.randomUUID()` and persist it.
-2. Redeem token via `POST https://go-list.app/api/v1/share-tokens/{shareToken}/redeem` using `GOLIST_SHARE_TOKEN` and header `X-Device-Id: {GOLIST_DEVICE_ID}`.
-3. Persist `listId` response as `GOLIST_LIST_ID`.
+1. If device id is missing, CLI generates a random UUID and persists it.
+2. Redeem token via `POST https://go-list.app/api/v1/share-tokens/{shareToken}/redeem` using `GOLIST_SHARE_TOKEN` and header `X-Device-Id: {deviceId}`.
+3. Persist `listId` response.
 4. All future operations in this session must use only this `listId` and device id.
 
-## API usage
-Use `Authorization: Bearer <token>` when available in your OpenClaw runtime.
+CLI command:
 
+```bash
+python3 apps/openclaw/golist_cli.py bootstrap
+```
+
+## API operations via CLI
 ### 1) Read current list
-`GET https://go-list.app/api/v1/lists/{listId}`
-
-Response includes list metadata and items.
+```bash
+python3 apps/openclaw/golist_cli.py show
+```
+Returns list metadata and non-deleted items.
 
 ### 2) Upsert item
-`PUT https://go-list.app/api/v1/lists/{listId}/items/{itemId}`
-
-Request body:
-
-```json
-{
-  "name": "milk",
-  "deleted": false,
-  "updatedAt": "2026-01-01T12:00:00.000Z"
-}
+```bash
+python3 apps/openclaw/golist_cli.py upsert "milk" [--item-id <uuid>] [--icon-name <icon>] [--category <category>]
 ```
 
 Rules:
 - `itemId` should be stable for updates and random UUID for new items.
-- `updatedAt` must be an ISO timestamp.
-- Do not include `iconName` or `category` unless explicitly given by user/operator.
+- `updatedAt` is generated as an ISO timestamp.
+- Do not pass `--icon-name` or `--category` unless explicitly requested by caller.
 
 ### 3) Soft-delete item
-`PUT https://go-list.app/api/v1/lists/{listId}/items/{itemId}` with:
-
-```json
-{
-  "name": "existing item name",
-  "deleted": true,
-  "updatedAt": "2026-01-01T12:00:00.000Z"
-}
+```bash
+python3 apps/openclaw/golist_cli.py delete <item-id> "existing item name"
 ```
 
 ### 4) Optional incremental sync
-`GET https://go-list.app/api/v1/lists/{listId}/items?updatedAfter=<ISO_TIMESTAMP>`
+```bash
+python3 apps/openclaw/golist_cli.py sync <ISO_TIMESTAMP>
+```
 
 ## Intent mapping for OpenClaw
-- “show my list / what is on my list” → fetch list and return non-deleted items.
-- “add X” → upsert a new item with `name = X`, `deleted = false`.
-- “rename A to B” → find item `A`, upsert same `itemId` with `name = B`, `deleted = false`.
-- “remove X” → soft-delete matching item by setting `deleted = true`.
+- “show my list / what is on my list” → run `show` and return non-deleted items.
+- “add X” → run `upsert "X"`.
+- “rename A to B” → find item `A`, then run `upsert "B" --item-id <existing-id>`.
+- “remove X” → find item `X`, then run `delete <item-id> "X"`.
 
 ## Safety behavior
 - If device id is missing, generate and persist it before any API call.
