@@ -686,6 +686,21 @@ body {
   color: #ffffff;
 }
 
+.drawer__legal-links {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  padding: 12px 18px calc(18px + env(safe-area-inset-bottom));
+  background: #f4eef5;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.drawer__legal-link {
+  color: #005382;
+  font-size: 14px;
+  text-decoration: underline;
+}
+
 .add-dialog {
   align-items: flex-start;
   padding-top: 60px;

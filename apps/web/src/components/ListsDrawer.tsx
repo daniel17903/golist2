@@ -263,6 +263,14 @@ const ListsDrawer = ({
               </svg>
             </span>
           </button>
+          <div className="drawer__legal-links" aria-label={t("drawer.legal")}>
+            <a className="drawer__legal-link" href="/impressum.html" target="_blank" rel="noreferrer noopener">
+              {t("drawer.imprint")}
+            </a>
+            <a className="drawer__legal-link" href="/privacy-policy.html" target="_blank" rel="noreferrer noopener">
+              {t("drawer.privacy")}
+            </a>
+          </div>
         </aside>
       </div>
     </>
