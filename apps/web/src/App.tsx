@@ -219,8 +219,10 @@ const App = () => {
       onShortPress: handleToggleItem,
     });
 
+  const showBackendLogs = __ENVIRONMENT__ !== "production";
+
   useEffect(() => {
-    if (!__IS_VERCEL_NON_PRODUCTION__ || !syncNotice) {
+    if (!showBackendLogs || !syncNotice) {
       return;
     }
 
@@ -231,7 +233,7 @@ const App = () => {
     return () => {
       window.clearTimeout(timeout);
     };
-  }, [syncNotice, clearSyncNotice]);
+  }, [showBackendLogs, syncNotice, clearSyncNotice]);
 
   return (
     <div className="app">
@@ -304,7 +306,7 @@ const App = () => {
         ))}
       </div>
 
-      {__IS_VERCEL_NON_PRODUCTION__ && syncNotice ? (
+      {showBackendLogs && syncNotice ? (
         <div className="sync-toast" role="status" aria-live="polite">
           <span>{syncNotice.message}</span>
           <button type="button" className="sync-toast__close" onClick={clearSyncNotice}>
@@ -313,7 +315,7 @@ const App = () => {
         </div>
       ) : null}
 
-      {__IS_VERCEL_NON_PRODUCTION__ ? (
+      {showBackendLogs ? (
         <div className="backend-log-panel" aria-live="polite">
           <p className="backend-log-panel__title">{t("debug.backendLogs")}</p>
           <ul className="backend-log-panel__list">

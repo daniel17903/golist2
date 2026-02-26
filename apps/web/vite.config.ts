@@ -4,9 +4,7 @@ import { VitePWA } from "vite-plugin-pwa";
 
 const apiBaseUrl = process.env.API_BASE_URL ?? "http://localhost:3000";
 
-if (process.env.VERCEL === "1") {
-  console.info(`[web-build] Configured API_BASE_URL=${apiBaseUrl}`);
-}
+console.info(`[web-build] Configured API_BASE_URL=${apiBaseUrl}`);
 
 export default defineConfig({
   define: {
@@ -14,8 +12,7 @@ export default defineConfig({
     __DEVICE_ID__: JSON.stringify(process.env.DEVICE_ID ?? ""),
     __API_BASE_URL__: JSON.stringify(apiBaseUrl),
     __API_TIMEOUT_MS__: JSON.stringify(process.env.API_TIMEOUT_MS ?? "15000"),
-    __IS_VERCEL_PRODUCTION__: JSON.stringify(process.env.VERCEL === "1" && process.env.VERCEL_ENV === "production"),
-    __IS_VERCEL_NON_PRODUCTION__: JSON.stringify(process.env.VERCEL === "1" && process.env.VERCEL_ENV !== "production"),
+    __ENVIRONMENT__: JSON.stringify(process.env.ENVIRONMENT ?? "development"),
   },
   plugins: [
     react(),

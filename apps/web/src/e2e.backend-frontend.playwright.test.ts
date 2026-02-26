@@ -67,8 +67,7 @@ describe("frontend/backend integration via playwright", () => {
     backendUrl = `http://127.0.0.1:${backendAddress.port}`;
 
     process.env.API_BASE_URL = `http://127.0.0.1:${frontendPort}`;
-    process.env.VERCEL = "1";
-    process.env.VERCEL_ENV = "preview";
+    process.env.ENVIRONMENT = "preview";
 
     const currentFile = fileURLToPath(import.meta.url);
     const webRoot = path.resolve(path.dirname(currentFile), "..");

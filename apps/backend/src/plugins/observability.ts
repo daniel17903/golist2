@@ -5,9 +5,6 @@ export function registerObservability(app: FastifyInstance) {
     app.log.info(
       {
         nodeEnv: process.env.NODE_ENV,
-        vercelRegion: process.env.VERCEL_REGION,
-        vercelEnv: process.env.VERCEL_ENV,
-        isVercelRuntime: Boolean(process.env.VERCEL),
         routes: app.printRoutes(),
       },
       'server boot completed',

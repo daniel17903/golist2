@@ -9,9 +9,6 @@ async function start() {
       host: env.HOST,
       port: env.PORT,
       nodeEnv: env.NODE_ENV,
-      isVercelRuntime: Boolean(process.env.VERCEL),
-      vercelRegion: process.env.VERCEL_REGION,
-      vercelEnv: process.env.VERCEL_ENV,
     },
     'starting backend server',
   )
