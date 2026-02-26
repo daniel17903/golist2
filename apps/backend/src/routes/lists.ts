@@ -34,6 +34,7 @@ export function registerListRoutes(app: FastifyInstance, listRepository: ListRep
       return { message: 'Forbidden' }
     }
 
+
     reply.code(result.outcome === 'created' ? 201 : 200)
     return { listId: params.listId }
   })
