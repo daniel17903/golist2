@@ -103,12 +103,9 @@ components:
           type: string
     ListCreateResponse:
       type: object
-      required: [listId, shareToken]
+      required: [listId]
       properties:
         listId:
-          type: string
-          format: uuid
-        shareToken:
           type: string
           format: uuid
     ItemUpsertRequest:
