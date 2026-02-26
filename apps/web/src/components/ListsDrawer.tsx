@@ -17,6 +17,8 @@ type ListsDrawerProps = {
   onDeleteList: (listId: string) => void;
   onCreateList: () => void;
   onOpenSettings: () => void;
+  onOpenImprint: () => void;
+  onOpenPrivacy: () => void;
 };
 
 type DragMode = "opening" | "closing";
@@ -36,6 +38,8 @@ const ListsDrawer = ({
   onDeleteList,
   onCreateList,
   onOpenSettings,
+  onOpenImprint,
+  onOpenPrivacy,
 }: ListsDrawerProps) => {
   const { t, locale } = useI18n();
   const drawerRef = useRef<HTMLElement | null>(null);
@@ -252,6 +256,25 @@ const ListsDrawer = ({
             </div>
           </div>
 
+          <div className="drawer__legal-actions" aria-label={t("drawer.legal")}>
+            <button type="button" className="drawer__legal-button" onClick={onOpenImprint}>
+              <span className="drawer__item-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24">
+                  <path d="M4 4h16v16H4V4zm2 2v12h12V6H6zm2 2h8v2H8V8zm0 4h8v2H8v-2z" fill="currentColor" />
+                </svg>
+              </span>
+              {t("drawer.imprint")}
+            </button>
+            <button type="button" className="drawer__legal-button" onClick={onOpenPrivacy}>
+              <span className="drawer__item-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24">
+                  <path d="M12 2 4 5v6c0 5.55 3.84 10.74 8 12 4.16-1.26 8-6.45 8-12V5l-8-3zm0 3.18 5 1.88V11c0 4.04-2.59 7.9-5 9.25-2.41-1.35-5-5.21-5-9.25V7.06l5-1.88zM11 9h2v5h-2V9zm0 6h2v2h-2v-2z" fill="currentColor" />
+                </svg>
+              </span>
+              {t("drawer.privacy")}
+            </button>
+          </div>
+
           <button type="button" className="drawer__settings" onClick={onOpenSettings}>
             <span>{t("drawer.settings")}</span>
             <span className="drawer__item-icon" aria-hidden="true">
@@ -263,14 +286,6 @@ const ListsDrawer = ({
               </svg>
             </span>
           </button>
-          <div className="drawer__legal-links" aria-label={t("drawer.legal")}>
-            <a className="drawer__legal-link" href="/impressum.html" target="_blank" rel="noreferrer noopener">
-              {t("drawer.imprint")}
-            </a>
-            <a className="drawer__legal-link" href="/privacy-policy.html" target="_blank" rel="noreferrer noopener">
-              {t("drawer.privacy")}
-            </a>
-          </div>
         </aside>
       </div>
     </>

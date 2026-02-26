@@ -8,6 +8,7 @@ import ItemGrid from "./components/ItemGrid";
 import ListsDrawer from "./components/ListsDrawer";
 import CreateListModal from "./components/CreateListModal";
 import SettingsModal from "./components/SettingsModal";
+import LegalModal from "./components/LegalModal";
 import { useAppState } from "./hooks/useAppState";
 import { useLongPressItem } from "./hooks/useLongPressItem";
 import { useI18n } from "./i18n";
@@ -22,6 +23,8 @@ type AppToast = {
   message: string;
   tone: "success" | "error";
 };
+
+type LegalModalType = "imprint" | "privacy";
 
 const isAbortError = (error: unknown): boolean => {
   if (error instanceof DOMException) {
@@ -86,6 +89,7 @@ const App = () => {
   const [undoToasts, setUndoToasts] = useState<UndoToast[]>([]);
   const [appToasts, setAppToasts] = useState<AppToast[]>([]);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+  const [activeLegalModal, setActiveLegalModal] = useState<LegalModalType | null>(null);
 
   const listMetaById = useMemo(() => {
     const updatedAtByList = new Map<string, number>();
@@ -367,6 +371,14 @@ const App = () => {
           setIsDrawerOpen(false);
           setIsSettingsModalOpen(true);
         }}
+        onOpenImprint={() => {
+          setIsDrawerOpen(false);
+          setActiveLegalModal("imprint");
+        }}
+        onOpenPrivacy={() => {
+          setIsDrawerOpen(false);
+          setActiveLegalModal("privacy");
+        }}
       />
 
       <AddItemDialog
@@ -395,6 +407,12 @@ const App = () => {
       <SettingsModal
         isOpen={isSettingsModalOpen}
         onClose={() => setIsSettingsModalOpen(false)}
+      />
+
+      <LegalModal
+        isOpen={activeLegalModal !== null}
+        type={activeLegalModal ?? "imprint"}
+        onClose={() => setActiveLegalModal(null)}
       />
 
       <EditItemModal
