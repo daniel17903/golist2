@@ -702,6 +702,59 @@ body {
   color: #ffffff;
 }
 
+.drawer__legal-actions {
+  display: flex;
+  flex-direction: row;
+  gap: 2px;
+  padding: 4px 10px;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  background: #f4eef5;
+}
+
+.drawer__legal-button {
+  flex: 1;
+  border: none;
+  background: transparent;
+  color: rgba(11, 61, 92, 0.66);
+  padding: 3px 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.drawer__legal-button .drawer__item-icon {
+  width: 13px;
+  height: 13px;
+}
+
+.legal-modal__body {
+  gap: 10px;
+}
+
+.legal-modal__content {
+  max-height: min(62vh, 520px);
+  overflow-y: auto;
+  color: #3d3240;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.legal-modal__content h1,
+.legal-modal__content h2,
+.legal-modal__content h3,
+.legal-modal__content h4 {
+  color: #2f2433;
+  margin: 10px 0 6px;
+}
+
+.legal-modal__content p,
+.legal-modal__content ul {
+  margin: 0 0 10px;
+}
+
 .add-dialog {
   align-items: flex-start;
   padding-top: 60px;
