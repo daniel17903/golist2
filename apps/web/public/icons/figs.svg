@@ -1,12 +1,10 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
 <svg width="100%" height="100%" viewBox="0 0 512 512" version="1.1" xmlns="http://www.w3.org/2000/svg" xml:space="preserve" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linecap:round;stroke-linejoin:round;">
-  <g>
-    <path d="M160 82c30-24 71-19 95 12 4 5 2 13-4 16-22 10-34 18-45 32-5 7-16 8-22 2-26-25-36-45-24-62z" style="fill:#4f8a3f;stroke:#000;stroke-width:10px;"/>
-    <path d="M286 138c-10 9-18 24-24 43-12 39-10 90-22 140-13 56-43 104-95 104-54 0-96-48-96-112 0-47 25-92 62-122 42-35 123-67 175-53z" style="fill:#8e4aa8;stroke:#000;stroke-width:10px;"/>
-    <path d="M363 171c17-9 36-14 56-14 54 0 95 46 95 105 0 63-42 112-96 112-52 0-82-48-95-104-13-52-12-102-24-141-7-23-16-39-28-50 30-7 63 0 92 20z" style="fill:#7c3c97;stroke:#000;stroke-width:10px;"/>
-    <path d="M163 237c20 11 34 34 37 62" style="fill:none;stroke:#f4d0e5;stroke-width:10px;"/>
-    <path d="M343 226c-17 13-28 33-30 57" style="fill:none;stroke:#f1c6df;stroke-width:10px;"/>
-    <path d="M243 96c10 12 14 26 13 42" style="fill:none;stroke:#000;stroke-width:10px;"/>
+  <g style="fill:none;stroke:#000;stroke-width:10px;">
+    <path d="M256 94C236 96 218 107 208 124C198 141 198 161 208 178C217 194 232 207 256 222C280 207 295 194 304 178C314 161 314 141 304 124C294 107 276 96 256 94Z"/>
+    <path d="M256 222C234 251 220 286 220 323C220 379 236 418 256 440C276 418 292 379 292 323C292 286 278 251 256 222Z"/>
+    <path d="M256 94C261 75 275 60 295 54"/>
+    <path d="M256 252L256 424"/>
   </g>
 </svg>
