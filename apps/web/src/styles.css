@@ -10,7 +10,7 @@
     #f6f294 75%,
     #005382 100%
   );
-  min-height: 100vh;
+  min-height: 100svh;
 }
 
 @media (min-width: 421px) {
@@ -23,8 +23,18 @@
   box-sizing: border-box;
 }
 
+html {
+  width: 100%;
+  overflow: hidden;
+}
+
 body {
   margin: 0;
+  height: 100svh;
+  position: fixed;
+  width: 100%;
+  overflow-y: scroll;
+  -webkit-overflow-scrolling: touch;
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -42,7 +52,7 @@ body {
 }
 
 .app {
-  min-height: 100vh;
+  min-height: 100%;
   display: flex;
   flex-direction: column;
   padding: 24px 18px 96px;
