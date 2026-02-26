@@ -41,6 +41,7 @@ const App = () => {
     activeList,
     listItems,
     suggestions,
+    duplicatePreview,
     newListName,
     editingTitle,
     itemName,
@@ -375,6 +376,7 @@ const App = () => {
         isOpen={isAddDialogOpen}
         itemName={itemName}
         suggestions={suggestions}
+        duplicatePreview={duplicatePreview}
         onItemNameChange={setItemName}
         onClose={() => setIsAddDialogOpen(false)}
         onAddItem={handleAddItem}

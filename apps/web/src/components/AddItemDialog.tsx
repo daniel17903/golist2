@@ -7,6 +7,10 @@ type AddItemDialogProps = {
   isOpen: boolean;
   itemName: string;
   suggestions: string[];
+  duplicatePreview: {
+    name: string;
+    quantityOrUnit?: string;
+  } | null;
   onItemNameChange: (value: string) => void;
   onClose: () => void;
   onAddItem: () => void;
@@ -17,6 +21,7 @@ const AddItemDialog = ({
   isOpen,
   itemName,
   suggestions,
+  duplicatePreview,
   onItemNameChange,
   onClose,
   onAddItem,
@@ -57,6 +62,23 @@ const AddItemDialog = ({
           />
         </form>
         <div className="modal__grid">
+          {duplicatePreview && (
+            <button
+              type="button"
+              className="item-card item-card--dialog item-card--duplicate"
+              aria-label={`${duplicatePreview.name}. ${t("addItem.duplicateWarning")}`}
+              onClick={() => {
+                void onAddSuggestion(duplicatePreview.name, duplicatePreview.quantityOrUnit);
+              }}
+            >
+              <span className="item-icon" aria-hidden="true">
+                <img src={getItemIcon(duplicatePreview.name, locale)} alt="" />
+              </span>
+              <div className="item-text item-text--duplicate">
+                <span className="item-warning">{t("addItem.duplicateWarning")}</span>
+              </div>
+            </button>
+          )}
           {suggestions.map((name) => {
             const parsed = parseItemInput(name, locale);
             const displayName = parsed.name || name;

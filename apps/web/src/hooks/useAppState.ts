@@ -154,6 +154,21 @@ export const useAppState = () => {
     return filtered.slice(0, 12);
   }, [itemName, suggestionPool, currentItemNames]);
 
+  const duplicatePreview = useMemo(() => {
+    const parsed = parseItemInput(itemName, locale);
+    const trimmedName = parsed.name.trim();
+    if (!trimmedName) {
+      return null;
+    }
+    if (!currentItemNames.has(trimmedName.toLowerCase())) {
+      return null;
+    }
+    return {
+      name: trimmedName,
+      quantityOrUnit: parsed.quantityOrUnit,
+    };
+  }, [itemName, locale, currentItemNames]);
+
   const handleAddItem = async () => {
     if (!activeListId) {return;}
     const parsed = parseItemInput(itemName, locale);
@@ -240,6 +255,7 @@ export const useAppState = () => {
     activeList,
     listItems,
     suggestions,
+    duplicatePreview,
     newListName,
     editingTitle,
     itemName,
