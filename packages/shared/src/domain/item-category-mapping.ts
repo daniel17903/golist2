@@ -2635,6 +2635,24 @@ const itemIconMapByLanguage: Record<CategoryLanguage, Map<string, string>> = {
   es: new Map(),
 };
 
+type NormalizedCategoryMatcher = {
+  normalizedName: string;
+  entry: CategoryEntry;
+};
+
+const normalizeNameForMatching = (value: string): string =>
+  value
+    .trim()
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .replace(/\s+/g, " ");
+
+const itemMatchersByLanguage: Record<CategoryLanguage, NormalizedCategoryMatcher[]> = {
+  en: [],
+  de: [],
+  es: [],
+};
+
 (["en", "de", "es"] as const).forEach((locale) => {
   categoryEntriesByLanguage[locale].forEach((entry) => {
     entry.matchingNames.forEach((name) => {
@@ -2646,14 +2664,50 @@ const itemIconMapByLanguage: Record<CategoryLanguage, Map<string, string>> = {
       if (!itemIconMapByLanguage[locale].has(key)) {
         itemIconMapByLanguage[locale].set(key, entry.assetFileName);
       }
+
+      const normalizedName = normalizeNameForMatching(name);
+      if (!normalizedName) {return;}
+      itemMatchersByLanguage[locale].push({ normalizedName, entry });
     });
   });
 });
+
+const resolveCategoryEntryForItemName = (
+  name: string,
+  language: CategoryLanguage,
+): CategoryEntry | undefined => {
+  const normalizedItemName = normalizeNameForMatching(name);
+  if (!normalizedItemName) {return undefined;}
+
+  const paddedItemName = ` ${normalizedItemName} `;
+  const matches = itemMatchersByLanguage[language].filter(({ normalizedName }) =>
+    paddedItemName.includes(` ${normalizedName} `),
+  );
+
+  if (matches.length === 0) {
+    return undefined;
+  }
+
+  if (matches.length === 1) {
+    return matches[0]?.entry;
+  }
+
+  const endingMatch = matches.find(({ normalizedName }) =>
+    normalizedItemName.endsWith(` ${normalizedName}`) || normalizedItemName === normalizedName,
+  );
+
+  return endingMatch?.entry ?? matches[0]?.entry;
+};
 
 export const getCategoryIdForItemName = (
   name: string,
   language: CategoryLanguage = defaultCategoryLanguage,
 ): string | undefined => {
+  const resolvedEntry = resolveCategoryEntryForItemName(name, language);
+  if (resolvedEntry) {
+    return resolvedEntry.category;
+  }
+
   const key = name.trim().toLowerCase();
   return itemCategoryMapByLanguage[language].get(key);
 };
@@ -2663,6 +2717,11 @@ export const getIconNameForItemName = (
   name: string,
   language: CategoryLanguage = defaultCategoryLanguage,
 ): string | undefined => {
+  const resolvedEntry = resolveCategoryEntryForItemName(name, language);
+  if (resolvedEntry) {
+    return resolvedEntry.assetFileName;
+  }
+
   const key = name.trim().toLowerCase();
   return itemIconMapByLanguage[language].get(key);
 };
