@@ -15,10 +15,7 @@ Strasse<br />
 plz ort</p>
 
 <h2>Kontakt</h2>
-<p>Telefon: telefon<br />
-E-Mail: golist@ge1ger.de</p>
-
-<p>Quelle: <a href="https://www.e-recht24.de">e-recht24.de</a></p>`;
+<p>E-Mail: golist@ge1ger.de</p>`;
 
 const privacyHtmlDe = `<h1>Datenschutz&shy;erkl&auml;rung</h1>
 <h2>1. Datenschutz auf einen Blick</h2>
