@@ -8,7 +8,7 @@ type LegalModalProps = {
   onClose: () => void;
 };
 
-const imprintHtml = `<h1>Impressum</h1>
+const imprintHtmlDe = `<h1>Impressum</h1>
 
 <p>Daniel Geiger<br />
 c/o Online-Impressum #6667<br />
@@ -17,6 +17,26 @@ Europaring 90<br />
 
 <h2>Kontakt</h2>
 <p>E-Mail: golist@ge1ger.de</p>`;
+
+const imprintHtmlEn = `<h1>Imprint</h1>
+
+<p>Daniel Geiger<br />
+c/o Online-Impressum #6667<br />
+Europaring 90<br />
+53757 Sankt Augustin</p>
+
+<h2>Contact</h2>
+<p>Email: golist@ge1ger.de</p>`;
+
+const imprintHtmlEs = `<h1>Aviso legal</h1>
+
+<p>Daniel Geiger<br />
+c/o Online-Impressum #6667<br />
+Europaring 90<br />
+53757 Sankt Augustin</p>
+
+<h2>Contacto</h2>
+<p>Correo electr&oacute;nico: golist@ge1ger.de</p>`;
 
 const privacyHtmlDe = `<h1>Datenschutz&shy;erkl&auml;rung</h1>
 <h2>1. Datenschutz auf einen Blick</h2>
@@ -136,6 +156,12 @@ const LegalModal = ({ isOpen, type, onClose }: LegalModalProps) => {
 
   if (!isOpen) {return null;}
 
+  const imprintHtmlByLocale = {
+    de: imprintHtmlDe,
+    en: imprintHtmlEn,
+    es: imprintHtmlEs,
+  };
+
   const privacyHtmlByLocale = {
     de: privacyHtmlDe,
     en: privacyHtmlEn,
@@ -154,7 +180,7 @@ const LegalModal = ({ isOpen, type, onClose }: LegalModalProps) => {
           <div
             className="legal-modal__content"
             dangerouslySetInnerHTML={{
-              __html: type === "imprint" ? imprintHtml : privacyHtmlByLocale[locale],
+              __html: type === "imprint" ? imprintHtmlByLocale[locale] : privacyHtmlByLocale[locale],
             }}
           />
         </div>
