@@ -738,6 +738,10 @@ body {
   opacity: 0.95;
 }
 
+.item-text--duplicate {
+  justify-content: center;
+}
+
 .add-dialog .item-icon img {
   filter: brightness(0) invert(1);
 }
