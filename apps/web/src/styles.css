@@ -725,6 +725,19 @@ body {
   color: #ffffff;
 }
 
+.item-card--duplicate {
+  background: rgba(247, 171, 47, 0.45);
+}
+
+.item-warning {
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+  text-align: center;
+  max-width: 100%;
+  opacity: 0.95;
+}
+
 .add-dialog .item-icon img {
   filter: brightness(0) invert(1);
 }
