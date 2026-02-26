@@ -138,6 +138,35 @@ describe('sharing API contract basics', () => {
   })
 
 
+  it('accepts item updatedAt values with explicit UTC offsets', async () => {
+    const repository = new InMemoryListRepository()
+    const app = buildServer({ listRepository: repository })
+
+    await app.inject({
+      method: 'PUT',
+      url: '/v1/lists/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      headers: { 'x-device-id': '11111111-1111-4111-8111-111111111111' },
+      payload: { name: 'Groceries' },
+    })
+
+    const response = await app.inject({
+      method: 'PUT',
+      url: '/v1/lists/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/items/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb1',
+      headers: {
+        'x-device-id': '11111111-1111-4111-8111-111111111111',
+      },
+      payload: {
+        name: 'Apples',
+        deleted: false,
+        updatedAt: '2026-02-26T21:02:36.191600+00:00',
+      },
+    })
+
+    expect(response.statusCode).toBe(201)
+
+    await app.close()
+  })
+
   it('auto-assigns category from item name when category is omitted and defaults language to en', async () => {
     const repository = new InMemoryListRepository()
     const app = buildServer({ listRepository: repository })
