@@ -21,6 +21,11 @@ describe("categories helpers", () => {
     expect(["apple", "bread"]).toContain(getItemIconName("apple bread now", "en"));
   });
 
+  it("matches category and icon when matching names are concatenated", () => {
+    expect(getCategoryIdForItem("applebread", "en")).toBe("bread");
+    expect(getItemIconName("applebread", "en")).toBe("bread");
+  });
+
   it("returns locale-aware icon names and categories", () => {
     expect(getItemIconName("apfel", "de")).toBe("apple");
     expect(getItemIcon("apfel", "de")).toBe("/icons/apple.svg");

@@ -2679,9 +2679,8 @@ const resolveCategoryEntryForItemName = (
   const normalizedItemName = normalizeNameForMatching(name);
   if (!normalizedItemName) {return undefined;}
 
-  const paddedItemName = ` ${normalizedItemName} `;
   const matches = itemMatchersByLanguage[language].filter(({ normalizedName }) =>
-    paddedItemName.includes(` ${normalizedName} `),
+    normalizedItemName.includes(normalizedName),
   );
 
   if (matches.length === 0) {
@@ -2693,7 +2692,7 @@ const resolveCategoryEntryForItemName = (
   }
 
   const endingMatch = matches.find(({ normalizedName }) =>
-    normalizedItemName.endsWith(` ${normalizedName}`) || normalizedItemName === normalizedName,
+    normalizedItemName.endsWith(normalizedName),
   );
 
   return endingMatch?.entry ?? matches[0]?.entry;
