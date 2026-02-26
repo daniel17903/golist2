@@ -16,7 +16,7 @@ const itemUpsertSchema = z.object({
   category: z.string().min(1).optional(),
   language: z.enum(supportedCategoryLanguages).default(defaultCategoryLanguage),
   deleted: z.boolean(),
-  updatedAt: z.iso.datetime(),
+  updatedAt: z.iso.datetime({ offset: true }),
 })
 
 export function registerListRoutes(app: FastifyInstance, listRepository: ListRepository) {
