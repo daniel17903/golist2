@@ -54,6 +54,10 @@ export type ApiListDocument = {
   items: ApiListItem[];
 };
 
+export type ApiListItemsUpdatedAfterResponse = {
+  items: ApiListItem[];
+};
+
 export type ApiListUpsertRequest = {
   name: string;
 };
