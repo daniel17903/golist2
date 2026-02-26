@@ -11,8 +11,9 @@ type LegalModalProps = {
 const imprintHtml = `<h1>Impressum</h1>
 
 <p>Daniel Geiger<br />
-Strasse<br />
-plz ort</p>
+c/o Online-Impressum #6667<br />
+Europaring 90<br />
+53757 Sankt Augustin</p>
 
 <h2>Kontakt</h2>
 <p>E-Mail: golist@ge1ger.de</p>`;
@@ -56,9 +57,8 @@ noreferrer">https://www.hetzner.com/de/legal/privacy-policy/</a>.</p>
 ernst. Wir behandeln Ihre personenbezogenen Daten vertraulich und entsprechend den gesetzlichen
 Datenschutzvorschriften sowie dieser Datenschutzerkl&auml;rung.</p>
 <h3>Hinweis zur verantwortlichen Stelle</h3> <p>Die verantwortliche Stelle f&uuml;r die Datenverarbeitung auf
-dieser Website ist:</p> <p>adresse</p>
-<p>Telefon: &#91;Telefonnummer der verantwortlichen Stelle&#93;<br />
-E-Mail: &#91;E-Mail-Adresse der verantwortlichen Stelle&#93;</p>
+dieser Website ist:</p> <p>Daniel Geiger<br />c/o Online-Impressum #6667<br />Europaring 90<br />53757 Sankt Augustin</p>
+<p>E-Mail: golist@ge1ger.de</p>
 <h3>Speicherdauer</h3> <p>Soweit innerhalb dieser Datenschutzerkl&auml;rung keine speziellere Speicherdauer
 genannt wurde, verbleiben Ihre personenbezogenen Daten bei uns, bis der Zweck f&uuml;r die Datenverarbeitung
 entf&auml;llt.</p>
@@ -90,8 +90,8 @@ const privacyHtmlEn = `<h1>Privacy Policy</h1>
 <p>The operators of this website take the protection of your personal data very seriously. We treat your personal data confidentially and in accordance with statutory data protection regulations and this privacy policy.</p>
 <h3>Information on the controller</h3>
 <p>The controller responsible for data processing on this website is:</p>
-<p>address</p>
-<p>Phone: [controller phone number]<br />Email: [controller email address]</p>
+<p>Daniel Geiger<br />c/o Online-Impressum #6667<br />Europaring 90<br />53757 Sankt Augustin</p>
+<p>Email: golist@ge1ger.de</p>
 <h3>Storage period</h3>
 <p>Unless a more specific storage period is stated in this policy, your personal data remains with us until the purpose for processing no longer applies.</p>
 <h2>4. Data collection on this website</h2>
@@ -122,8 +122,8 @@ const privacyHtmlEs = `<h1>Pol&iacute;tica de privacidad</h1>
 <p>Los operadores de este sitio web se toman muy en serio la protecci&oacute;n de sus datos personales. Tratamos sus datos personales de forma confidencial y de acuerdo con la normativa legal de protecci&oacute;n de datos y esta pol&iacute;tica de privacidad.</p>
 <h3>Informaci&oacute;n sobre el responsable</h3>
 <p>El responsable del tratamiento de datos en este sitio web es:</p>
-<p>direcci&oacute;n</p>
-<p>Tel&eacute;fono: [tel&eacute;fono del responsable]<br />Correo electr&oacute;nico: [correo del responsable]</p>
+<p>Daniel Geiger<br />c/o Online-Impressum #6667<br />Europaring 90<br />53757 Sankt Augustin</p>
+<p>Correo electr&oacute;nico: golist@ge1ger.de</p>
 <h3>Plazo de conservaci&oacute;n</h3>
 <p>Si en esta pol&iacute;tica no se indica un periodo de conservaci&oacute;n m&aacute;s espec&iacute;fico, sus datos personales permanecer&aacute;n con nosotros hasta que deje de existir la finalidad del tratamiento.</p>
 <h2>4. Recopilaci&oacute;n de datos en este sitio web</h2>
