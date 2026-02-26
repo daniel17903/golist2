@@ -6,6 +6,26 @@ describe("categories helpers", () => {
     expect(getCategoryIdForItem("  ApPlE  ", "en")).toBe("fruitsVegetables");
   });
 
+  it("matches category and icon when the item name contains a matching word", () => {
+    expect(getCategoryIdForItem("fresh apple slices", "en")).toBe("fruitsVegetables");
+    expect(getItemIconName("fresh apple slices", "en")).toBe("apple");
+  });
+
+  it("prefers a match at the end when multiple words match", () => {
+    expect(getCategoryIdForItem("apple bread", "en")).toBe("bread");
+    expect(getItemIconName("apple bread", "en")).toBe("bread");
+  });
+
+  it("allows any match when there are multiple matches and none at the end", () => {
+    expect(["fruitsVegetables", "bread"]).toContain(getCategoryIdForItem("apple bread now", "en"));
+    expect(["apple", "bread"]).toContain(getItemIconName("apple bread now", "en"));
+  });
+
+  it("matches category and icon when matching names are concatenated", () => {
+    expect(getCategoryIdForItem("applebread", "en")).toBe("bread");
+    expect(getItemIconName("applebread", "en")).toBe("bread");
+  });
+
   it("returns locale-aware icon names and categories", () => {
     expect(getItemIconName("apfel", "de")).toBe("apple");
     expect(getItemIcon("apfel", "de")).toBe("/icons/apple.svg");
