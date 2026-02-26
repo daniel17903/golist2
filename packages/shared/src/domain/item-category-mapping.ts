@@ -675,6 +675,14 @@ const categoryEntriesDe: CategoryEntry[] = [
     "category": "fruitsVegetables",
   },
   {
+    "assetFileName": "figs",
+    "matchingNames": [
+      "feige",
+      "feigen",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
     "assetFileName": "dates",
     "matchingNames": [
       "dattel",
@@ -1524,6 +1532,14 @@ const categoryEntriesEn: CategoryEntry[] = [
     "assetFileName": "cucumber",
     "matchingNames": [
       "cucumber",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "figs",
+    "matchingNames": [
+      "fig",
+      "figs",
     ],
     "category": "fruitsVegetables",
   },
@@ -2423,6 +2439,14 @@ const categoryEntriesEs: CategoryEntry[] = [
     "assetFileName": "cucumber",
     "matchingNames": [
       "pepino",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "figs",
+    "matchingNames": [
+      "higo",
+      "higos",
     ],
     "category": "fruitsVegetables",
   },

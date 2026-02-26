@@ -39,6 +39,14 @@ describe("categories helpers", () => {
     expect(getItemIcon("manzana", "es")).toBe("/icons/apple.svg");
   });
 
+  it("matches fig synonyms across locales", () => {
+    expect(getItemIconName("figs", "en")).toBe("figs");
+    expect(getItemIconName("feigen", "de")).toBe("figs");
+    expect(getItemIconName("higo", "es")).toBe("figs");
+    expect(getItemIcon("figs", "en")).toBe("/icons/figs.svg");
+  });
+
+
   it("renders list icons from stored icon names", () => {
     expect(getListItemIcon("banana")).toBe("/icons/banana.svg");
     expect(getListItemIcon("cream")).toBe("/icons/cream.svg");
