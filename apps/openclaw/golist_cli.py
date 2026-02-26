@@ -186,6 +186,10 @@ def cmd_upsert(state: RuntimeState, args: argparse.Namespace) -> None:
         body["iconName"] = args.icon_name
     if args.category is not None:
         body["category"] = args.category
+    if args.quantity_or_unit is not None:
+        body["quantityOrUnit"] = args.quantity_or_unit
+    if args.language is not None:
+        body["language"] = args.language
 
     payload = api_request(
         "PUT",
@@ -246,6 +250,8 @@ def build_parser() -> argparse.ArgumentParser:
     upsert_parser.add_argument("--item-id", help="Stable UUID for updates. Random UUID used when omitted.")
     upsert_parser.add_argument("--icon-name", help="Explicit iconName to send")
     upsert_parser.add_argument("--category", help="Explicit category to send")
+    upsert_parser.add_argument("--quantity-or-unit", help="Explicit quantityOrUnit to send")
+    upsert_parser.add_argument("--language", help="Explicit language to send")
     upsert_parser.set_defaults(func=cmd_upsert)
 
     delete_parser = subparsers.add_parser("delete", help="Soft-delete an existing item")

@@ -17,7 +17,7 @@ It does **not** support multiple lists in one session.
 3. OpenClaw must generate its own random device UUID and persist it for reuse.
 4. OpenClaw must never attempt icon/category inference or mapping.
 5. When creating or renaming items, OpenClaw must only upsert the user-provided `name` and required fields.
-6. OpenClaw must not send `iconName` or `category` unless the caller explicitly provides those exact values.
+6. OpenClaw must not send optional fields (`iconName`, `category`, `quantityOrUnit`, `language`) unless the caller explicitly provides those exact values.
 7. Every request must include the `X-Device-Id` header.
 
 ## Python CLI tool
@@ -28,7 +28,7 @@ Use `apps/openclaw/golist_cli.py` as the operational API wrapper for this skill.
 - Generates and persists device id when missing.
 - Redeems and persists a single list id.
 - Automatically sends `X-Device-Id` on every request.
-- Includes `iconName`/`category` only when explicitly passed via CLI flags.
+- Includes optional fields (`iconName`, `category`, `quantityOrUnit`, `language`) only when explicitly passed via CLI flags.
 
 ### CLI state and environment
 Required runtime input:
@@ -64,13 +64,13 @@ Returns list metadata and non-deleted items.
 
 ### 2) Upsert item
 ```bash
-python3 apps/openclaw/golist_cli.py upsert "milk" [--item-id <uuid>] [--icon-name <icon>] [--category <category>]
+python3 apps/openclaw/golist_cli.py upsert "milk" [--item-id <uuid>] [--icon-name <icon>] [--category <category>] [--quantity-or-unit <value>] [--language <code>]
 ```
 
 Rules:
 - `itemId` should be stable for updates and random UUID for new items.
 - `updatedAt` is generated as an ISO timestamp.
-- Do not pass `--icon-name` or `--category` unless explicitly requested by caller.
+- Do not pass optional field flags unless explicitly requested by caller (`--icon-name`, `--category`, `--quantity-or-unit`, `--language`).
 
 ### 3) Soft-delete item
 ```bash
@@ -93,4 +93,4 @@ python3 apps/openclaw/golist_cli.py sync <ISO_TIMESTAMP>
 - If list id is missing, redeem token first.
 - If token redemption fails, return a clear auth/share error.
 - If asked to access another list, refuse and explain this skill is single-list scoped.
-- If icon/category mapping is requested implicitly, ignore mapping and only persist names unless explicit values are provided.
+- If metadata mapping is requested implicitly, ignore mapping and only persist names unless explicit optional values are provided.
