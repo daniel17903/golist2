@@ -9,7 +9,6 @@ console.info(`[web-build] Configured API_BASE_URL=${apiBaseUrl}`);
 export default defineConfig({
   define: {
     __APP_VERSION__: JSON.stringify(process.env.npm_package_version ?? "dev"),
-    __DEVICE_ID__: JSON.stringify(process.env.DEVICE_ID ?? ""),
     __API_BASE_URL__: JSON.stringify(apiBaseUrl),
     __API_TIMEOUT_MS__: JSON.stringify(process.env.API_TIMEOUT_MS ?? "15000"),
     __ENVIRONMENT__: JSON.stringify(process.env.ENVIRONMENT ?? "development"),

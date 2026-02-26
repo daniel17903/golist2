@@ -12,7 +12,6 @@ import {
 
 const createId = () => crypto.randomUUID();
 const appVersion = __APP_VERSION__;
-const buildDeviceId = __DEVICE_ID__.trim();
 const selectedListStorageKey = "golist.selectedListId";
 
 const toIsoTimestamp = (value: number) => new Date(value).toISOString();
@@ -20,12 +19,6 @@ const toMillis = (value: string) => new Date(value).getTime();
 
 const getOrCreateDeviceId = (): string => {
   const storageKey = "golist.deviceId";
-
-  if (buildDeviceId) {
-    localStorage.setItem(storageKey, buildDeviceId);
-    return buildDeviceId;
-  }
-
   const existing = localStorage.getItem(storageKey);
   if (existing) {
     return existing;
