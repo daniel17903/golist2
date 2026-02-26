@@ -46,7 +46,6 @@ type StoreState = {
   items: Item[];
   metadata?: AppMetadata;
   activeListId?: string;
-  listShareTokens: Record<string, string>;
   backendConnection: "unknown" | "online" | "offline";
   syncNotice?: { id: string; message: string };
   backendLogs: Array<{ id: string; message: string; outcome: "success" | "error" | "skipped" }>;
@@ -170,7 +169,6 @@ export const useStore = create<StoreState>((set, get) => ({
   items: [],
   isLoaded: false,
   activeListId: undefined,
-  listShareTokens: {},
   backendConnection: "unknown",
   syncNotice: undefined,
   backendLogs: [],
@@ -199,7 +197,6 @@ export const useStore = create<StoreState>((set, get) => ({
       items,
       activeListId: initialActiveListId,
       metadata,
-      listShareTokens: {},
       isLoaded: true,
     });
 
@@ -251,13 +248,10 @@ export const useStore = create<StoreState>((set, get) => ({
       const nextActiveListId =
         state.activeListId === listId ? remainingLists[0]?.id : state.activeListId;
       persistSelectedListId(nextActiveListId);
-      const remainingTokens = { ...state.listShareTokens };
-      delete remainingTokens[listId];
       return {
         lists: remainingLists,
         items: state.items.filter((item) => item.listId !== listId),
         activeListId: nextActiveListId,
-        listShareTokens: remainingTokens,
       };
     });
   },
@@ -392,8 +386,13 @@ export const useStore = create<StoreState>((set, get) => ({
         updatedAt: toMillis(item.updatedAt),
       }));
 
+      const syncedAt = Date.now();
       await db.lists.put(localList);
       await db.items.bulkPut(localItems);
+      await db.listShares.put({
+        listId: localList.id,
+        lastSyncedAt: syncedAt,
+      });
       persistSelectedListId(localList.id);
       set((current) => {
         const withoutListItems = current.items.filter((item) => item.listId !== localList.id);
@@ -429,6 +428,11 @@ export const useStore = create<StoreState>((set, get) => ({
     }
 
     const deviceId = state.metadata.deviceId;
+    const localItemsForList = state.items.filter((item) => item.listId === listId);
+    const localItemMap = new Map(localItemsForList.map((item) => [item.id, item]));
+    const listShare = await db.listShares.get(listId);
+    const previousLastSyncedAt = listShare?.lastSyncedAt;
+
     let remoteList;
 
     try {
@@ -455,24 +459,14 @@ export const useStore = create<StoreState>((set, get) => ({
       });
     }
 
-    const localItemsForList = state.items.filter((item) => item.listId === listId);
-    const localItemMap = new Map(localItemsForList.map((item) => [item.id, item]));
     const localPushById = new Map<string, Item>();
-
-    for (const remoteItem of remoteList.items) {
-      const local = localItemMap.get(remoteItem.id);
-      const remoteUpdatedAt = toMillis(remoteItem.updatedAt);
-      if (!local || local.updatedAt > remoteUpdatedAt) {
-        if (local) {
-          localPushById.set(local.id, local);
-        }
-      }
-    }
-
-    const remoteIds = new Set(remoteList.items.map((item) => item.id));
-    for (const local of localItemsForList) {
-      if (!remoteIds.has(local.id)) {
-        localPushById.set(local.id, local);
+    for (const localItem of localItemsForList) {
+      if (
+        !previousLastSyncedAt
+        || localItem.updatedAt > previousLastSyncedAt
+        || localItem.createdAt > previousLastSyncedAt
+      ) {
+        localPushById.set(localItem.id, localItem);
       }
     }
 
@@ -492,14 +486,15 @@ export const useStore = create<StoreState>((set, get) => ({
       });
     }
 
-    const refreshedList = await sharingApiClient.fetchList({ deviceId, listId });
-    const syncedList: List = {
-      id: refreshedList.listId,
-      name: refreshedList.name,
-      createdAt: toMillis(refreshedList.createdAt),
-      updatedAt: toMillis(refreshedList.updatedAt),
-    };
-    const syncedItems: Item[] = refreshedList.items.map((item) => ({
+    const now = Date.now();
+    const updatedAfterIso = toIsoTimestamp(previousLastSyncedAt ?? 0);
+    const remoteItemsResponse = await sharingApiClient.fetchItemsUpdatedAfter({
+      deviceId,
+      listId,
+      updatedAfter: updatedAfterIso,
+    });
+
+    const remoteSyncedItems: Item[] = remoteItemsResponse.items.map((item) => ({
       id: item.id,
       listId,
       name: item.name,
@@ -511,14 +506,36 @@ export const useStore = create<StoreState>((set, get) => ({
       updatedAt: toMillis(item.updatedAt),
     }));
 
+    const remoteItemsById = new Map(remoteSyncedItems.map((item) => [item.id, item]));
+    const nextItemsForList = localItemsForList.map((item) => remoteItemsById.get(item.id) ?? item);
+    for (const remoteItem of remoteSyncedItems) {
+      if (!localItemMap.has(remoteItem.id)) {
+        nextItemsForList.push(remoteItem);
+      }
+    }
+
+    const syncedList: List = {
+      id: remoteList.listId,
+      name: remoteList.name,
+      createdAt: toMillis(remoteList.createdAt),
+      updatedAt: toMillis(remoteList.updatedAt),
+    };
+
     await db.lists.put(syncedList);
-    await db.items.bulkPut(syncedItems);
+    if (remoteSyncedItems.length > 0) {
+      await db.items.bulkPut(remoteSyncedItems);
+    }
+    await db.listShares.put({
+      listId,
+      lastSyncedAt: now,
+    });
+
     set((current) => {
       const remainingLists = current.lists.filter((entry) => entry.id !== listId);
       const remainingItems = current.items.filter((entry) => entry.listId !== listId);
       return {
         lists: [...remainingLists, syncedList].sort((a, b) => a.createdAt - b.createdAt),
-        items: [...remainingItems, ...syncedItems],
+        items: [...remainingItems, ...nextItemsForList],
       };
     });
 

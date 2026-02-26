@@ -3,7 +3,6 @@ import type { AppMetadata, Item, List } from "@golist/shared/domain/types";
 
 export type ListShare = {
   listId: string;
-  shareToken: string;
   lastSyncedAt: number;
 };
 
@@ -29,6 +28,12 @@ export class GoListDatabase extends Dexie {
       items: "id, listId, deleted, updatedAt",
       metadata: "id",
       listShares: "listId, shareToken, lastSyncedAt",
+    });
+    this.version(4).stores({
+      lists: "id, name, updatedAt",
+      items: "id, listId, deleted, updatedAt",
+      metadata: "id",
+      listShares: "listId, lastSyncedAt",
     });
   }
 }

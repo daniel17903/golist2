@@ -34,21 +34,23 @@ For list/item mutations, the app first writes to IndexedDB and updates in-memory
 After local write, the app attempts immediate backend push for the changed entity when a share token exists:
 
 - list name changes -> `PUT /v1/lists`
-- item create/update/tombstone -> `PUT /v1/lists/{shareToken}/items/{itemId}`
+- item create/update/tombstone -> `PUT /v1/lists/{listId}/items/{itemId}`
 
 If backend is unreachable or slow, request timeout/error is swallowed so UX stays local-first.
 
-### 3. Full reconciliation (background)
+### 3. Incremental reconciliation (background)
 
-After immediate push attempt, app triggers full list reconciliation in background (`syncList`):
+After immediate push attempt, app triggers list reconciliation in background (`syncList`) without re-fetching the full item set:
 
-1. pull remote list snapshot
+1. pull remote list metadata snapshot (`GET /v1/lists/:listId`)
 2. push local list name when local is newer/different
-3. push local items missing/older on remote
-4. pull final remote snapshot again
-5. replace local list+item state for that shared list with final pulled snapshot
+3. read `lastSyncedAt` for that list from IndexedDB (`listShares`)
+4. push only local items updated since `lastSyncedAt`
+5. fetch only remote item deltas with `GET /v1/lists/:listId/items?updatedAfter=<ISO timestamp>`
+6. merge fetched remote deltas into local IndexedDB/state
+7. persist a new `lastSyncedAt` timestamp on successful completion
 
-This ensures eventual full convergence when backend is reachable.
+This keeps convergence behavior while avoiding full list-item downloads on every sync cycle.
 
 ## Startup and periodic behavior
 
@@ -70,3 +72,18 @@ This ensures eventual full convergence when backend is reachable.
 - Sync errors publish a toast message when `ENVIRONMENT` is not `production`.
 - When `ENVIRONMENT` is not `production`, the UI includes a backend log panel with all backend call outcomes (success, error, timeout) and skipped-call reasons.
 - Toast and backend log visibility are controlled by the compiled `__ENVIRONMENT__` constant.
+
+
+## Local sync cursor (lastSyncedAt)
+
+The frontend stores per-list sync metadata in IndexedDB table `listShares`:
+
+- `listId`
+- `lastSyncedAt` (epoch milliseconds)
+
+`lastSyncedAt` is updated after a successful incremental sync and is reused on the next sync to compute both:
+
+- which local items to push, and
+- which remote items to pull via `updatedAfter`.
+
+On first sync (no cursor), the frontend uses an initial timestamp baseline and then records `lastSyncedAt` after the sync succeeds.

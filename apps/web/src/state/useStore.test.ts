@@ -31,6 +31,7 @@ vi.mock("../sharing/apiClient", () => ({
     redeemShareToken: vi.fn(),
     createShareToken: vi.fn(),
     upsertItem: vi.fn(),
+    fetchItemsUpdatedAfter: vi.fn(),
   },
   setBackendCallLogger: vi.fn(),
   setActiveBackendRequestLogger: vi.fn(),
@@ -38,7 +39,7 @@ vi.mock("../sharing/apiClient", () => ({
 
 let listsData: List[] = [];
 let itemsData: Item[] = [];
-let listSharesData: Array<{ listId: string; shareToken: string; lastSyncedAt: number }> = [];
+let listSharesData: Array<{ listId: string; lastSyncedAt: number }> = [];
 const metadataPut = vi.fn();
 const listAdd = vi.fn(async (list: List) => {
   listsData.push(list);
@@ -111,7 +112,8 @@ vi.mock("../storage/db", () => ({
     },
     listShares: {
       toArray: vi.fn(async () => [...listSharesData]),
-      put: vi.fn(async (entry: { listId: string; shareToken: string; lastSyncedAt: number }) => {
+      get: vi.fn(async (listId: string) => listSharesData.find((entry) => entry.listId === listId)),
+      put: vi.fn(async (entry: { listId: string; lastSyncedAt: number }) => {
         const index = listSharesData.findIndex((item) => item.listId === entry.listId);
         if (index >= 0) {
           listSharesData[index] = entry;
@@ -133,6 +135,7 @@ const upsertListMock = vi.mocked(sharingApiClient.upsertList);
 const createShareTokenMock = vi.mocked(sharingApiClient.createShareToken);
 const fetchListMock = vi.mocked(sharingApiClient.fetchList);
 const upsertItemMock = vi.mocked(sharingApiClient.upsertItem);
+const fetchItemsUpdatedAfterMock = vi.mocked(sharingApiClient.fetchItemsUpdatedAfter);
 
 const resetStore = () => {
   useStore.setState({
@@ -141,7 +144,6 @@ const resetStore = () => {
     isLoaded: false,
     activeListId: undefined,
     metadata: undefined,
-    listShareTokens: {},
     backendConnection: "unknown",
     syncNotice: undefined,
     backendLogs: [],
@@ -167,6 +169,7 @@ describe("useStore", () => {
     createShareTokenMock.mockReset();
     fetchListMock.mockReset();
     upsertItemMock.mockReset();
+    fetchItemsUpdatedAfterMock.mockReset();
     globalThis.localStorage.clear();
     resetStore();
     vi.useFakeTimers();
@@ -424,35 +427,29 @@ describe("useStore", () => {
         appVersion: "test-version",
         lastOpenedAt: 1,
       },
-      listShareTokens: {},
-    });
+      });
 
     upsertListMock.mockResolvedValue({ listId: "list-1" });
-    fetchListMock
-      .mockResolvedValueOnce({
-        listId: "list-1",
-        name: "Groceries",
-        createdAt: "2026-01-01T00:00:00.000Z",
-        updatedAt: "2026-01-01T00:00:00.000Z",
-        items: [],
-      })
-      .mockResolvedValueOnce({
-        listId: "list-1",
-        name: "Groceries",
-        createdAt: "2026-01-01T00:00:00.000Z",
-        updatedAt: "2026-01-01T00:00:00.000Z",
-        items: [
-          {
-            id: "item-1",
-            name: "Milk",
-            iconName: "milk",
-            category: "milkCheese",
-            deleted: false,
-            createdAt: "2026-01-01T00:00:00.000Z",
-            updatedAt: "2026-01-01T00:00:00.000Z",
-          },
-        ],
-      });
+    fetchListMock.mockResolvedValue({
+      listId: "list-1",
+      name: "Groceries",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+      items: [],
+    });
+    fetchItemsUpdatedAfterMock.mockResolvedValue({
+      items: [
+        {
+          id: "item-1",
+          name: "Milk",
+          iconName: "milk",
+          category: "milkCheese",
+          deleted: false,
+          createdAt: "2026-01-01T00:00:00.000Z",
+          updatedAt: "2026-01-01T00:00:00.000Z",
+        },
+      ],
+    });
 
     await useStore.getState().syncAllLists();
 
@@ -465,6 +462,53 @@ describe("useStore", () => {
     expect(upsertItemMock).toHaveBeenCalled();
   });
 
+
+  it("syncList pushes locally created items newer than lastSyncedAt", async () => {
+    listSharesData = [{ listId: "list-1", lastSyncedAt: 100 }];
+
+    useStore.setState({
+      lists: [{ id: "list-1", name: "Groceries", createdAt: 1, updatedAt: 1 }],
+      items: [
+        {
+          id: "item-created-after-sync",
+          listId: "list-1",
+          name: "Yogurt",
+          iconName: "milk",
+          category: "milkCheese",
+          deleted: false,
+          createdAt: 200,
+          updatedAt: 50,
+        },
+      ],
+      metadata: {
+        id: "app",
+        deviceId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        appVersion: "test-version",
+        lastOpenedAt: 1,
+      },
+    });
+
+    fetchListMock.mockResolvedValue({
+      listId: "list-1",
+      name: "Groceries",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+      items: [],
+    });
+    fetchItemsUpdatedAfterMock.mockResolvedValue({ items: [] });
+
+    await useStore.getState().syncList("list-1");
+
+    expect(upsertItemMock).toHaveBeenCalledWith({
+      deviceId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      listId: "list-1",
+      itemId: "item-created-after-sync",
+      body: expect.objectContaining({
+        name: "Yogurt",
+      }),
+    });
+  });
+
   it("syncList creates the remote list when initial fetch returns 403", async () => {
     useStore.setState({
       lists: [{ id: "list-1", name: "Groceries", createdAt: 1, updatedAt: 1 }],
@@ -475,8 +519,7 @@ describe("useStore", () => {
         appVersion: "test-version",
         lastOpenedAt: 1,
       },
-      listShareTokens: {},
-    });
+      });
 
     fetchListMock
       .mockRejectedValueOnce(new Error('fetch list failed: 403 {"message":"Forbidden"}'))
@@ -486,14 +529,9 @@ describe("useStore", () => {
         createdAt: "2026-01-01T00:00:00.000Z",
         updatedAt: "2026-01-01T00:00:00.000Z",
         items: [],
-      })
-      .mockResolvedValueOnce({
-        listId: "list-1",
-        name: "Groceries",
-        createdAt: "2026-01-01T00:00:00.000Z",
-        updatedAt: "2026-01-01T00:00:00.000Z",
-        items: [],
       });
+
+    fetchItemsUpdatedAfterMock.mockResolvedValue({ items: [] });
 
     await useStore.getState().syncList("list-1");
 
@@ -502,7 +540,7 @@ describe("useStore", () => {
       listId: "list-1",
       body: { name: "Groceries" },
     });
-    expect(fetchListMock).toHaveBeenCalledTimes(3);
+    expect(fetchListMock).toHaveBeenCalledTimes(2);
     expect(useStore.getState().backendConnection).toBe("online");
   });
 

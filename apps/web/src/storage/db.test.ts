@@ -54,7 +54,7 @@ describe("GoListDatabase", () => {
     const db = dbCandidate;
 
     expect(db.name).toBe("golist");
-    expect(db.versions).toHaveLength(3);
+    expect(db.versions).toHaveLength(4);
     expect(db.versions[0]?.number).toBe(1);
     expect(db.versions[0]?.stores).toEqual({
       lists: "id, name, updatedAt",
@@ -72,6 +72,13 @@ describe("GoListDatabase", () => {
       items: "id, listId, deleted, updatedAt",
       metadata: "id",
       listShares: "listId, shareToken, lastSyncedAt",
+    });
+    expect(db.versions[3]?.number).toBe(4);
+    expect(db.versions[3]?.stores).toEqual({
+      lists: "id, name, updatedAt",
+      items: "id, listId, deleted, updatedAt",
+      metadata: "id",
+      listShares: "listId, lastSyncedAt",
     });
   });
 });
