@@ -718,23 +718,25 @@ body {
   gap: 10px;
 }
 
-.legal-modal__body h3 {
-  margin: 6px 0 0;
-  font-size: 16px;
-  color: #2f2433;
-}
-
-.legal-modal__body p {
-  margin: 0;
+.legal-modal__content {
+  max-height: min(62vh, 520px);
+  overflow-y: auto;
   color: #3d3240;
+  font-size: 14px;
+  line-height: 1.45;
 }
 
-.legal-modal__note {
-  margin-top: 6px;
-  padding: 10px;
-  border-radius: 10px;
-  background: #fff5d6;
-  font-size: 14px;
+.legal-modal__content h1,
+.legal-modal__content h2,
+.legal-modal__content h3,
+.legal-modal__content h4 {
+  color: #2f2433;
+  margin: 10px 0 6px;
+}
+
+.legal-modal__content p,
+.legal-modal__content ul {
+  margin: 0 0 10px;
 }
 
 .add-dialog {
