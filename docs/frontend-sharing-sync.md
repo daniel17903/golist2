@@ -15,11 +15,13 @@ The frontend reads backend sync configuration at build time (in `apps/web/vite.c
 
 - `API_BASE_URL`: backend base URL used by sharing API client.
 - `API_TIMEOUT_MS`: per-request timeout in milliseconds (defaults to `15000`).
+- `ENVIRONMENT`: deployment environment string used for debug UI gating (defaults to `development`).
 
 These values are compiled into frontend constants:
 
 - `__API_BASE_URL__`
 - `__API_TIMEOUT_MS__`
+- `__ENVIRONMENT__`
 
 ## Sync stages
 
@@ -65,6 +67,6 @@ This ensures eventual full convergence when backend is reachable.
 ## Error surfacing and connection indicator
 
 - Frontend tracks backend connectivity as `unknown` / `online` / `offline` and surfaces this via a small header indicator icon.
-- Sync errors publish a toast message in non-production Vercel contexts.
-- On Vercel non-production deployments, the UI includes a backend log panel with all backend call outcomes (success, error, timeout) and skipped-call reasons.
-- Toast display is suppressed only when deployed on Vercel production (`VERCEL=1` and `VERCEL_ENV=production`, exposed as `__IS_VERCEL_PRODUCTION__`).
+- Sync errors publish a toast message when `ENVIRONMENT` is not `production`.
+- When `ENVIRONMENT` is not `production`, the UI includes a backend log panel with all backend call outcomes (success, error, timeout) and skipped-call reasons.
+- Toast and backend log visibility are controlled by the compiled `__ENVIRONMENT__` constant.
