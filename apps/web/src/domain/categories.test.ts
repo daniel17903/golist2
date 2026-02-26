@@ -39,6 +39,34 @@ describe("categories helpers", () => {
     expect(getItemIcon("manzana", "es")).toBe("/icons/apple.svg");
   });
 
+  it("maps rosemary to the same icon and category as herbs across locales", () => {
+    expect(getCategoryIdForItem("kräuter", "de")).toBe("spicesCanned");
+    expect(getItemIconName("kräuter", "de")).toBe("herbs");
+    expect(getCategoryIdForItem("rosmarin", "de")).toBe("spicesCanned");
+    expect(getItemIconName("rosmarin", "de")).toBe("herbs");
+
+    expect(getCategoryIdForItem("herbs", "en")).toBe("spicesCanned");
+    expect(getItemIconName("herbs", "en")).toBe("herbs");
+    expect(getCategoryIdForItem("rosemary", "en")).toBe("spicesCanned");
+    expect(getItemIconName("rosemary", "en")).toBe("herbs");
+
+    expect(getCategoryIdForItem("hierbas", "es")).toBe("spicesCanned");
+    expect(getItemIconName("hierbas", "es")).toBe("herbs");
+    expect(getCategoryIdForItem("romero", "es")).toBe("spicesCanned");
+    expect(getItemIconName("romero", "es")).toBe("herbs");
+  });
+
+  it("maps granola to the box icon and household category across locales", () => {
+    expect(getCategoryIdForItem("granola", "de")).toBe("household");
+    expect(getItemIconName("granola", "de")).toBe("box");
+
+    expect(getCategoryIdForItem("granola", "en")).toBe("household");
+    expect(getItemIconName("granola", "en")).toBe("box");
+
+    expect(getCategoryIdForItem("granola", "es")).toBe("household");
+    expect(getItemIconName("granola", "es")).toBe("box");
+  });
+
   it("renders list icons from stored icon names", () => {
     expect(getListItemIcon("banana")).toBe("/icons/banana.svg");
     expect(getListItemIcon("cream")).toBe("/icons/cream.svg");
