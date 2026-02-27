@@ -352,6 +352,17 @@ body {
   }
 }
 
+@keyframes item-pop-dialog {
+  0% {
+    transform: scale(0.94);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .item-card,
   .item-card--exit {
@@ -808,6 +819,7 @@ body {
   min-width: 0;
   aspect-ratio: 1 / 1;
   color: #ffffff;
+  animation: item-pop-dialog 220ms ease-out;
 }
 
 .item-card--duplicate {
