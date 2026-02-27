@@ -557,13 +557,14 @@ body {
   z-index: 30;
   opacity: 0;
   visibility: hidden;
-  transition: opacity 0.3s ease;
+  transition: opacity 0.2s ease 0.3s, visibility 0s linear 0.5s;
 }
 
 .drawer-overlay--open {
   pointer-events: auto;
   opacity: 1;
   visibility: visible;
+  transition: opacity 0.2s ease 0s, visibility 0s linear 0s;
 }
 
 .drawer-backdrop {
@@ -580,7 +581,7 @@ body {
   width: min(320px, 80vw);
   background: #f4eef5;
   transform: translateX(-100%);
-  transition: transform 0.3s ease;
+  transition: transform 0.26s ease-in;
   display: flex;
   flex-direction: column;
   touch-action: none;
@@ -588,6 +589,11 @@ body {
 
 .drawer--open {
   transform: translateX(0);
+  transition-timing-function: ease-out;
+}
+
+.drawer--dragging {
+  transition: none;
 }
 
 .drawer__header {

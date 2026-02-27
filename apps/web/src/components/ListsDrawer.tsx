@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type PointerEvent } from "react";
+import { useMemo, useRef, useState, type PointerEvent, type TouchEvent } from "react";
 import type { List } from "@golist/shared/domain/types";
 import { useI18n } from "../i18n";
 
@@ -45,6 +45,7 @@ const ListsDrawer = ({
   const drawerRef = useRef<HTMLElement | null>(null);
   const dragStateRef = useRef<{ pointerId: number; startX: number; mode: DragMode } | null>(null);
   const [dragOffset, setDragOffset] = useState<number | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
   const [confirmDeleteListId, setConfirmDeleteListId] = useState<string | null>(null);
 
 
@@ -93,9 +94,29 @@ const ListsDrawer = ({
   );
 
   const handleDragStart = (event: PointerEvent<HTMLElement>, mode: DragMode) => {
-    if (event.pointerType !== "touch") {return;}
+    if (event.pointerType !== "touch" && event.pointerType !== "pen") {return;}
     dragStateRef.current = { pointerId: event.pointerId, startX: event.clientX, mode };
+    setIsDragging(true);
     event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const handleTouchDragStart = (event: TouchEvent<HTMLElement>, mode: DragMode) => {
+    const touch = event.changedTouches[0];
+    if (!touch) {return;}
+
+    dragStateRef.current = {
+      pointerId: touch.identifier,
+      startX: touch.clientX,
+      mode,
+    };
+    setIsDragging(true);
+  };
+
+  const getTrackedTouch = (event: TouchEvent<HTMLElement>) => {
+    const dragState = dragStateRef.current;
+    if (!dragState) {return null;}
+
+    return Array.from(event.changedTouches).find((touch) => touch.identifier === dragState.pointerId) ?? null;
   };
 
   const handleDragMove = (event: PointerEvent<HTMLElement>) => {
@@ -131,6 +152,7 @@ const ListsDrawer = ({
       onClose();
     }
 
+    setIsDragging(false);
     setDragOffset(null);
     dragStateRef.current = null;
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
@@ -138,7 +160,47 @@ const ListsDrawer = ({
     }
   };
 
-  const drawerStyle = dragOffset === null ? undefined : { transform: `translateX(${dragOffset}px)`, transition: "none" };
+  const handleTouchDragMove = (event: TouchEvent<HTMLElement>) => {
+    const dragState = dragStateRef.current;
+    const touch = getTrackedTouch(event);
+    if (!dragState || !touch) {return;}
+
+    const drawerWidth = getDrawerWidth();
+    const deltaX = touch.clientX - dragState.startX;
+
+    if (dragState.mode === "opening") {
+      const clampedDelta = Math.min(drawerWidth, Math.max(0, deltaX));
+      setDragOffset(-drawerWidth + clampedDelta);
+      return;
+    }
+
+    const clampedDelta = Math.max(-drawerWidth, Math.min(0, deltaX));
+    setDragOffset(clampedDelta);
+  };
+
+  const handleTouchDragEnd = (event: TouchEvent<HTMLElement>) => {
+    const dragState = dragStateRef.current;
+    const touch = getTrackedTouch(event);
+    if (!dragState || !touch) {return;}
+
+    const drawerWidth = getDrawerWidth();
+    const deltaX = touch.clientX - dragState.startX;
+    const threshold = drawerWidth * 0.35;
+
+    if (dragState.mode === "opening") {
+      if (deltaX > threshold) {
+        onOpen();
+      }
+    } else if (-deltaX > threshold) {
+      onClose();
+    }
+
+    setIsDragging(false);
+    setDragOffset(null);
+    dragStateRef.current = null;
+  };
+
+  const drawerStyle = dragOffset === null ? undefined : { transform: `translateX(${dragOffset}px)` };
 
   return (
     <>
@@ -153,6 +215,14 @@ const ListsDrawer = ({
           onPointerMove={handleDragMove}
           onPointerUp={handleDragEnd}
           onPointerCancel={handleDragEnd}
+          onTouchStart={(event) => {
+            const touch = event.changedTouches[0];
+            if (!touch || touch.clientX > EDGE_SWIPE_WIDTH) {return;}
+            handleTouchDragStart(event, "opening");
+          }}
+          onTouchMove={handleTouchDragMove}
+          onTouchEnd={handleTouchDragEnd}
+          onTouchCancel={handleTouchDragEnd}
         />
       ) : null}
       <div className={`drawer-overlay ${isOpen ? "drawer-overlay--open" : ""}`}>
@@ -169,13 +239,17 @@ const ListsDrawer = ({
         />
         <aside
           ref={drawerRef}
-          className={`drawer ${isOpen ? "drawer--open" : ""}`}
+          className={`drawer ${isOpen ? "drawer--open" : ""} ${isDragging ? "drawer--dragging" : ""}`}
           style={drawerStyle}
           aria-hidden={!isOpen}
           onPointerDown={(event) => handleDragStart(event, "closing")}
           onPointerMove={handleDragMove}
           onPointerUp={handleDragEnd}
           onPointerCancel={handleDragEnd}
+          onTouchStart={(event) => handleTouchDragStart(event, "closing")}
+          onTouchMove={handleTouchDragMove}
+          onTouchEnd={handleTouchDragEnd}
+          onTouchCancel={handleTouchDragEnd}
         >
           <div className="drawer__header">
             <span>GoList</span>
