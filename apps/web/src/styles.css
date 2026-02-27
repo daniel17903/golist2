@@ -76,8 +76,8 @@ body {
 }
 
 .pull-refresh__circle {
-  width: 52px;
-  height: 52px;
+  width: 58px;
+  height: 58px;
   border-radius: 999px;
   display: inline-flex;
   align-items: center;
@@ -85,8 +85,13 @@ body {
   background: rgba(245, 240, 248, 0.95);
   color: #6b50a8;
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.22);
-  font-size: 34px;
   line-height: 1;
+}
+
+.pull-refresh__icon {
+  width: 34px;
+  height: 34px;
+  display: block;
 }
 
 .pull-refresh__circle--spinning {

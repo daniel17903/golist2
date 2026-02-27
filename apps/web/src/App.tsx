@@ -100,6 +100,7 @@ const App = () => {
   const isPullTrackingRef = useRef(false);
   const pullRefreshThreshold = 76;
   const pullDistanceMax = 120;
+  const canUsePullRefresh = !isDrawerOpen;
 
   const listMetaById = useMemo(() => {
     const updatedAtByList = new Map<string, number>();
@@ -250,14 +251,7 @@ const App = () => {
   }, [showBackendLogs, syncNotice, clearSyncNotice]);
 
   const handlePullTouchStart = (event: TouchEvent<HTMLDivElement>) => {
-    if (isPullRefreshing) {
-      return;
-    }
-
-    const scrollTop = document.scrollingElement?.scrollTop ?? window.scrollY;
-    if (scrollTop > 0) {
-      isPullTrackingRef.current = false;
-      pullStartYRef.current = null;
+    if (isPullRefreshing || !canUsePullRefresh || event.touches.length !== 1) {
       return;
     }
 
@@ -266,12 +260,19 @@ const App = () => {
   };
 
   const handlePullTouchMove = (event: TouchEvent<HTMLDivElement>) => {
-    if (!isPullTrackingRef.current || pullStartYRef.current === null || isPullRefreshing) {
+    if (!isPullTrackingRef.current || pullStartYRef.current === null || isPullRefreshing || !canUsePullRefresh) {
       return;
     }
 
     const nextY = event.touches[0]?.clientY;
     if (typeof nextY !== "number") {
+      return;
+    }
+
+    const scrollTop = document.scrollingElement?.scrollTop ?? window.scrollY;
+    if (scrollTop > 0) {
+      setPullDistance(0);
+      pullStartYRef.current = nextY;
       return;
     }
 
@@ -281,6 +282,7 @@ const App = () => {
       return;
     }
 
+    event.preventDefault();
     const damped = Math.min(pullDistanceMax, delta * 0.5);
     setPullDistance(damped);
   };
@@ -292,12 +294,19 @@ const App = () => {
   };
 
   const handlePullTouchEnd = () => {
+    if (!canUsePullRefresh) {
+      resetPullGesture();
+      return;
+    }
+
     if (isPullRefreshing) {
       resetPullGesture();
       return;
     }
 
-    if (pullDistance >= pullRefreshThreshold) {
+    const effectivePullDistance = canUsePullRefresh ? pullDistance : 0;
+
+    if (effectivePullDistance >= pullRefreshThreshold) {
       setIsPullRefreshing(true);
       setPullDistance(pullRefreshThreshold);
       reconnectBackend();
@@ -321,8 +330,15 @@ const App = () => {
       onTouchEnd={handlePullTouchEnd}
       onTouchCancel={handlePullTouchEnd}
     >
-      <div className="pull-refresh" style={{ transform: `translate(-50%, ${-56 + pullDistance}px)` }} aria-hidden="true">
-        <span className={`pull-refresh__circle ${isPullRefreshing ? "pull-refresh__circle--spinning" : ""}`}>↻</span>
+      <div className="pull-refresh" style={{ transform: `translate(-50%, ${-64 + (canUsePullRefresh ? pullDistance : 0)}px)` }} aria-hidden="true">
+        <span className={`pull-refresh__circle ${isPullRefreshing ? "pull-refresh__circle--spinning" : ""}`}>
+          <svg viewBox="0 0 24 24" className="pull-refresh__icon">
+            <path
+              d="M12 5a7 7 0 1 0 6.65 9H16l3.8 3.8L23.6 14h-2.92A9 9 0 1 1 12 3v2z"
+              fill="currentColor"
+            />
+          </svg>
+        </span>
       </div>
 
       <AppHeader
