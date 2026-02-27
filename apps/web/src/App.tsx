@@ -96,6 +96,7 @@ const App = () => {
   const pullStartYRef = useRef<number | null>(null);
   const [pullDistance, setPullDistance] = useState(0);
   const [isPullRefreshing, setIsPullRefreshing] = useState(false);
+  const pullRefreshStartedAtRef = useRef<number | null>(null);
 
   const listMetaById = useMemo(() => {
     const updatedAtByList = new Map<string, number>();
@@ -292,11 +293,20 @@ const App = () => {
 
       setPullDistance(pullThreshold);
       setIsPullRefreshing(true);
+      pullRefreshStartedAtRef.current = Date.now();
+
       void refreshRealtimeConnection()
         .catch(() => "failed")
         .finally(() => {
-          setIsPullRefreshing(false);
-          setPullDistance(0);
+          const startedAt = pullRefreshStartedAtRef.current ?? Date.now();
+          const elapsed = Date.now() - startedAt;
+          const remainingMs = Math.max(0, 1000 - elapsed);
+
+          window.setTimeout(() => {
+            setIsPullRefreshing(false);
+            setPullDistance(0);
+            pullRefreshStartedAtRef.current = null;
+          }, remainingMs);
         });
     };
 
