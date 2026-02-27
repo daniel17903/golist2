@@ -8,6 +8,7 @@ import {
   setBackendCallLogger,
   sharingApiClient,
   setActiveBackendRequestLogger,
+  isBackendSharingEnabled,
 } from "../sharing/apiClient";
 
 const createId = () => crypto.randomUUID();
@@ -50,6 +51,7 @@ type StoreState = {
   syncNotice?: { id: string; message: string };
   backendLogs: Array<{ id: string; message: string; outcome: "success" | "error" | "skipped" }>;
   backendBusyRequests: number;
+  backendSharingEnabled: boolean;
   isLoaded: boolean;
   load: () => Promise<void>;
   addList: (name: string) => Promise<void>;
@@ -154,6 +156,10 @@ const logSkippedBackendCall = (reason: string) => {
 };
 
 const runBackendSyncInBackground = (action: () => Promise<void>, message: string) => {
+  if (!isBackendSharingEnabled) {
+    return;
+  }
+
   void action().catch((error) => {
     const details = describeSyncError(error);
     reportSyncError(
@@ -169,10 +175,11 @@ export const useStore = create<StoreState>((set, get) => ({
   items: [],
   isLoaded: false,
   activeListId: undefined,
-  backendConnection: "unknown",
+  backendConnection: isBackendSharingEnabled ? "unknown" : "offline",
   syncNotice: undefined,
   backendLogs: [],
   backendBusyRequests: 0,
+  backendSharingEnabled: isBackendSharingEnabled,
   load: async () => {
     const [lists, items] = await Promise.all([
       db.lists.toArray(),
@@ -200,7 +207,9 @@ export const useStore = create<StoreState>((set, get) => ({
       isLoaded: true,
     });
 
-    void get().syncAllLists();
+    if (isBackendSharingEnabled) {
+      void get().syncAllLists();
+    }
   },
   addList: async (name: string) => {
     const now = Date.now();
@@ -325,6 +334,9 @@ export const useStore = create<StoreState>((set, get) => ({
   },
   ensureShareToken: async (listId: string) => {
     const state = get();
+    if (!isBackendSharingEnabled) {
+      throw new Error("Backend sharing is disabled");
+    }
 
     const list = state.lists.find((entry) => entry.id === listId);
     if (!list || !state.metadata?.deviceId) {
@@ -347,6 +359,10 @@ export const useStore = create<StoreState>((set, get) => ({
   },
   joinSharedList: async (rawShareValue: string) => {
     const state = get();
+    if (!isBackendSharingEnabled) {
+      throw new Error("Backend sharing is disabled");
+    }
+
     if (!state.metadata?.deviceId) {
       throw new Error("Device metadata missing");
     }
@@ -418,7 +434,7 @@ export const useStore = create<StoreState>((set, get) => ({
   },
   syncList: async (listId: string) => {
     const state = get();
-    if (!state.metadata?.deviceId) {
+    if (!isBackendSharingEnabled || !state.metadata?.deviceId) {
       return;
     }
 
@@ -543,6 +559,10 @@ export const useStore = create<StoreState>((set, get) => ({
   },
   syncAllLists: async () => {
     const state = get();
+    if (!isBackendSharingEnabled) {
+      return;
+    }
+
     await Promise.all(
       state.lists.map(async (list) => {
         try {

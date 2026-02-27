@@ -29,6 +29,7 @@ export const useAppState = () => {
     clearSyncNotice,
     backendLogs,
     backendBusyRequests,
+    backendSharingEnabled,
   } = useStore();
 
   const [newListName, setNewListName] = useState("");
@@ -53,12 +54,12 @@ export const useAppState = () => {
   }, [isLoaded, lists.length, addList, t]);
 
   useEffect(() => {
-    if (!isLoaded) {
+    if (!isLoaded || !backendSharingEnabled) {
       return;
     }
 
     const shareTokenFromUrl = new URLSearchParams(window.location.search).get("shareToken");
-    if (!shareTokenFromUrl) {
+    if (!backendSharingEnabled || !shareTokenFromUrl) {
       return;
     }
 
@@ -71,10 +72,10 @@ export const useAppState = () => {
         window.history.replaceState({}, "", cleanedUrl.toString());
       }
     })();
-  }, [isLoaded, joinSharedList]);
+  }, [isLoaded, backendSharingEnabled, joinSharedList]);
 
   useEffect(() => {
-    if (!isLoaded) {
+    if (!isLoaded || !backendSharingEnabled) {
       return;
     }
 
@@ -96,7 +97,7 @@ export const useAppState = () => {
       document.removeEventListener("visibilitychange", onVisibilityChange);
       window.removeEventListener("online", onVisibilityChange);
     };
-  }, [isLoaded, syncAllLists]);
+  }, [isLoaded, backendSharingEnabled, syncAllLists]);
 
   const activeList = lists.find((list) => list.id === activeListId) ?? null;
   const listItems = useMemo(() => {
@@ -294,5 +295,6 @@ export const useAppState = () => {
     clearSyncNotice,
     backendLogs,
     backendBusyRequests,
+    backendSharingEnabled,
   };
 };

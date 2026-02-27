@@ -56,6 +56,7 @@ const App = () => {
     isCreateListModalOpen,
     createListName,
     backendBusyRequests,
+    backendSharingEnabled,
     setNewListName,
     setEditingTitle,
     setItemName,
@@ -275,6 +276,7 @@ const App = () => {
         onAddItem={openAddDialog}
         backendConnection={backendConnection}
         isBackendBusy={backendBusyRequests > 0}
+        canShareList={backendSharingEnabled}
         onShareList={() => {
           void (async () => {
             try {

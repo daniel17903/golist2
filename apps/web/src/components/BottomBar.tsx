@@ -4,11 +4,12 @@ type BottomBarProps = {
   onOpenDrawer: () => void;
   onAddItem: () => void;
   onShareList: () => void;
+  canShareList: boolean;
   backendConnection: "unknown" | "online" | "offline";
   isBackendBusy: boolean;
 };
 
-const BottomBar = ({ onOpenDrawer, onAddItem, onShareList, backendConnection, isBackendBusy }: BottomBarProps) => {
+const BottomBar = ({ onOpenDrawer, onAddItem, onShareList, canShareList, backendConnection, isBackendBusy }: BottomBarProps) => {
   const { t } = useI18n();
 
   return (
@@ -54,14 +55,16 @@ const BottomBar = ({ onOpenDrawer, onAddItem, onShareList, backendConnection, is
             </span>
           )}
         </span>
-        <button className="bottom-icon" type="button" aria-label={t("bottom.shareList")} onClick={onShareList}>
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path
-              d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7 0-.24-.03-.47-.09-.7l7.02-4.11c.54.5 1.25.81 2.07.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.03.47.09.7L8.91 9.81C8.37 9.31 7.66 9 6.84 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.82 0 1.53-.31 2.07-.81l7.12 4.19c-.05.2-.08.41-.08.62 0 1.66 1.34 3 3 3s3-1.34 3-3-1.34-3-3-3z"
-              fill="currentColor"
-            />
-          </svg>
-        </button>
+        {canShareList ? (
+          <button className="bottom-icon" type="button" aria-label={t("bottom.shareList")} onClick={onShareList}>
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7 0-.24-.03-.47-.09-.7l7.02-4.11c.54.5 1.25.81 2.07.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.03.47.09.7L8.91 9.81C8.37 9.31 7.66 9 6.84 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.82 0 1.53-.31 2.07-.81l7.12 4.19c-.05.2-.08.41-.08.62 0 1.66 1.34 3 3 3s3-1.34 3-3-1.34-3-3-3z"
+                fill="currentColor"
+              />
+            </svg>
+          </button>
+        ) : null}
       </div>
     </footer>
   );
