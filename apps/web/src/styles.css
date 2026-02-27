@@ -66,6 +66,34 @@ body {
 }
 
 
+.pull-refresh {
+  position: fixed;
+  top: 0;
+  left: 50%;
+  z-index: 44;
+  pointer-events: none;
+  transition: transform 140ms ease;
+}
+
+.pull-refresh__circle {
+  width: 52px;
+  height: 52px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(245, 240, 248, 0.95);
+  color: #6b50a8;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.22);
+  font-size: 34px;
+  line-height: 1;
+}
+
+.pull-refresh__circle--spinning {
+  animation: spin 0.9s linear infinite;
+}
+
+
 .ghost-button {
   border: 1px solid rgba(255, 255, 255, 0.7);
   background: transparent;

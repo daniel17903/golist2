@@ -119,6 +119,23 @@ class SocketSyncManager {
     this.sendDigest(this.subscribedListId);
   }
 
+  reconnect() {
+    if (this.reconnectTimer !== null) {
+      window.clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+
+    const currentSocket = this.socket;
+    if (currentSocket) {
+      this.socket = null;
+      currentSocket.close();
+    }
+
+    this.isSubscribedReady = false;
+    this.callbacks?.onConnectionState('offline');
+    this.connect();
+  }
+
   private connect() {
     if (!this.deviceId) {
       return;
@@ -133,9 +150,14 @@ class SocketSyncManager {
       return;
     }
 
-    this.socket = new WebSocket(url);
+    const socket = new WebSocket(url);
+    this.socket = socket;
 
-    this.socket.addEventListener('open', () => {
+    socket.addEventListener('open', () => {
+      if (this.socket !== socket) {
+        return;
+      }
+
       if (this.reconnectTimer !== null) {
         window.clearTimeout(this.reconnectTimer);
         this.reconnectTimer = null;
@@ -150,18 +172,27 @@ class SocketSyncManager {
       this.flushQueue();
     });
 
-    this.socket.addEventListener('message', (event) => {
+    socket.addEventListener('message', (event) => {
+      if (this.socket !== socket) {
+        return;
+      }
       void this.handleMessage(event.data);
     });
 
-    this.socket.addEventListener('close', () => {
+    socket.addEventListener('close', () => {
+      if (this.socket !== socket) {
+        return;
+      }
       this.socket = null;
       this.isSubscribedReady = false;
       this.callbacks?.onConnectionState('offline');
       this.scheduleReconnect();
     });
 
-    this.socket.addEventListener('error', () => {
+    socket.addEventListener('error', () => {
+      if (this.socket !== socket) {
+        return;
+      }
       this.callbacks?.onConnectionState('offline');
     });
   }

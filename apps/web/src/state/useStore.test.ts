@@ -31,6 +31,7 @@ vi.mock("../sharing/socketSync", () => ({
     queueLocalItemPatch: vi.fn(),
     queueLocalListMetadataPatch: vi.fn(),
     requestResync: vi.fn(),
+    reconnect: vi.fn(),
   },
 }));
 
@@ -150,6 +151,7 @@ const socketSetActiveListMock = vi.mocked(socketSyncManager.setActiveList);
 const socketQueueLocalItemPatchMock = vi.mocked(socketSyncManager.queueLocalItemPatch);
 const socketQueueLocalListMetadataPatchMock = vi.mocked(socketSyncManager.queueLocalListMetadataPatch);
 const socketRequestResyncMock = vi.mocked(socketSyncManager.requestResync);
+const socketReconnectMock = vi.mocked(socketSyncManager.reconnect);
 
 const resetStore = () => {
   useStore.setState({
@@ -188,6 +190,7 @@ describe("useStore", () => {
     socketQueueLocalItemPatchMock.mockReset();
     socketQueueLocalListMetadataPatchMock.mockReset();
     socketRequestResyncMock.mockReset();
+    socketReconnectMock.mockReset();
     globalThis.localStorage.clear();
     resetStore();
     vi.useFakeTimers();
@@ -423,6 +426,13 @@ describe("useStore", () => {
 
     expect(socketSetActiveListMock).toHaveBeenCalledWith("list-1");
     expect(socketRequestResyncMock).toHaveBeenCalledTimes(1);
+  });
+
+
+  it("reconnectBackend closes and reconnects websocket", () => {
+    useStore.getState().reconnectBackend();
+
+    expect(socketReconnectMock).toHaveBeenCalledTimes(1);
   });
 
   it("load initializes websocket sync manager", async () => {

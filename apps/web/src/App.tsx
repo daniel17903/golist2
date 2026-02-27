@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { TouchEvent } from "react";
 import type { Item } from "@golist/shared/domain/types";
 import AppHeader from "./components/AppHeader";
 import BottomBar from "./components/BottomBar";
@@ -57,6 +58,7 @@ const App = () => {
     createListName,
     backendBusyRequests,
     backendSharingEnabled,
+    reconnectBackend,
     setNewListName,
     setEditingTitle,
     setItemName,
@@ -92,6 +94,12 @@ const App = () => {
   const [appToasts, setAppToasts] = useState<AppToast[]>([]);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [activeLegalModal, setActiveLegalModal] = useState<LegalModalType | null>(null);
+  const [pullDistance, setPullDistance] = useState(0);
+  const [isPullRefreshing, setIsPullRefreshing] = useState(false);
+  const pullStartYRef = useRef<number | null>(null);
+  const isPullTrackingRef = useRef(false);
+  const pullRefreshThreshold = 76;
+  const pullDistanceMax = 120;
 
   const listMetaById = useMemo(() => {
     const updatedAtByList = new Map<string, number>();
@@ -241,8 +249,82 @@ const App = () => {
     };
   }, [showBackendLogs, syncNotice, clearSyncNotice]);
 
+  const handlePullTouchStart = (event: TouchEvent<HTMLDivElement>) => {
+    if (isPullRefreshing) {
+      return;
+    }
+
+    const scrollTop = document.scrollingElement?.scrollTop ?? window.scrollY;
+    if (scrollTop > 0) {
+      isPullTrackingRef.current = false;
+      pullStartYRef.current = null;
+      return;
+    }
+
+    isPullTrackingRef.current = true;
+    pullStartYRef.current = event.touches[0]?.clientY ?? null;
+  };
+
+  const handlePullTouchMove = (event: TouchEvent<HTMLDivElement>) => {
+    if (!isPullTrackingRef.current || pullStartYRef.current === null || isPullRefreshing) {
+      return;
+    }
+
+    const nextY = event.touches[0]?.clientY;
+    if (typeof nextY !== "number") {
+      return;
+    }
+
+    const delta = nextY - pullStartYRef.current;
+    if (delta <= 0) {
+      setPullDistance(0);
+      return;
+    }
+
+    const damped = Math.min(pullDistanceMax, delta * 0.5);
+    setPullDistance(damped);
+  };
+
+  const resetPullGesture = () => {
+    isPullTrackingRef.current = false;
+    pullStartYRef.current = null;
+    setPullDistance(0);
+  };
+
+  const handlePullTouchEnd = () => {
+    if (isPullRefreshing) {
+      resetPullGesture();
+      return;
+    }
+
+    if (pullDistance >= pullRefreshThreshold) {
+      setIsPullRefreshing(true);
+      setPullDistance(pullRefreshThreshold);
+      reconnectBackend();
+      window.setTimeout(() => {
+        setIsPullRefreshing(false);
+        setPullDistance(0);
+      }, 700);
+    } else {
+      setPullDistance(0);
+    }
+
+    isPullTrackingRef.current = false;
+    pullStartYRef.current = null;
+  };
+
   return (
-    <div className="app">
+    <div
+      className="app"
+      onTouchStart={handlePullTouchStart}
+      onTouchMove={handlePullTouchMove}
+      onTouchEnd={handlePullTouchEnd}
+      onTouchCancel={handlePullTouchEnd}
+    >
+      <div className="pull-refresh" style={{ transform: `translate(-50%, ${-56 + pullDistance}px)` }} aria-hidden="true">
+        <span className={`pull-refresh__circle ${isPullRefreshing ? "pull-refresh__circle--spinning" : ""}`}>↻</span>
+      </div>
+
       <AppHeader
         activeListName={activeList?.name ?? ""}
         renameValue={newListName}
