@@ -66,6 +66,7 @@ type StoreState = {
   joinSharedList: (rawShareValue: string) => Promise<string>;
   syncList: (listId: string) => Promise<void>;
   syncAllLists: () => Promise<void>;
+  reconnectRealtimeSync: () => Promise<void>;
   clearSyncNotice: () => void;
   appendBackendLog: (entry: { message: string; outcome: "success" | "error" | "skipped" }) => void;
 };
@@ -486,6 +487,13 @@ export const useStore = create<StoreState>((set, get) => ({
     }
 
     socketSyncManager.requestResync();
+  },
+  reconnectRealtimeSync: async () => {
+    if (!isBackendSharingEnabled) {
+      return;
+    }
+
+    socketSyncManager.reconnect();
   },
   clearSyncNotice: () => set({ syncNotice: undefined }),
   appendBackendLog: (entry) =>

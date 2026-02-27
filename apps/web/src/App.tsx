@@ -11,6 +11,7 @@ import SettingsModal from "./components/SettingsModal";
 import LegalModal from "./components/LegalModal";
 import { useAppState } from "./hooks/useAppState";
 import { useLongPressItem } from "./hooks/useLongPressItem";
+import { usePullToRefresh } from "./hooks/usePullToRefresh";
 import { useI18n } from "./i18n";
 
 type UndoToast = {
@@ -57,6 +58,7 @@ const App = () => {
     createListName,
     backendBusyRequests,
     backendSharingEnabled,
+    reconnectRealtimeSync,
     setNewListName,
     setEditingTitle,
     setItemName,
@@ -225,6 +227,11 @@ const App = () => {
       onShortPress: handleToggleItem,
     });
 
+  const { pullDistance, isRefreshing, onTouchStart, onTouchMove, onTouchEnd, onTouchCancel } = usePullToRefresh({
+    isEnabled: !isDrawerOpen,
+    onRefresh: reconnectRealtimeSync,
+  });
+
   const showBackendLogs = __ENVIRONMENT__ !== "production";
 
   useEffect(() => {
@@ -241,8 +248,30 @@ const App = () => {
     };
   }, [showBackendLogs, syncNotice, clearSyncNotice]);
 
+  const pullProgress = Math.min(1, pullDistance / 72);
+
   return (
-    <div className="app">
+    <div
+      className={`app ${pullDistance > 0 || isRefreshing ? "app--pulling" : ""}`}
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEnd}
+      onTouchCancel={onTouchCancel}
+      style={{
+        transform: `translateY(${pullDistance}px)`,
+        transition: pullDistance > 0 || isRefreshing ? "none" : "transform 180ms ease-out",
+      }}
+    >
+      <div
+        className={`pull-refresh ${isRefreshing ? "pull-refresh--active" : ""}`}
+        style={{
+          transform: `translate(-50%, ${-72 + pullDistance}px)`,
+          opacity: isRefreshing ? 1 : Math.max(0, pullProgress),
+        }}
+        aria-hidden="true"
+      >
+        <span className="pull-refresh__spinner" />
+      </div>
       <AppHeader
         activeListName={activeList?.name ?? ""}
         renameValue={newListName}

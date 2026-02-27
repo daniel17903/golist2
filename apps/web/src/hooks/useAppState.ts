@@ -24,6 +24,7 @@ export const useAppState = () => {
     ensureShareToken,
     joinSharedList,
     syncAllLists,
+    reconnectRealtimeSync,
     backendConnection,
     syncNotice,
     clearSyncNotice,
@@ -296,5 +297,6 @@ export const useAppState = () => {
     backendLogs,
     backendBusyRequests,
     backendSharingEnabled,
+    reconnectRealtimeSync,
   };
 };

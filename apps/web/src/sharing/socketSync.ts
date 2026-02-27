@@ -50,6 +50,7 @@ class SocketSyncManager {
   private reconnectAttempts = 0;
   private isSubscribedReady = false;
   private reconnectTimer: number | null = null;
+  private manualReconnectPending = false;
   private onlineListenerRegistered = false;
   private queue: OutboundPatch[] = [];
   private listMetadataQueue: OutboundListMetadataPatch[] = [];
@@ -119,6 +120,23 @@ class SocketSyncManager {
     this.sendDigest(this.subscribedListId);
   }
 
+  reconnect() {
+    if (this.reconnectTimer !== null) {
+      window.clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+
+    this.reconnectAttempts = 0;
+
+    if (this.socket) {
+      this.manualReconnectPending = true;
+      this.socket.close();
+      return;
+    }
+
+    this.connect();
+  }
+
   private connect() {
     if (!this.deviceId) {
       return;
@@ -158,6 +176,13 @@ class SocketSyncManager {
       this.socket = null;
       this.isSubscribedReady = false;
       this.callbacks?.onConnectionState('offline');
+
+      if (this.manualReconnectPending) {
+        this.manualReconnectPending = false;
+        this.connect();
+        return;
+      }
+
       this.scheduleReconnect();
     });
 
