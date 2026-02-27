@@ -7,6 +7,9 @@ const apiBaseUrl = process.env.API_BASE_URL ?? "";
 console.info(`[web-build] Configured API_BASE_URL=${apiBaseUrl || "<offline-only>"}`);
 
 export default defineConfig({
+  build: {
+    minify: "esbuild",
+  },
   define: {
     __APP_VERSION__: JSON.stringify(process.env.npm_package_version ?? "dev"),
     __API_BASE_URL__: JSON.stringify(apiBaseUrl),
