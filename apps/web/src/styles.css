@@ -795,8 +795,10 @@ body {
 
 .item-card--dialog {
   background: rgba(213, 254, 181, 0.39);
-  height: var(--item-size);
-  width: var(--item-size);
+  height: auto;
+  width: 100%;
+  min-width: 0;
+  aspect-ratio: 1 / 1;
   color: #ffffff;
 }
 
@@ -819,6 +821,12 @@ body {
 
 .add-dialog .item-icon img {
   filter: brightness(0) invert(1);
+}
+
+.add-dialog .item-icon,
+.add-dialog .item-icon img {
+  width: clamp(42px, 16vw, 60px);
+  height: clamp(42px, 16vw, 60px);
 }
 
 .add-dialog .modal__grid {
