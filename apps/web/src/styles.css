@@ -243,7 +243,7 @@ body {
 .list-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(var(--item-size), var(--item-size)));
-  gap: 8px;
+  gap: 6px;
   margin-top: 16px;
   justify-content: center;
 }
