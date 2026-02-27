@@ -63,6 +63,13 @@ const BottomBar = ({ onOpenDrawer, onAddItem, onShareList, canShareList, backend
                     strokeLinecap="round"
                     strokeLinejoin="round"
                   />
+                  <path
+                    d="M5 19L19 5"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                  />
                 </svg>
               </span>
               <span className={`connection-badge__tooltip ${showOfflineInfo ? "connection-badge__tooltip--visible" : ""}`}>
