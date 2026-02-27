@@ -8,6 +8,7 @@ import { postgresListRepository } from './repositories/postgres-list-repository.
 import { registerHealthRoutes } from './routes/health.js'
 import { registerListRoutes } from './routes/lists.js'
 import { registerShareTokenRoutes } from './routes/share-tokens.js'
+import { registerSyncWebsocketRoute } from './routes/sync-websocket.js'
 
 export function buildServer(deps: { listRepository?: ListRepository } = {}) {
   const app = Fastify({ logger: true })
@@ -24,6 +25,7 @@ export function buildServer(deps: { listRepository?: ListRepository } = {}) {
   registerHealthRoutes(app, listRepository)
   registerListRoutes(app, listRepository)
   registerShareTokenRoutes(app, listRepository)
+  void registerSyncWebsocketRoute(app, listRepository)
 
   return app
 }
