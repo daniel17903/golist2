@@ -62,24 +62,25 @@ body {
   position: fixed;
   top: 0;
   left: 50%;
-  width: 34px;
-  height: 34px;
+  width: 44px;
+  height: 44px;
   border-radius: 999px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(11, 31, 42, 0.72);
+  background: #ece6f2;
+  box-shadow: 0 3px 10px rgba(44, 24, 79, 0.25);
   z-index: 65;
   pointer-events: none;
   transition: transform 120ms ease-out;
 }
 
 .pull-refresh-indicator__ring {
-  width: 20px;
-  height: 20px;
+  width: 26px;
+  height: 26px;
   border-radius: 999px;
-  border: 2px solid rgba(243, 248, 246, 0.45);
-  border-top-color: #f3f8f6;
+  border: 3px solid rgba(108, 82, 168, 0.25);
+  border-top-color: #6b52a8;
 }
 
 .pull-refresh-indicator--active .pull-refresh-indicator__ring {
