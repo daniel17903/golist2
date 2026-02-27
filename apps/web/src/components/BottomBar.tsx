@@ -14,6 +14,7 @@ const BottomBar = ({ onOpenDrawer, onAddItem, onShareList, canShareList, backend
   const { t } = useI18n();
   const [showOfflineInfo, setShowOfflineInfo] = useState(false);
   const showOfflineBadge = backendConnection === "offline";
+  const showShareButton = canShareList && backendConnection !== "offline";
 
   return (
     <footer className="bottom-bar">
@@ -78,7 +79,7 @@ const BottomBar = ({ onOpenDrawer, onAddItem, onShareList, canShareList, backend
             </button>
           ) : null}
         </span>
-        {canShareList ? (
+        {showShareButton ? (
           <button className="bottom-icon" type="button" aria-label={t("bottom.shareList")} onClick={onShareList}>
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path
