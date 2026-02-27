@@ -57,6 +57,7 @@ const App = () => {
     createListName,
     backendBusyRequests,
     backendSharingEnabled,
+    refreshRealtimeConnection,
     setNewListName,
     setEditingTitle,
     setItemName,
@@ -92,6 +93,10 @@ const App = () => {
   const [appToasts, setAppToasts] = useState<AppToast[]>([]);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [activeLegalModal, setActiveLegalModal] = useState<LegalModalType | null>(null);
+  const pullStartYRef = useRef<number | null>(null);
+  const [pullDistance, setPullDistance] = useState(0);
+  const [isPullRefreshing, setIsPullRefreshing] = useState(false);
+  const pullRefreshStartedAtRef = useRef<number | null>(null);
 
   const listMetaById = useMemo(() => {
     const updatedAtByList = new Map<string, number>();
@@ -241,8 +246,92 @@ const App = () => {
     };
   }, [showBackendLogs, syncNotice, clearSyncNotice]);
 
+  useEffect(() => {
+    const pullThreshold = 72;
+    const maxPull = 96;
+    const getScrollY = () => window.scrollY || document.scrollingElement?.scrollTop || 0;
+
+    const onTouchStart = (event: TouchEvent) => {
+      if (isDrawerOpen || isPullRefreshing || event.touches.length !== 1 || getScrollY() > 0) {
+        pullStartYRef.current = null;
+        return;
+      }
+
+      pullStartYRef.current = event.touches[0]?.clientY ?? null;
+    };
+
+    const onTouchMove = (event: TouchEvent) => {
+      if (pullStartYRef.current === null || isDrawerOpen || isPullRefreshing) {
+        return;
+      }
+
+      const currentY = event.touches[0]?.clientY;
+      if (typeof currentY !== "number") {
+        return;
+      }
+
+      const rawDistance = currentY - pullStartYRef.current;
+      if (rawDistance <= 0) {
+        if (pullDistance !== 0) {
+          setPullDistance(0);
+        }
+        return;
+      }
+
+      event.preventDefault();
+      setPullDistance(Math.min(maxPull, rawDistance * 0.45));
+    };
+
+    const onTouchEnd = () => {
+      pullStartYRef.current = null;
+      const shouldRefresh = pullDistance >= pullThreshold && !isDrawerOpen && !isPullRefreshing;
+
+      if (!shouldRefresh) {
+        setPullDistance(0);
+        return;
+      }
+
+      setPullDistance(pullThreshold);
+      setIsPullRefreshing(true);
+      pullRefreshStartedAtRef.current = Date.now();
+
+      void refreshRealtimeConnection()
+        .catch(() => "failed")
+        .finally(() => {
+          const startedAt = pullRefreshStartedAtRef.current ?? Date.now();
+          const elapsed = Date.now() - startedAt;
+          const remainingMs = Math.max(0, 1000 - elapsed);
+
+          window.setTimeout(() => {
+            setIsPullRefreshing(false);
+            setPullDistance(0);
+            pullRefreshStartedAtRef.current = null;
+          }, remainingMs);
+        });
+    };
+
+    window.addEventListener("touchstart", onTouchStart, { passive: true });
+    window.addEventListener("touchmove", onTouchMove, { passive: false });
+    window.addEventListener("touchend", onTouchEnd);
+    window.addEventListener("touchcancel", onTouchEnd);
+
+    return () => {
+      window.removeEventListener("touchstart", onTouchStart);
+      window.removeEventListener("touchmove", onTouchMove);
+      window.removeEventListener("touchend", onTouchEnd);
+      window.removeEventListener("touchcancel", onTouchEnd);
+    };
+  }, [isDrawerOpen, isPullRefreshing, pullDistance, refreshRealtimeConnection]);
+
   return (
     <div className="app">
+      <div
+        className={`pull-refresh-indicator${isPullRefreshing ? " pull-refresh-indicator--active" : ""}`}
+        style={{ transform: `translate(-50%, ${-56 + pullDistance}px)` }}
+        aria-hidden="true"
+      >
+        <span className="pull-refresh-indicator__ring" />
+      </div>
       <AppHeader
         activeListName={activeList?.name ?? ""}
         renameValue={newListName}

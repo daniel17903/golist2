@@ -58,6 +58,35 @@ body {
   padding: 24px 18px 96px;
 }
 
+.pull-refresh-indicator {
+  position: fixed;
+  top: 0;
+  left: 50%;
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #ece6f2;
+  box-shadow: 0 3px 10px rgba(44, 24, 79, 0.25);
+  z-index: 65;
+  pointer-events: none;
+  transition: transform 120ms ease-out;
+}
+
+.pull-refresh-indicator__ring {
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  border: 3px solid rgba(108, 82, 168, 0.25);
+  border-top-color: #6b52a8;
+}
+
+.pull-refresh-indicator--active .pull-refresh-indicator__ring {
+  animation: spin 0.8s linear infinite;
+}
+
 .app__header {
   display: flex;
   flex-direction: column;
