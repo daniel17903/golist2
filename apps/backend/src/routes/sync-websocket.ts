@@ -1,6 +1,7 @@
 import type { Item } from '@golist/shared/domain/types'
 import { buildItemHash, buildItemSummaries, buildListDigest } from '@golist/shared/domain/sync'
 import websocket from '@fastify/websocket'
+import type { RawData, WebSocket } from 'ws'
 import { type FastifyInstance } from 'fastify'
 import { z } from 'zod'
 
@@ -55,6 +56,8 @@ type ConnectionState = {
   subscribedListId?: string
 }
 
+type ServerSocket = WebSocket
+
 const parseClientMessage = (payload: unknown): ClientMessage => {
   if (typeof payload !== 'object' || payload === null) {
     throw new Error('Expected object message')
@@ -86,6 +89,23 @@ const parseClientMessage = (payload: unknown): ClientMessage => {
   throw new Error('Unsupported message type')
 }
 
+
+const rawDataToString = (raw: RawData): string => {
+  if (typeof raw === 'string') {
+    return raw
+  }
+
+  if (raw instanceof ArrayBuffer) {
+    return Buffer.from(raw).toString('utf8')
+  }
+
+  if (Array.isArray(raw)) {
+    return Buffer.concat(raw).toString('utf8')
+  }
+
+  return raw.toString('utf8')
+}
+
 const toSyncItem = (item: ListItemRecord): Item => ({
   id: item.id,
   listId: item.listId,
@@ -98,12 +118,26 @@ const toSyncItem = (item: ListItemRecord): Item => ({
   updatedAt: Date.parse(item.updatedAt),
 })
 
+const shouldAcceptIncomingItem = (existing: Item | null, incoming: Item) => {
+  if (!existing) {
+    return true
+  }
+
+  if (incoming.updatedAt > existing.updatedAt) {
+    return true
+  }
+
+  if (incoming.updatedAt < existing.updatedAt) {
+    return false
+  }
+
+  return buildItemHash(incoming) >= buildItemHash(existing)
+}
+
 export function registerSyncWebsocketRoute(app: FastifyInstance, listRepository: ListRepository) {
   void app.register(websocket)
 
   const subscribers = new Map<string, Set<ServerSocket>>()
-
-  type ServerSocket = { send: (payload: string) => void; on: (event: string, cb: (...args: any[]) => void) => void }
 
   const send = (socket: ServerSocket, message: ServerMessage) => {
     socket.send(JSON.stringify(message))
@@ -138,10 +172,9 @@ export function registerSyncWebsocketRoute(app: FastifyInstance, listRepository:
   app.get('/v1/ws', { websocket: true }, (socket) => {
     const state: ConnectionState = {}
 
-    socket.on('message', async (raw: unknown) => {
+    socket.on('message', async (raw: RawData) => {
       try {
-        const payloadText = typeof raw === 'string' ? raw : String(raw)
-        const parsedPayload = parseClientMessage(JSON.parse(payloadText))
+        const parsedPayload = parseClientMessage(JSON.parse(rawDataToString(raw)))
 
         if (parsedPayload.type === 'hello') {
           state.deviceId = parsedPayload.deviceId
@@ -236,14 +269,11 @@ export function registerSyncWebsocketRoute(app: FastifyInstance, listRepository:
         if (parsedPayload.type === 'item_patch') {
           const accepted: Item[] = []
           for (const item of parsedPayload.items) {
-            const existing = await listRepository.getListItem(parsedPayload.listId, item.id)
-            const incomingIso = new Date(item.updatedAt).toISOString()
+            const existingRecord = await listRepository.getListItem(parsedPayload.listId, item.id)
+            const existing = existingRecord ? toSyncItem(existingRecord) : null
 
-            if (existing) {
-              const existingMillis = Date.parse(existing.updatedAt)
-              if (existingMillis > item.updatedAt) {
-                continue
-              }
+            if (!shouldAcceptIncomingItem(existing, item)) {
+              continue
             }
 
             await listRepository.upsertListItem(parsedPayload.listId, item.id, state.deviceId, {
@@ -252,7 +282,7 @@ export function registerSyncWebsocketRoute(app: FastifyInstance, listRepository:
               quantityOrUnit: item.quantityOrUnit,
               category: item.category,
               deleted: item.deleted,
-              updatedAt: incomingIso,
+              updatedAt: new Date(item.updatedAt).toISOString(),
             })
             accepted.push(item)
           }

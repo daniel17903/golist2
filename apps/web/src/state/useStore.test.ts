@@ -30,6 +30,7 @@ vi.mock("../sharing/socketSync", () => ({
     setActiveList: vi.fn(),
     queueLocalItemPatch: vi.fn(),
     requestResync: vi.fn(),
+    canSyncList: vi.fn(() => true),
   },
 }));
 
@@ -152,6 +153,7 @@ const socketInitMock = vi.mocked(socketSyncManager.init);
 const socketSetActiveListMock = vi.mocked(socketSyncManager.setActiveList);
 const socketQueueLocalItemPatchMock = vi.mocked(socketSyncManager.queueLocalItemPatch);
 const socketRequestResyncMock = vi.mocked(socketSyncManager.requestResync);
+const socketCanSyncListMock = vi.mocked(socketSyncManager.canSyncList);
 
 const resetStore = () => {
   useStore.setState({
@@ -191,6 +193,8 @@ describe("useStore", () => {
     socketSetActiveListMock.mockReset();
     socketQueueLocalItemPatchMock.mockReset();
     socketRequestResyncMock.mockReset();
+    socketCanSyncListMock.mockReset();
+    socketCanSyncListMock.mockReturnValue(true);
     globalThis.localStorage.clear();
     resetStore();
     vi.useFakeTimers();

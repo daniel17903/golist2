@@ -45,6 +45,7 @@ class SocketSyncManager {
   private subscribedListId: string | null = null;
   private deviceId: string | null = null;
   private reconnectAttempts = 0;
+  private isSubscribedReady = false;
   private reconnectTimer: number | null = null;
   private queue: OutboundPatch[] = [];
 
@@ -62,6 +63,7 @@ class SocketSyncManager {
 
     const previousListId = this.subscribedListId;
     this.subscribedListId = nextListId;
+    this.isSubscribedReady = false;
 
     if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
       return;
@@ -74,6 +76,15 @@ class SocketSyncManager {
     if (nextListId) {
       this.send({ type: 'subscribe_list', listId: nextListId });
     }
+  }
+
+
+  canSyncList(listId: string): boolean {
+    return (
+      this.subscribedListId === listId &&
+      this.isSubscribedReady &&
+      this.socket?.readyState === WebSocket.OPEN
+    );
   }
 
   queueLocalItemPatch(item: Item) {
@@ -108,6 +119,7 @@ class SocketSyncManager {
     this.socket.addEventListener('open', () => {
       this.reconnectAttempts = 0;
       this.callbacks?.onConnectionState('online');
+      this.isSubscribedReady = false;
       this.send({ type: 'hello', deviceId: this.deviceId });
       if (this.subscribedListId) {
         this.send({ type: 'subscribe_list', listId: this.subscribedListId });
@@ -120,6 +132,7 @@ class SocketSyncManager {
     });
 
     this.socket.addEventListener('close', () => {
+      this.isSubscribedReady = false;
       this.callbacks?.onConnectionState('offline');
       this.scheduleReconnect();
     });
@@ -162,8 +175,10 @@ class SocketSyncManager {
 
     if (payload.type === 'subscribed') {
       const listId = typeof payload.listId === 'string' ? payload.listId : null;
-      if (listId) {
+      if (listId && listId === this.subscribedListId) {
+        this.isSubscribedReady = true;
         this.sendDigest(listId);
+        this.flushQueue();
       }
       return;
     }
@@ -233,7 +248,7 @@ class SocketSyncManager {
       return;
     }
 
-    if (!this.subscribedListId) {
+    if (!this.subscribedListId || !this.isSubscribedReady) {
       return;
     }
 

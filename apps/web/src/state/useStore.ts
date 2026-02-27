@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type { AppMetadata, Item, List } from "@golist/shared/domain/types";
+import { buildItemHash } from "@golist/shared/domain/sync";
 import { getCategoryIdForItem, getItemIconName } from "../domain/categories";
 import { db } from "../storage/db";
 import { t } from "../i18n";
@@ -69,6 +70,31 @@ type StoreState = {
   appendBackendLog: (entry: { message: string; outcome: "success" | "error" | "skipped" }) => void;
 };
 
+
+const syncItemFallbackImmediately = async (item: Item) => {
+  const state = useStore.getState();
+  if (!state.metadata?.deviceId) {
+    logSkippedBackendCall("Item fallback sync skipped: device metadata missing.");
+    return;
+  }
+
+  await sharingApiClient.upsertItem({
+    deviceId: state.metadata.deviceId,
+    listId: item.listId,
+    itemId: item.id,
+    body: {
+      name: item.name,
+      iconName: item.iconName,
+      quantityOrUnit: item.quantityOrUnit,
+      category: item.category,
+      deleted: item.deleted,
+      updatedAt: new Date(item.updatedAt).toISOString(),
+    },
+  });
+
+  markBackendOnline();
+};
+
 const syncListNameImmediately = async (listId: string, listName: string) => {
   const state = useStore.getState();
   if (!state.metadata?.deviceId) {
@@ -82,6 +108,11 @@ const syncListNameImmediately = async (listId: string, listName: string) => {
     body: {
       name: listName,
     },
+  });
+
+  await sharingApiClient.fetchList({
+    deviceId: state.metadata.deviceId,
+    listId,
   });
 
   markBackendOnline();
@@ -194,7 +225,7 @@ export const useStore = create<StoreState>((set, get) => ({
             if (incoming.updatedAt < localItem.updatedAt) {
               return false;
             }
-            return incoming.id.localeCompare(localItem.id) >= 0;
+            return buildItemHash(incoming) >= buildItemHash(localItem);
           });
 
           if (acceptedItems.length === 0) {
@@ -293,6 +324,9 @@ export const useStore = create<StoreState>((set, get) => ({
     await db.items.add(item);
     set((state) => ({ items: [...state.items, item] }));
     socketSyncManager.queueLocalItemPatch(item);
+    if (!socketSyncManager.canSyncList(listId)) {
+      runBackendSyncInBackground(() => syncItemFallbackImmediately(item), t("sync.offline"));
+    }
   },
   toggleItem: async (itemId: string) => {
     const { items } = get();
@@ -309,6 +343,9 @@ export const useStore = create<StoreState>((set, get) => ({
     }));
 
     socketSyncManager.queueLocalItemPatch(updated);
+    if (!socketSyncManager.canSyncList(updated.listId)) {
+      runBackendSyncInBackground(() => syncItemFallbackImmediately(updated), t("sync.offline"));
+    }
   },
   updateItem: async (itemId: string, name: string, quantityOrUnit?: string) => {
     const { items } = get();
@@ -328,6 +365,9 @@ export const useStore = create<StoreState>((set, get) => ({
     }));
 
     socketSyncManager.queueLocalItemPatch(updated);
+    if (!socketSyncManager.canSyncList(updated.listId)) {
+      runBackendSyncInBackground(() => syncItemFallbackImmediately(updated), t("sync.offline"));
+    }
   },
   ensureShareToken: async (listId: string) => {
     const state = get();

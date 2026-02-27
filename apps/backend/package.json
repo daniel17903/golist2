@@ -30,7 +30,8 @@
     "globals": "17.3.0",
     "tsx": "4.21.0",
     "typescript": "5.9.3",
-    "vitest": "4.0.18"
+    "vitest": "4.0.18",
+    "@types/ws": "8.18.1"
   },
   "engines": {
     "node": ">=24.0.0"

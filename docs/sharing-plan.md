@@ -92,14 +92,16 @@ The API contract is maintained in `apps/api-spec/openapi.yaml` (and related file
 2. UI flows are implemented in `apps/web`:
    - share active list (calls share-token creation route on button click and reveals tokenized link)
    - join list by share link/token via header action
-3. Sync triggers are wired in web state/hooks:
-   - initial-load pull sync for shared lists
-   - foreground/background periodic sync (`setInterval`, `visibilitychange`, and `online` hooks)
-   - optimistic local updates with reconciliation against remote list/item state
-4. Frontend does not persist share tokens to local storage/IndexedDB; share tokens are kept in-memory only for the active session.
-5. Local-first behavior is preserved when offline by keeping local mutations authoritative and treating sync errors as non-fatal.
-   - Frontend sync flow details are documented in `docs/frontend-sharing-sync.md` (immediate mutation push + background full reconciliation).
-5. **GitHub Actions update**: web CI continues to validate web lint/typecheck/test/build, while backend integration behavior remains covered by backend test suites/workflows.
+3. Sync triggers are wired in web state/hooks using a single long-lived WebSocket connection to `/v1/ws`:
+   - app-load socket bootstrap after device metadata is available
+   - active-list scoped subscribe/unsubscribe (only one list synced at a time)
+   - digest/hash reconciliation (`list_digest` + `hash_diff`) before targeted `item_patch` exchange
+   - optimistic local updates queued and flushed through websocket `item_patch` messages
+4. Frontend keeps bounded reconnect logic (exponential backoff + jitter, max retries) and re-runs digest/hash reconciliation after reconnect.
+5. Frontend does not persist share tokens to local storage/IndexedDB; share tokens are kept in-memory only for the active session.
+6. Local-first behavior is preserved when offline by keeping local mutations authoritative and treating sync errors as non-fatal.
+   - Frontend sync flow details are documented in `docs/frontend-sharing-sync.md`.
+7. **GitHub Actions update**: web CI continues to validate web lint/typecheck/test/build, while backend integration behavior remains covered by backend test suites/workflows.
 
 ### Phase 5 — Quality, observability, and hardening
 1. Add integration tests with ephemeral Postgres.
