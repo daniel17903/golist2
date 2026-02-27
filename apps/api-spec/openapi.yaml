@@ -248,10 +248,17 @@ components:
               items:
                 $ref: "#/components/schemas/SyncItem"
         - type: object
-          required: [type]
+          required: [type, listId, name, updatedAt]
           properties:
             type:
-              const: ping
+              const: list_metadata_patch
+            listId:
+              type: string
+              format: uuid
+            name:
+              type: string
+            updatedAt:
+              type: integer
     WebSocketServerMessage:
       description: Server-to-client websocket sync messages.
       oneOf:
@@ -259,15 +266,19 @@ components:
           required: [type]
           properties:
             type:
-              enum: [hello_ack, pong]
+              const: hello_ack
         - type: object
-          required: [type, listId, serverListDigest]
+          required: [type, listId, listName, listUpdatedAt, serverListDigest]
           properties:
             type:
               const: subscribed
             listId:
               type: string
               format: uuid
+            listName:
+              type: string
+            listUpdatedAt:
+              type: integer
             serverListDigest:
               type: string
         - type: object
@@ -294,6 +305,18 @@ components:
               type: array
               items:
                 $ref: "#/components/schemas/SyncItem"
+        - type: object
+          required: [type, listId, name, updatedAt]
+          properties:
+            type:
+              const: list_metadata_patch
+            listId:
+              type: string
+              format: uuid
+            name:
+              type: string
+            updatedAt:
+              type: integer
         - type: object
           required: [type, message]
           properties:

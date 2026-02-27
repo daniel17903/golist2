@@ -50,7 +50,6 @@ class SocketSyncManager {
   private reconnectAttempts = 0;
   private isSubscribedReady = false;
   private reconnectTimer: number | null = null;
-  private pingTimer: number | null = null;
   private onlineListenerRegistered = false;
   private queue: OutboundPatch[] = [];
   private listMetadataQueue: OutboundListMetadataPatch[] = [];
@@ -148,7 +147,6 @@ class SocketSyncManager {
       if (this.subscribedListId) {
         this.send({ type: 'subscribe_list', listId: this.subscribedListId });
       }
-      this.startPingLoop();
       this.flushQueue();
     });
 
@@ -157,7 +155,6 @@ class SocketSyncManager {
     });
 
     this.socket.addEventListener('close', () => {
-      this.stopPingLoop();
       this.socket = null;
       this.isSubscribedReady = false;
       this.callbacks?.onConnectionState('offline');
@@ -165,26 +162,8 @@ class SocketSyncManager {
     });
 
     this.socket.addEventListener('error', () => {
-      this.stopPingLoop();
       this.callbacks?.onConnectionState('offline');
     });
-  }
-
-  private startPingLoop() {
-    if (this.pingTimer !== null) {
-      window.clearInterval(this.pingTimer);
-    }
-
-    this.pingTimer = window.setInterval(() => {
-      this.send({ type: 'ping' });
-    }, 15000);
-  }
-
-  private stopPingLoop() {
-    if (this.pingTimer !== null) {
-      window.clearInterval(this.pingTimer);
-      this.pingTimer = null;
-    }
   }
 
   private scheduleReconnect() {
@@ -286,10 +265,6 @@ class SocketSyncManager {
           updatedAt: listUpdatedAt,
         });
       }
-      return;
-    }
-
-    if (payload.type === 'pong') {
       return;
     }
 

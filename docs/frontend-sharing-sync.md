@@ -29,13 +29,13 @@ For list/item mutations, the app writes to IndexedDB and updates Zustand state f
 - One `SocketSyncManager` is initialized after app metadata/device context is loaded.
 - Socket URL is derived from `API_BASE_URL` (`http -> ws`, `https -> wss`) and targets `/v1/ws`.
 - Connection state is surfaced as `unknown` / `online` / `offline`.
-- Reconnect uses bounded exponential backoff with jitter.
+- Reconnect retries 3 times with a 3s delay, then continues retrying every 10s indefinitely.
 
 ### 3. Active-list subscription
 
 - Only the active list is subscribed.
 - On list switch the client sends `unsubscribe_list` (old) then `subscribe_list` (new).
-- Outbound item patches are queued and flushed only after the subscription is acknowledged.
+- Outbound item and list-metadata patches are queued and flushed only after the subscription is acknowledged.
 
 ### 4. Reconciliation protocol
 

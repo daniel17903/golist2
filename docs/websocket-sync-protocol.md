@@ -24,21 +24,21 @@ This document defines the list-scoped realtime sync protocol used by GoList web 
   - `{ "type": "hash_diff", "listId": "<uuid>", "summaries": [{ "itemId": "<uuid>", "itemHash": "<string>", "updatedAt": <number> }] }`
 - `item_patch`
   - `{ "type": "item_patch", "listId": "<uuid>", "items": [<item-state>] }`
-- `ping`
-  - `{ "type": "ping" }`
+- `list_metadata_patch`
+  - `{ "type": "list_metadata_patch", "listId": "<uuid>", "name": "<string>", "updatedAt": <number> }`
 
 ### Server -> client
 
 - `hello_ack`
   - `{ "type": "hello_ack" }`
 - `subscribed`
-  - `{ "type": "subscribed", "listId": "<uuid>", "serverListDigest": "<string>" }`
+  - `{ "type": "subscribed", "listId": "<uuid>", "listName": "<string>", "listUpdatedAt": <number>, "serverListDigest": "<string>" }`
 - `hash_diff`
   - same shape as client `hash_diff`
 - `item_patch`
   - same shape as client `item_patch`
-- `pong`
-  - `{ "type": "pong" }`
+- `list_metadata_patch`
+  - `{ "type": "list_metadata_patch", "listId": "<uuid>", "name": "<string>", "updatedAt": <number> }`
 - `error`
   - `{ "type": "error", "message": "<string>" }`
 

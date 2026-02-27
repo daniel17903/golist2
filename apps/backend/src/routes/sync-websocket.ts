@@ -15,7 +15,6 @@ type ClientMessage =
   | { type: 'hash_diff'; listId: string; summaries: Array<{ itemId: string; itemHash: string; updatedAt: number }> }
   | { type: 'item_patch'; listId: string; items: Item[] }
   | { type: 'list_metadata_patch'; listId: string; name: string; updatedAt: number }
-  | { type: 'ping' }
 
 type ServerMessage =
   | { type: 'hello_ack' }
@@ -23,7 +22,6 @@ type ServerMessage =
   | { type: 'hash_diff'; listId: string; summaries: Array<{ itemId: string; itemHash: string; updatedAt: number }> }
   | { type: 'item_patch'; listId: string; items: Item[] }
   | { type: 'list_metadata_patch'; listId: string; name: string; updatedAt: number }
-  | { type: 'pong' }
   | { type: 'error'; message: string }
 
 const helloSchema = z.object({ type: z.literal('hello'), deviceId: z.uuid() })
@@ -111,9 +109,6 @@ const parseClientMessage = (payload: unknown): ClientMessage => {
   }
   if (type === 'list_metadata_patch') {
     return listMetadataPatchSchema.parse(payload)
-  }
-  if (type === 'ping') {
-    return { type: 'ping' }
   }
 
   throw new Error('Unsupported message type')
@@ -242,10 +237,6 @@ export function registerSyncWebsocketRoute(app: FastifyInstance, listRepository:
             return
           }
 
-          if (parsedPayload.type === 'ping') {
-            send(socket, { type: 'pong' })
-            return
-          }
 
           if (parsedPayload.type === 'unsubscribe_list') {
             if (state.subscribedListId === parsedPayload.listId) {
