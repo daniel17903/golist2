@@ -5,85 +5,55 @@ This document explains how the web app (`apps/web`) syncs shared lists with the 
 ## Goals
 
 - Keep local writes instant and available offline.
-- Push user-triggered mutations to backend immediately when possible.
-- Avoid blocking app startup or normal UI interactions when backend is slow/unreachable.
-- Converge to backend-canonical list/item state after mutations and periodic sync cycles.
+- Maintain one long-lived WebSocket connection for realtime synchronization while the app is open.
+- Sync only the currently active list over that socket.
+- Reconcile with digest/hash exchange and targeted patches instead of full-list transfers on every mutation.
+- Converge deterministically with last-write-wins (`updatedAt`) and stable hash tie-breaks.
 
 ## Configuration
 
 The frontend reads backend sync configuration at build time (in `apps/web/vite.config.ts`):
 
-- `API_BASE_URL`: backend base URL used by sharing API client.
+- `API_BASE_URL`: backend base URL used for list/share-token HTTP endpoints and WebSocket URL derivation.
 - `API_TIMEOUT_MS`: per-request timeout in milliseconds (defaults to `15000`).
 - `ENVIRONMENT`: deployment environment string used for debug UI gating (defaults to `development`).
 
-These values are compiled into frontend constants:
+## Sync model
 
-- `__API_BASE_URL__`
-- `__API_TIMEOUT_MS__`
-- `__ENVIRONMENT__`
+### 1. Local-first mutations
 
-## Sync stages
+For list/item mutations, the app writes to IndexedDB and updates Zustand state first.
 
-### 1. Immediate local write (always)
+### 2. WebSocket lifecycle
 
-For list/item mutations, the app first writes to IndexedDB and updates in-memory Zustand state.
+- One `SocketSyncManager` is initialized after app metadata/device context is loaded.
+- Socket URL is derived from `API_BASE_URL` (`http -> ws`, `https -> wss`) and targets `/v1/ws`.
+- Connection state is surfaced as `unknown` / `online` / `offline`.
+- Reconnect uses bounded exponential backoff with jitter.
 
-### 2. Immediate mutation push (best-effort)
+### 3. Active-list subscription
 
-After local write, the app attempts immediate backend push for the changed entity when a share token exists:
+- Only the active list is subscribed.
+- On list switch the client sends `unsubscribe_list` (old) then `subscribe_list` (new).
+- Outbound item patches are queued and flushed only after the subscription is acknowledged.
 
-- list name changes -> `PUT /v1/lists`
-- item create/update/tombstone -> `PUT /v1/lists/{listId}/items/{itemId}`
+### 4. Reconciliation protocol
 
-If backend is unreachable or slow, request timeout/error is swallowed so UX stays local-first.
+On subscription and manual resync:
 
-### 3. Incremental reconciliation (background)
+1. Client and server exchange `list_digest` values.
+2. On mismatch, both sides exchange per-item `hash_diff` summaries (`itemId`, `itemHash`, `updatedAt`).
+3. Each side computes missing/stale items and exchanges targeted `item_patch` payloads.
+4. Incoming items are applied only when their `updatedAt` wins; equal timestamps use deterministic hash tie-break.
 
-After immediate push attempt, app triggers list reconciliation in background (`syncList`) without re-fetching the full item set:
+Protocol details are documented in `docs/websocket-sync-protocol.md` and mirrored in `apps/api-spec/openapi.yaml` under `/v1/ws`.
 
-1. pull remote list metadata snapshot (`GET /v1/lists/:listId`)
-2. push local list name when local is newer/different
-3. read `lastSyncedAt` for that list from IndexedDB (`listShares`)
-4. push only local items updated since `lastSyncedAt`
-5. fetch only remote item deltas with `GET /v1/lists/:listId/items?updatedAfter=<ISO timestamp>`
-6. merge fetched remote deltas into local IndexedDB/state
-7. persist a new `lastSyncedAt` timestamp on successful completion
+## HTTP usage boundaries
 
-This keeps convergence behavior while avoiding full list-item downloads on every sync cycle.
-
-## Startup and periodic behavior
-
-- On app load, shared-list sync starts in background (`syncAllLists`) and is not awaited.
-- Periodic/lifecycle triggers continue to run in app state hook:
-  - interval-based sync
-  - on `visibilitychange` back to foreground
-  - on `online`
+- HTTP remains used for list/share-token operations (`PUT /v1/lists/{listId}`, `GET /v1/lists/{listId}`, share-token create/redeem).
+- Item synchronization does **not** use item HTTP endpoints (`/v1/lists/{listId}/items...`) in frontend sync flow.
 
 ## Failure handling
 
-- API client uses `AbortController` timeout per request.
-- Sync errors are non-fatal to preserve local-first UX.
-- Local changes remain in IndexedDB and are retried by later sync attempts.
-
-## Error surfacing and connection indicator
-
-- Frontend tracks backend connectivity as `unknown` / `online` / `offline` and surfaces this via a small header indicator icon.
-- Sync errors publish a toast message when `ENVIRONMENT` is not `production`.
-- When `ENVIRONMENT` is not `production`, the UI includes a backend log panel with all backend call outcomes (success, error, timeout) and skipped-call reasons.
-- Toast and backend log visibility are controlled by the compiled `__ENVIRONMENT__` constant.
-
-
-## Local sync cursor (lastSyncedAt)
-
-The frontend stores per-list sync metadata in IndexedDB table `listShares`:
-
-- `listId`
-- `lastSyncedAt` (epoch milliseconds)
-
-`lastSyncedAt` is updated after a successful incremental sync and is reused on the next sync to compute both:
-
-- which local items to push, and
-- which remote items to pull via `updatedAfter`.
-
-On first sync (no cursor), the frontend uses an initial timestamp baseline and then records `lastSyncedAt` after the sync succeeds.
+- WebSocket disconnects are non-fatal; local mutations remain in IndexedDB and are retried by subsequent reconciliation.
+- Sync errors are surfaced as notices/logs in non-production environments.

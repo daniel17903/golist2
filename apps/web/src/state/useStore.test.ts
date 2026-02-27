@@ -30,7 +30,6 @@ vi.mock("../sharing/socketSync", () => ({
     setActiveList: vi.fn(),
     queueLocalItemPatch: vi.fn(),
     requestResync: vi.fn(),
-    canSyncList: vi.fn(() => true),
   },
 }));
 
@@ -41,8 +40,6 @@ vi.mock("../sharing/apiClient", () => ({
     fetchList: vi.fn(),
     redeemShareToken: vi.fn(),
     createShareToken: vi.fn(),
-    upsertItem: vi.fn(),
-    fetchItemsUpdatedAfter: vi.fn(),
   },
   setBackendCallLogger: vi.fn(),
   setActiveBackendRequestLogger: vi.fn(),
@@ -147,13 +144,10 @@ const { socketSyncManager } = await import("../sharing/socketSync");
 const upsertListMock = vi.mocked(sharingApiClient.upsertList);
 const createShareTokenMock = vi.mocked(sharingApiClient.createShareToken);
 const fetchListMock = vi.mocked(sharingApiClient.fetchList);
-const upsertItemMock = vi.mocked(sharingApiClient.upsertItem);
-const fetchItemsUpdatedAfterMock = vi.mocked(sharingApiClient.fetchItemsUpdatedAfter);
 const socketInitMock = vi.mocked(socketSyncManager.init);
 const socketSetActiveListMock = vi.mocked(socketSyncManager.setActiveList);
 const socketQueueLocalItemPatchMock = vi.mocked(socketSyncManager.queueLocalItemPatch);
 const socketRequestResyncMock = vi.mocked(socketSyncManager.requestResync);
-const socketCanSyncListMock = vi.mocked(socketSyncManager.canSyncList);
 
 const resetStore = () => {
   useStore.setState({
@@ -187,14 +181,10 @@ describe("useStore", () => {
     upsertListMock.mockReset();
     createShareTokenMock.mockReset();
     fetchListMock.mockReset();
-    upsertItemMock.mockReset();
-    fetchItemsUpdatedAfterMock.mockReset();
     socketInitMock.mockReset();
     socketSetActiveListMock.mockReset();
     socketQueueLocalItemPatchMock.mockReset();
     socketRequestResyncMock.mockReset();
-    socketCanSyncListMock.mockReset();
-    socketCanSyncListMock.mockReturnValue(true);
     globalThis.localStorage.clear();
     resetStore();
     vi.useFakeTimers();

@@ -57,7 +57,7 @@ class SocketSyncManager {
 
   setActiveList(listId: string | undefined) {
     const nextListId = listId ?? null;
-    if (this.subscribedListId === nextListId) {
+    if (this.subscribedListId === nextListId && this.isSubscribedReady) {
       return;
     }
 
@@ -78,14 +78,6 @@ class SocketSyncManager {
     }
   }
 
-
-  canSyncList(listId: string): boolean {
-    return (
-      this.subscribedListId === listId &&
-      this.isSubscribedReady &&
-      this.socket?.readyState === WebSocket.OPEN
-    );
-  }
 
   queueLocalItemPatch(item: Item) {
     this.queue.push({ listId: item.listId, item });
@@ -230,6 +222,9 @@ class SocketSyncManager {
 
     if (payload.type === 'error') {
       const message = typeof payload.message === 'string' ? payload.message : 'sync error';
+      if (message === 'forbidden') {
+        this.isSubscribedReady = false;
+      }
       this.callbacks?.onError(message);
     }
   }

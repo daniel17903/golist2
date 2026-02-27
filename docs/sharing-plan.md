@@ -92,7 +92,7 @@ The API contract is maintained in `apps/api-spec/openapi.yaml` (and related file
 2. UI flows are implemented in `apps/web`:
    - share active list (calls share-token creation route on button click and reveals tokenized link)
    - join list by share link/token via header action
-3. Sync triggers are wired in web state/hooks using a single long-lived WebSocket connection to `/v1/ws`:
+3. Sync triggers are wired in web state/hooks using a single long-lived WebSocket connection to `/v1/ws` (protocol reference: `docs/websocket-sync-protocol.md`):
    - app-load socket bootstrap after device metadata is available
    - active-list scoped subscribe/unsubscribe (only one list synced at a time)
    - digest/hash reconciliation (`list_digest` + `hash_diff`) before targeted `item_patch` exchange

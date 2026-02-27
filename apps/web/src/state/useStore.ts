@@ -71,30 +71,6 @@ type StoreState = {
 };
 
 
-const syncItemFallbackImmediately = async (item: Item) => {
-  const state = useStore.getState();
-  if (!state.metadata?.deviceId) {
-    logSkippedBackendCall("Item fallback sync skipped: device metadata missing.");
-    return;
-  }
-
-  await sharingApiClient.upsertItem({
-    deviceId: state.metadata.deviceId,
-    listId: item.listId,
-    itemId: item.id,
-    body: {
-      name: item.name,
-      iconName: item.iconName,
-      quantityOrUnit: item.quantityOrUnit,
-      category: item.category,
-      deleted: item.deleted,
-      updatedAt: new Date(item.updatedAt).toISOString(),
-    },
-  });
-
-  markBackendOnline();
-};
-
 const syncListNameImmediately = async (listId: string, listName: string) => {
   const state = useStore.getState();
   if (!state.metadata?.deviceId) {
@@ -115,6 +91,8 @@ const syncListNameImmediately = async (listId: string, listName: string) => {
     listId,
   });
 
+  socketSyncManager.setActiveList(listId);
+  socketSyncManager.requestResync();
   markBackendOnline();
 };
 
@@ -324,9 +302,6 @@ export const useStore = create<StoreState>((set, get) => ({
     await db.items.add(item);
     set((state) => ({ items: [...state.items, item] }));
     socketSyncManager.queueLocalItemPatch(item);
-    if (!socketSyncManager.canSyncList(listId)) {
-      runBackendSyncInBackground(() => syncItemFallbackImmediately(item), t("sync.offline"));
-    }
   },
   toggleItem: async (itemId: string) => {
     const { items } = get();
@@ -343,9 +318,6 @@ export const useStore = create<StoreState>((set, get) => ({
     }));
 
     socketSyncManager.queueLocalItemPatch(updated);
-    if (!socketSyncManager.canSyncList(updated.listId)) {
-      runBackendSyncInBackground(() => syncItemFallbackImmediately(updated), t("sync.offline"));
-    }
   },
   updateItem: async (itemId: string, name: string, quantityOrUnit?: string) => {
     const { items } = get();
@@ -365,9 +337,6 @@ export const useStore = create<StoreState>((set, get) => ({
     }));
 
     socketSyncManager.queueLocalItemPatch(updated);
-    if (!socketSyncManager.canSyncList(updated.listId)) {
-      runBackendSyncInBackground(() => syncItemFallbackImmediately(updated), t("sync.offline"));
-    }
   },
   ensureShareToken: async (listId: string) => {
     const state = get();

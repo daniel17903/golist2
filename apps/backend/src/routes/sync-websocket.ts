@@ -58,6 +58,25 @@ type ConnectionState = {
 
 type ServerSocket = WebSocket
 
+const isServerSocket = (value: unknown): value is ServerSocket =>
+  typeof value === 'object' &&
+  value !== null &&
+  typeof Reflect.get(value, 'send') === 'function' &&
+  typeof Reflect.get(value, 'on') === 'function'
+
+const toServerSocket = (connection: unknown): ServerSocket => {
+  if (isServerSocket(connection)) {
+    return connection
+  }
+
+  const nestedSocket = typeof connection === 'object' && connection !== null ? Reflect.get(connection, 'socket') : null
+  if (isServerSocket(nestedSocket)) {
+    return nestedSocket
+  }
+
+  throw new Error('Invalid websocket connection')
+}
+
 const parseClientMessage = (payload: unknown): ClientMessage => {
   if (typeof payload !== 'object' || payload === null) {
     throw new Error('Expected object message')
@@ -88,7 +107,6 @@ const parseClientMessage = (payload: unknown): ClientMessage => {
 
   throw new Error('Unsupported message type')
 }
-
 
 const rawDataToString = (raw: RawData): string => {
   if (typeof raw === 'string') {
@@ -135,8 +153,6 @@ const shouldAcceptIncomingItem = (existing: Item | null, incoming: Item) => {
 }
 
 export function registerSyncWebsocketRoute(app: FastifyInstance, listRepository: ListRepository) {
-  void app.register(websocket)
-
   const subscribers = new Map<string, Set<ServerSocket>>()
 
   const send = (socket: ServerSocket, message: ServerMessage) => {
@@ -169,136 +185,141 @@ export function registerSyncWebsocketRoute(app: FastifyInstance, listRepository:
     }
   }
 
-  app.get('/v1/ws', { websocket: true }, (socket) => {
-    const state: ConnectionState = {}
+  void app.register(async (websocketApp) => {
+    await websocketApp.register(websocket)
 
-    socket.on('message', async (raw: RawData) => {
-      try {
-        const parsedPayload = parseClientMessage(JSON.parse(rawDataToString(raw)))
+    websocketApp.get('/v1/ws', { websocket: true }, (connection) => {
+      const state: ConnectionState = {}
+      const socket = toServerSocket(connection)
 
-        if (parsedPayload.type === 'hello') {
-          state.deviceId = parsedPayload.deviceId
-          send(socket, { type: 'hello_ack' })
-          return
-        }
+      socket.on('message', async (raw: RawData) => {
+        try {
+          const parsedPayload = parseClientMessage(JSON.parse(rawDataToString(raw)))
 
-        if (!state.deviceId) {
-          send(socket, { type: 'error', message: 'hello is required before other messages' })
-          return
-        }
-
-        if (parsedPayload.type === 'ping') {
-          send(socket, { type: 'pong' })
-          return
-        }
-
-        if (parsedPayload.type === 'unsubscribe_list') {
-          if (state.subscribedListId === parsedPayload.listId) {
-            removeFromSubscription(socket, state)
-          }
-          return
-        }
-
-        if (parsedPayload.type === 'subscribe_list') {
-          const hasAccess = await listRepository.hasListAccess(parsedPayload.listId, state.deviceId)
-          if (!hasAccess) {
-            send(socket, { type: 'error', message: 'forbidden' })
+          if (parsedPayload.type === 'hello') {
+            state.deviceId = parsedPayload.deviceId
+            send(socket, { type: 'hello_ack' })
             return
           }
 
-          removeFromSubscription(socket, state)
-          state.subscribedListId = parsedPayload.listId
-          const listSockets = subscribers.get(parsedPayload.listId) ?? new Set<ServerSocket>()
-          listSockets.add(socket)
-          subscribers.set(parsedPayload.listId, listSockets)
+          if (!state.deviceId) {
+            send(socket, { type: 'error', message: 'hello is required before other messages' })
+            return
+          }
 
-          const serverItems = (await listRepository.listItems(parsedPayload.listId)).map(toSyncItem)
-          send(socket, {
-            type: 'subscribed',
-            listId: parsedPayload.listId,
-            serverListDigest: buildListDigest(serverItems),
-          })
-          send(socket, {
-            type: 'hash_diff',
-            listId: parsedPayload.listId,
-            summaries: buildItemSummaries(serverItems),
-          })
-          return
-        }
+          if (parsedPayload.type === 'ping') {
+            send(socket, { type: 'pong' })
+            return
+          }
 
-        if (!state.subscribedListId || state.subscribedListId !== parsedPayload.listId) {
-          send(socket, { type: 'error', message: 'not subscribed to list' })
-          return
-        }
+          if (parsedPayload.type === 'unsubscribe_list') {
+            if (state.subscribedListId === parsedPayload.listId) {
+              removeFromSubscription(socket, state)
+            }
+            return
+          }
 
-        if (parsedPayload.type === 'list_digest') {
-          const serverItems = (await listRepository.listItems(parsedPayload.listId)).map(toSyncItem)
-          const serverDigest = buildListDigest(serverItems)
-          if (serverDigest !== parsedPayload.digest) {
+          if (parsedPayload.type === 'subscribe_list') {
+            const hasAccess = await listRepository.hasListAccess(parsedPayload.listId, state.deviceId)
+            if (!hasAccess) {
+              send(socket, { type: 'error', message: 'forbidden' })
+              return
+            }
+
+            removeFromSubscription(socket, state)
+            state.subscribedListId = parsedPayload.listId
+            const listSockets = subscribers.get(parsedPayload.listId) ?? new Set<ServerSocket>()
+            listSockets.add(socket)
+            subscribers.set(parsedPayload.listId, listSockets)
+
+            const serverItems = (await listRepository.listItems(parsedPayload.listId)).map(toSyncItem)
+            send(socket, {
+              type: 'subscribed',
+              listId: parsedPayload.listId,
+              serverListDigest: buildListDigest(serverItems),
+            })
             send(socket, {
               type: 'hash_diff',
               listId: parsedPayload.listId,
               summaries: buildItemSummaries(serverItems),
             })
+            return
           }
-          return
-        }
 
-        if (parsedPayload.type === 'hash_diff') {
-          const serverItems = (await listRepository.listItems(parsedPayload.listId)).map(toSyncItem)
-          const clientSummaryById = new Map(parsedPayload.summaries.map((entry) => [entry.itemId, entry]))
+          if (!state.subscribedListId || state.subscribedListId !== parsedPayload.listId) {
+            send(socket, { type: 'error', message: 'not subscribed to list' })
+            return
+          }
 
-          const serverMissingOrStaleForClient = serverItems.filter((serverItem) => {
-            const summary = clientSummaryById.get(serverItem.id)
-            if (!summary) {
-              return true
+          if (parsedPayload.type === 'list_digest') {
+            const serverItems = (await listRepository.listItems(parsedPayload.listId)).map(toSyncItem)
+            const serverDigest = buildListDigest(serverItems)
+            if (serverDigest !== parsedPayload.digest) {
+              send(socket, {
+                type: 'hash_diff',
+                listId: parsedPayload.listId,
+                summaries: buildItemSummaries(serverItems),
+              })
             }
-            return summary.itemHash !== buildItemHash(serverItem)
-          })
-
-          if (serverMissingOrStaleForClient.length > 0) {
-            send(socket, {
-              type: 'item_patch',
-              listId: parsedPayload.listId,
-              items: serverMissingOrStaleForClient,
-            })
+            return
           }
-          return
-        }
 
-        if (parsedPayload.type === 'item_patch') {
-          const accepted: Item[] = []
-          for (const item of parsedPayload.items) {
-            const existingRecord = await listRepository.getListItem(parsedPayload.listId, item.id)
-            const existing = existingRecord ? toSyncItem(existingRecord) : null
+          if (parsedPayload.type === 'hash_diff') {
+            const serverItems = (await listRepository.listItems(parsedPayload.listId)).map(toSyncItem)
+            const clientSummaryById = new Map(parsedPayload.summaries.map((entry) => [entry.itemId, entry]))
 
-            if (!shouldAcceptIncomingItem(existing, item)) {
-              continue
+            const serverMissingOrStaleForClient = serverItems.filter((serverItem) => {
+              const summary = clientSummaryById.get(serverItem.id)
+              if (!summary) {
+                return true
+              }
+              return summary.itemHash !== buildItemHash(serverItem)
+            })
+
+            if (serverMissingOrStaleForClient.length > 0) {
+              send(socket, {
+                type: 'item_patch',
+                listId: parsedPayload.listId,
+                items: serverMissingOrStaleForClient,
+              })
+            }
+            return
+          }
+
+          if (parsedPayload.type === 'item_patch') {
+            const accepted: Item[] = []
+            for (const item of parsedPayload.items) {
+              const existingRecord = await listRepository.getListItem(parsedPayload.listId, item.id)
+              const existing = existingRecord ? toSyncItem(existingRecord) : null
+
+              if (!shouldAcceptIncomingItem(existing, item)) {
+                continue
+              }
+
+              await listRepository.upsertListItem(parsedPayload.listId, item.id, state.deviceId, {
+                name: item.name,
+                iconName: item.iconName,
+                quantityOrUnit: item.quantityOrUnit,
+                category: item.category,
+                deleted: item.deleted,
+                updatedAt: new Date(item.updatedAt).toISOString(),
+              })
+              accepted.push(item)
             }
 
-            await listRepository.upsertListItem(parsedPayload.listId, item.id, state.deviceId, {
-              name: item.name,
-              iconName: item.iconName,
-              quantityOrUnit: item.quantityOrUnit,
-              category: item.category,
-              deleted: item.deleted,
-              updatedAt: new Date(item.updatedAt).toISOString(),
-            })
-            accepted.push(item)
+            if (accepted.length > 0) {
+              broadcastItemPatch(parsedPayload.listId, accepted, socket)
+            }
           }
-
-          if (accepted.length > 0) {
-            broadcastItemPatch(parsedPayload.listId, accepted, socket)
-          }
+        } catch (error) {
+          app.log.warn({ err: error }, 'invalid websocket message')
+          send(socket, { type: 'error', message: 'invalid_message' })
         }
-      } catch (error) {
-        app.log.warn({ err: error }, 'invalid websocket message')
-        send(socket, { type: 'error', message: 'invalid_message' })
-      }
-    })
+      })
 
-    socket.on('close', () => {
-      removeFromSubscription(socket, state)
+      socket.on('close', () => {
+        removeFromSubscription(socket, state)
+      })
     })
   })
 }

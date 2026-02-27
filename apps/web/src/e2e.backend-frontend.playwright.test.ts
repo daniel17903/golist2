@@ -84,7 +84,10 @@ describe("frontend/backend integration via playwright", () => {
         port: frontendPort,
         strictPort: true,
         proxy: {
-          "/v1": backendUrl,
+          "/v1": {
+            target: backendUrl,
+            ws: true,
+          },
           "/health": backendUrl,
         },
       },
