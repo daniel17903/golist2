@@ -57,7 +57,11 @@ const BottomBar = ({ onOpenDrawer, onAddItem, onShareList, canShareList, backend
                 <svg viewBox="0 0 24 24" aria-hidden="true">
                   <path
                     d="M19 18H6a4 4 0 1 1 .6-7.96A5.5 5.5 0 0 1 17.06 9a3.75 3.75 0 0 1 1.94 7z"
-                    fill="currentColor"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
                   />
                 </svg>
               </span>
