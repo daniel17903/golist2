@@ -557,14 +557,14 @@ body {
   z-index: 30;
   opacity: 0;
   visibility: hidden;
-  transition: opacity 0.3s ease, visibility 0s linear 0.3s;
+  transition: opacity 0.2s ease 0.3s, visibility 0s linear 0.5s;
 }
 
 .drawer-overlay--open {
   pointer-events: auto;
   opacity: 1;
   visibility: visible;
-  transition-delay: 0s;
+  transition: opacity 0.2s ease 0s, visibility 0s linear 0s;
 }
 
 .drawer-backdrop {
