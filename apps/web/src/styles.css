@@ -581,7 +581,7 @@ body {
   width: min(320px, 80vw);
   background: #f4eef5;
   transform: translateX(-100%);
-  transition: transform 0.3s ease;
+  transition: transform 0.26s ease-in;
   display: flex;
   flex-direction: column;
   touch-action: none;
@@ -589,6 +589,7 @@ body {
 
 .drawer--open {
   transform: translateX(0);
+  transition-timing-function: ease-out;
 }
 
 .drawer--dragging {
