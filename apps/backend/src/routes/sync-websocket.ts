@@ -14,13 +14,15 @@ type ClientMessage =
   | { type: 'list_digest'; listId: string; digest: string }
   | { type: 'hash_diff'; listId: string; summaries: Array<{ itemId: string; itemHash: string; updatedAt: number }> }
   | { type: 'item_patch'; listId: string; items: Item[] }
+  | { type: 'list_metadata_patch'; listId: string; name: string; updatedAt: number }
   | { type: 'ping' }
 
 type ServerMessage =
   | { type: 'hello_ack' }
-  | { type: 'subscribed'; listId: string; serverListDigest: string }
+  | { type: 'subscribed'; listId: string; listName: string; listUpdatedAt: number; serverListDigest: string }
   | { type: 'hash_diff'; listId: string; summaries: Array<{ itemId: string; itemHash: string; updatedAt: number }> }
   | { type: 'item_patch'; listId: string; items: Item[] }
+  | { type: 'list_metadata_patch'; listId: string; name: string; updatedAt: number }
   | { type: 'pong' }
   | { type: 'error'; message: string }
 
@@ -49,6 +51,12 @@ const itemPatchSchema = z.object({
       updatedAt: z.number().int(),
     }),
   ),
+})
+const listMetadataPatchSchema = z.object({
+  type: z.literal('list_metadata_patch'),
+  listId: z.uuid(),
+  name: z.string().min(1),
+  updatedAt: z.number().int(),
 })
 
 type ConnectionState = {
@@ -100,6 +108,9 @@ const parseClientMessage = (payload: unknown): ClientMessage => {
   }
   if (type === 'item_patch') {
     return itemPatchSchema.parse(payload)
+  }
+  if (type === 'list_metadata_patch') {
+    return listMetadataPatchSchema.parse(payload)
   }
   if (type === 'ping') {
     return { type: 'ping' }
@@ -185,6 +196,30 @@ export function registerSyncWebsocketRoute(app: FastifyInstance, listRepository:
     }
   }
 
+  const broadcastListMetadataPatch = (
+    listId: string,
+    payload: { name: string; updatedAt: number },
+    sender: ServerSocket,
+  ) => {
+    const listSockets = subscribers.get(listId)
+    if (!listSockets) {
+      return
+    }
+
+    for (const socket of listSockets.values()) {
+      if (socket === sender) {
+        continue
+      }
+
+      send(socket, {
+        type: 'list_metadata_patch',
+        listId,
+        name: payload.name,
+        updatedAt: payload.updatedAt,
+      })
+    }
+  }
+
   void app.register(async (websocketApp) => {
     await websocketApp.register(websocket)
 
@@ -233,9 +268,13 @@ export function registerSyncWebsocketRoute(app: FastifyInstance, listRepository:
             subscribers.set(parsedPayload.listId, listSockets)
 
             const serverItems = (await listRepository.listItems(parsedPayload.listId)).map(toSyncItem)
+            const listRecord = await listRepository.getList(parsedPayload.listId)
+            const listUpdatedAt = listRecord ? Date.parse(listRecord.updatedAt) : Date.now()
             send(socket, {
               type: 'subscribed',
               listId: parsedPayload.listId,
+              listName: listRecord?.name ?? '',
+              listUpdatedAt,
               serverListDigest: buildListDigest(serverItems),
             })
             send(socket, {
@@ -310,6 +349,25 @@ export function registerSyncWebsocketRoute(app: FastifyInstance, listRepository:
             if (accepted.length > 0) {
               broadcastItemPatch(parsedPayload.listId, accepted, socket)
             }
+
+            return
+          }
+
+          if (parsedPayload.type === 'list_metadata_patch') {
+            const listResult = await listRepository.putList(parsedPayload.listId, parsedPayload.name, state.deviceId)
+            if (listResult.outcome === 'forbidden') {
+              send(socket, { type: 'error', message: 'forbidden' })
+              return
+            }
+
+            broadcastListMetadataPatch(
+              parsedPayload.listId,
+              {
+                name: parsedPayload.name,
+                updatedAt: parsedPayload.updatedAt,
+              },
+              socket,
+            )
           }
         } catch (error) {
           app.log.warn({ err: error }, 'invalid websocket message')

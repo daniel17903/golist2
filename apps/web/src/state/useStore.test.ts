@@ -29,6 +29,7 @@ vi.mock("../sharing/socketSync", () => ({
     init: vi.fn(),
     setActiveList: vi.fn(),
     queueLocalItemPatch: vi.fn(),
+    queueLocalListMetadataPatch: vi.fn(),
     requestResync: vi.fn(),
   },
 }));
@@ -147,6 +148,7 @@ const fetchListMock = vi.mocked(sharingApiClient.fetchList);
 const socketInitMock = vi.mocked(socketSyncManager.init);
 const socketSetActiveListMock = vi.mocked(socketSyncManager.setActiveList);
 const socketQueueLocalItemPatchMock = vi.mocked(socketSyncManager.queueLocalItemPatch);
+const socketQueueLocalListMetadataPatchMock = vi.mocked(socketSyncManager.queueLocalListMetadataPatch);
 const socketRequestResyncMock = vi.mocked(socketSyncManager.requestResync);
 
 const resetStore = () => {
@@ -184,6 +186,7 @@ describe("useStore", () => {
     socketInitMock.mockReset();
     socketSetActiveListMock.mockReset();
     socketQueueLocalItemPatchMock.mockReset();
+    socketQueueLocalListMetadataPatchMock.mockReset();
     socketRequestResyncMock.mockReset();
     globalThis.localStorage.clear();
     resetStore();
@@ -293,6 +296,10 @@ describe("useStore", () => {
     expect(state.lists[0]?.name).toBe("New");
     expect(state.lists[0]?.updatedAt).toBe(Date.now());
     expect(listUpdate).toHaveBeenCalledWith("list-1", {
+      name: "New",
+      updatedAt: Date.now(),
+    });
+    expect(socketQueueLocalListMetadataPatchMock).toHaveBeenCalledWith("list-1", {
       name: "New",
       updatedAt: Date.now(),
     });

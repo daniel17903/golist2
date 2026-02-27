@@ -219,6 +219,35 @@ export const useStore = create<StoreState>((set, get) => ({
             return { items: Array.from(mergedById.values()) };
           });
         },
+        applyIncomingListMetadata: async (listId, payload) => {
+          const currentList = useStore.getState().lists.find((entry) => entry.id === listId);
+          if (!currentList) {
+            return;
+          }
+
+          if (payload.updatedAt < currentList.updatedAt) {
+            return;
+          }
+
+          if (payload.updatedAt === currentList.updatedAt && payload.name === currentList.name) {
+            return;
+          }
+
+          const updatedList = {
+            ...currentList,
+            name: payload.name,
+            updatedAt: payload.updatedAt,
+          };
+
+          await db.lists.put(updatedList);
+          useStore.setState((state) => ({
+            lists: state.lists.map((entry) =>
+              entry.id === listId
+                ? updatedList
+                : entry,
+            ),
+          }));
+        },
         onConnectionState: (connectionState) => {
           useStore.setState({ backendConnection: connectionState });
         },
@@ -263,6 +292,10 @@ export const useStore = create<StoreState>((set, get) => ({
       () => syncListNameImmediately(listId, name),
       t("sync.offline"),
     );
+    socketSyncManager.queueLocalListMetadataPatch(listId, {
+      name,
+      updatedAt: now,
+    });
   },
   deleteList: async (listId: string) => {
     await db.items.where("listId").equals(listId).delete();

@@ -6,11 +6,13 @@ import { isBackendSharingEnabled } from './apiClient';
 type SocketSyncCallbacks = {
   getItemsForList: (listId: string) => Item[];
   applyIncomingItems: (listId: string, items: Item[]) => Promise<void>;
+  applyIncomingListMetadata: (listId: string, payload: { name: string; updatedAt: number }) => Promise<void>;
   onConnectionState: (state: 'online' | 'offline') => void;
   onError: (message: string) => void;
 };
 
 type OutboundPatch = { listId: string; item: Item };
+type OutboundListMetadataPatch = { listId: string; name: string; updatedAt: number };
 
 const createWebSocketUrl = (): string | null => {
   if (!isBackendSharingEnabled || typeof __API_BASE_URL__ !== 'string' || !__API_BASE_URL__) {
@@ -49,6 +51,7 @@ class SocketSyncManager {
   private isSubscribedReady = false;
   private reconnectTimer: number | null = null;
   private queue: OutboundPatch[] = [];
+  private listMetadataQueue: OutboundListMetadataPatch[] = [];
 
   init(deviceId: string, callbacks: SocketSyncCallbacks) {
     this.deviceId = deviceId;
@@ -85,6 +88,11 @@ class SocketSyncManager {
     this.flushQueue();
   }
 
+  queueLocalListMetadataPatch(listId: string, payload: { name: string; updatedAt: number }) {
+    this.listMetadataQueue.push({ listId, ...payload });
+    this.flushQueue();
+  }
+
   requestResync() {
     if (!this.subscribedListId || !this.callbacks) {
       return;
@@ -110,6 +118,10 @@ class SocketSyncManager {
     this.socket = new WebSocket(url);
 
     this.socket.addEventListener('open', () => {
+      if (this.reconnectTimer !== null) {
+        window.clearTimeout(this.reconnectTimer);
+        this.reconnectTimer = null;
+      }
       this.reconnectAttempts = 0;
       this.callbacks?.onConnectionState('online');
       this.isSubscribedReady = false;
@@ -125,6 +137,7 @@ class SocketSyncManager {
     });
 
     this.socket.addEventListener('close', () => {
+      this.socket = null;
       this.isSubscribedReady = false;
       this.callbacks?.onConnectionState('offline');
       this.scheduleReconnect();
@@ -136,20 +149,15 @@ class SocketSyncManager {
   }
 
   private scheduleReconnect() {
-    if (this.reconnectAttempts >= 5) {
-      this.callbacks?.onError('Realtime sync retries exhausted.');
+    if (this.reconnectTimer !== null) {
       return;
     }
 
+    const delay = this.reconnectAttempts < 3 ? 3000 : 10000;
     this.reconnectAttempts += 1;
-    const jitter = Math.floor(Math.random() * 200);
-    const delay = Math.min(5000, 250 * 2 ** this.reconnectAttempts) + jitter;
-
-    if (this.reconnectTimer !== null) {
-      window.clearTimeout(this.reconnectTimer);
-    }
 
     this.reconnectTimer = window.setTimeout(() => {
+      this.reconnectTimer = null;
       this.connect();
     }, delay);
   }
@@ -168,8 +176,16 @@ class SocketSyncManager {
 
     if (payload.type === 'subscribed') {
       const listId = typeof payload.listId === 'string' ? payload.listId : null;
+      const listName = typeof payload.listName === 'string' ? payload.listName : null;
+      const listUpdatedAt = typeof payload.listUpdatedAt === 'number' ? payload.listUpdatedAt : null;
       if (listId && listId === this.subscribedListId) {
         this.isSubscribedReady = true;
+        if (listName && listUpdatedAt !== null) {
+          await this.callbacks?.applyIncomingListMetadata(listId, {
+            name: listName,
+            updatedAt: listUpdatedAt,
+          });
+        }
         this.sendDigest(listId);
         this.flushQueue();
       }
@@ -221,6 +237,19 @@ class SocketSyncManager {
       return;
     }
 
+    if (payload.type === 'list_metadata_patch') {
+      const listId = typeof payload.listId === 'string' ? payload.listId : null;
+      const listName = typeof payload.name === 'string' ? payload.name : null;
+      const listUpdatedAt = typeof payload.updatedAt === 'number' ? payload.updatedAt : null;
+      if (listId && listName && listUpdatedAt !== null) {
+        await this.callbacks?.applyIncomingListMetadata(listId, {
+          name: listName,
+          updatedAt: listUpdatedAt,
+        });
+      }
+      return;
+    }
+
     if (payload.type === 'error') {
       const message = typeof payload.message === 'string' ? payload.message : 'sync error';
       if (message === 'forbidden') {
@@ -249,12 +278,25 @@ class SocketSyncManager {
     }
 
     const ready = this.queue.filter((entry) => entry.listId === this.subscribedListId);
-    if (ready.length === 0) {
-      return;
+    const readyMetadataPatches = this.listMetadataQueue.filter((entry) => entry.listId === this.subscribedListId);
+
+    if (ready.length > 0) {
+      this.queue = this.queue.filter((entry) => entry.listId !== this.subscribedListId);
+      this.send({ type: 'item_patch', listId: this.subscribedListId, items: ready.map((entry) => entry.item) });
     }
 
-    this.queue = this.queue.filter((entry) => entry.listId !== this.subscribedListId);
-    this.send({ type: 'item_patch', listId: this.subscribedListId, items: ready.map((entry) => entry.item) });
+    if (readyMetadataPatches.length > 0) {
+      this.listMetadataQueue = this.listMetadataQueue.filter((entry) => entry.listId !== this.subscribedListId);
+      const latestMetadataPatch = readyMetadataPatches.reduce((latest, entry) =>
+        entry.updatedAt > latest.updatedAt ? entry : latest,
+      );
+      this.send({
+        type: 'list_metadata_patch',
+        listId: this.subscribedListId,
+        name: latestMetadataPatch.name,
+        updatedAt: latestMetadataPatch.updatedAt,
+      });
+    }
   }
 
   private send(payload: Record<string, unknown>) {
