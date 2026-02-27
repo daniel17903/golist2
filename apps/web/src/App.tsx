@@ -252,15 +252,11 @@ const App = () => {
 
   return (
     <div
-      className={`app ${pullDistance > 0 || isRefreshing ? "app--pulling" : ""}`}
+      className="app"
       onTouchStart={onTouchStart}
       onTouchMove={onTouchMove}
       onTouchEnd={onTouchEnd}
       onTouchCancel={onTouchCancel}
-      style={{
-        transform: `translateY(${pullDistance}px)`,
-        transition: pullDistance > 0 || isRefreshing ? "none" : "transform 180ms ease-out",
-      }}
     >
       <div
         className={`pull-refresh ${isRefreshing ? "pull-refresh--active" : ""}`}
@@ -272,6 +268,14 @@ const App = () => {
       >
         <span className="pull-refresh__spinner" />
       </div>
+
+      <div
+        className="app__content"
+        style={{
+          transform: `translateY(${pullDistance}px)`,
+          transition: pullDistance > 0 || isRefreshing ? "none" : "transform 180ms ease-out",
+        }}
+      >
       <AppHeader
         activeListName={activeList?.name ?? ""}
         renameValue={newListName}
@@ -299,6 +303,8 @@ const App = () => {
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerCancel}
       />
+
+      </div>
 
       <BottomBar
         onOpenDrawer={() => setIsDrawerOpen(true)}

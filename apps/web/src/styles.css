@@ -59,6 +59,12 @@ body {
   touch-action: pan-x pan-y;
 }
 
+.app__content {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
 .pull-refresh {
   position: fixed;
   top: 0;
