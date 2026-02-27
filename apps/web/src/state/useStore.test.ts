@@ -35,6 +35,7 @@ vi.mock("../sharing/apiClient", () => ({
   },
   setBackendCallLogger: vi.fn(),
   setActiveBackendRequestLogger: vi.fn(),
+  isBackendSharingEnabled: true,
 }));
 
 let listsData: List[] = [];
@@ -148,6 +149,7 @@ const resetStore = () => {
     syncNotice: undefined,
     backendLogs: [],
     backendBusyRequests: 0,
+    backendSharingEnabled: true,
   });
 };
 

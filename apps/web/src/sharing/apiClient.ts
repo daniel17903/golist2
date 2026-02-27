@@ -32,7 +32,7 @@ const logBackendCall = (entry: BackendCallLog) => {
   backendCallLogger?.(entry);
 };
 
-const readApiBaseUrl = () => {
+const readApiBaseUrl = (): string | null => {
   if (typeof __API_BASE_URL__ === "string" && __API_BASE_URL__.trim().length > 0) {
     return __API_BASE_URL__.trim();
   }
@@ -40,9 +40,9 @@ const readApiBaseUrl = () => {
   logBackendCall({
     endpoint: "configuration",
     outcome: "skipped",
-    message: "Backend API URL missing. Falling back to http://localhost:3000.",
+    message: "Backend API URL missing. Running in offline-only mode.",
   });
-  return "http://localhost:3000";
+  return null;
 };
 
 const readRequestTimeoutMs = () => {
@@ -57,6 +57,17 @@ const readRequestTimeoutMs = () => {
 
 const apiBaseUrl = readApiBaseUrl();
 const requestTimeoutMs = readRequestTimeoutMs();
+
+export const isBackendSharingEnabled = apiBaseUrl !== null;
+
+const requireApiBaseUrl = () => {
+  if (apiBaseUrl) {
+    return apiBaseUrl;
+  }
+
+  throw new Error("Backend API URL is not configured");
+};
+
 
 const createHeaders = (deviceId: string, options: { includeJsonContentType?: boolean } = {}) => {
   const headers: HeadersInit = {
@@ -230,7 +241,7 @@ export const sharingApiClient = {
     body: ApiListUpsertRequest;
   }): Promise<ApiListUpsertResponse> {
     const response = await fetchWithTimeout(
-      `${apiBaseUrl}/v1/lists/${params.listId}`,
+      `${requireApiBaseUrl()}/v1/lists/${params.listId}`,
       {
         method: "PUT",
         headers: createHeaders(params.deviceId, { includeJsonContentType: true }),
@@ -244,7 +255,7 @@ export const sharingApiClient = {
 
   async fetchList(params: { deviceId: string; listId: string }): Promise<ApiListDocument> {
     const response = await fetchWithTimeout(
-      `${apiBaseUrl}/v1/lists/${params.listId}`,
+      `${requireApiBaseUrl()}/v1/lists/${params.listId}`,
       {
         method: "GET",
         headers: createHeaders(params.deviceId),
@@ -262,7 +273,7 @@ export const sharingApiClient = {
   }): Promise<ApiListItemsUpdatedAfterResponse> {
     const query = new URLSearchParams({ updatedAfter: params.updatedAfter });
     const response = await fetchWithTimeout(
-      `${apiBaseUrl}/v1/lists/${params.listId}/items?${query.toString()}`,
+      `${requireApiBaseUrl()}/v1/lists/${params.listId}/items?${query.toString()}`,
       {
         method: "GET",
         headers: createHeaders(params.deviceId),
@@ -275,7 +286,7 @@ export const sharingApiClient = {
 
   async redeemShareToken(params: { deviceId: string; shareToken: string }): Promise<ApiShareTokenRedeemResponse> {
     const response = await fetchWithTimeout(
-      `${apiBaseUrl}/v1/share-tokens/${params.shareToken}/redeem`,
+      `${requireApiBaseUrl()}/v1/share-tokens/${params.shareToken}/redeem`,
       {
         method: "POST",
         headers: {
@@ -294,7 +305,7 @@ export const sharingApiClient = {
     listId: string;
   }): Promise<ApiShareTokenCreateResponse> {
     const response = await fetchWithTimeout(
-      `${apiBaseUrl}/v1/lists/${params.listId}/share-tokens`,
+      `${requireApiBaseUrl()}/v1/lists/${params.listId}/share-tokens`,
       {
         method: "POST",
         headers: createHeaders(params.deviceId),
@@ -312,7 +323,7 @@ export const sharingApiClient = {
     body: ApiItemUpsertRequest;
   }): Promise<void> {
     const response = await fetchWithTimeout(
-      `${apiBaseUrl}/v1/lists/${params.listId}/items/${params.itemId}`,
+      `${requireApiBaseUrl()}/v1/lists/${params.listId}/items/${params.itemId}`,
       {
         method: "PUT",
         headers: createHeaders(params.deviceId, { includeJsonContentType: true }),

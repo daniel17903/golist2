@@ -2,9 +2,9 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
 
-const apiBaseUrl = process.env.API_BASE_URL ?? "http://localhost:3000";
+const apiBaseUrl = process.env.API_BASE_URL ?? "";
 
-console.info(`[web-build] Configured API_BASE_URL=${apiBaseUrl}`);
+console.info(`[web-build] Configured API_BASE_URL=${apiBaseUrl || "<offline-only>"}`);
 
 export default defineConfig({
   define: {
