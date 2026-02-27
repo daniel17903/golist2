@@ -333,10 +333,7 @@ const App = () => {
       <div className="pull-refresh" style={{ transform: `translate(-50%, ${-64 + (canUsePullRefresh ? pullDistance : 0)}px)` }} aria-hidden="true">
         <span className={`pull-refresh__circle ${isPullRefreshing ? "pull-refresh__circle--spinning" : ""}`}>
           <svg viewBox="0 0 24 24" className="pull-refresh__icon">
-            <path
-              d="M12 5a7 7 0 1 0 6.65 9H16l3.8 3.8L23.6 14h-2.92A9 9 0 1 1 12 3v2z"
-              fill="currentColor"
-            />
+            <path d="M17.65 6.35A7.95 7.95 0 0 0 12 4V1L7 6l5 5V7a5 5 0 1 1-4.9 6h-2.02A7 7 0 1 0 17.65 6.35z" fill="currentColor" />
           </svg>
         </span>
       </div>
