@@ -23,6 +23,9 @@ This skill supports:
    - `deleted` (optional, defaults to `false`),
    - `quantityOrUnit` (optional).
 5. OpenClaw must generate all item UUIDs and timestamps in the Python CLI (never require the agent to provide them).
+6. Immediately after creating a new list, OpenClaw must always generate a share token and send the share URL to the user without being asked.
+7. When talking to the user, OpenClaw must never refer to lists by ID; always use list names (use the stored name↔id mapping internally).
+8. For item upserts, if the user does not explicitly provide a quantity/unit, OpenClaw must omit `quantityOrUnit`.
 
 ## Python CLI tool
 Use `apps/openclaw/golist_cli.py` as the operational API wrapper for this skill.
@@ -51,8 +54,9 @@ Persisted state file (default):
 ### 1) Create a new list
 ```bash
 python3 apps/openclaw/golist_cli.py create-list "Weekend groceries"
+python3 apps/openclaw/golist_cli.py share
 ```
-Creates a list with a generated UUID, stores it in known lists, and sets it as active.
+Creates a list with a generated UUID, stores it in known lists, sets it as active, then immediately creates a share token and returns the share URL to the user.
 
 ### 2) Share a list with a user
 ```bash
@@ -81,6 +85,7 @@ python3 apps/openclaw/golist_cli.py delete "milk"
 
 ## Intent mapping for OpenClaw
 - “create a new list called X” → `create-list "X"`
+- After `create-list`, always run `share` and send the URL/token to the user.
 - “share this list with me” → `share`
 - “join this token” → `join <token>`
 - “show my lists” → `lists`
@@ -93,4 +98,6 @@ python3 apps/openclaw/golist_cli.py delete "milk"
 - If device id is missing, generate and persist it before any API call.
 - If no active list is set, require `create-list` or `join` first.
 - If token redemption fails, return a clear auth/share error.
+- In user-facing responses, refer to lists by name only (never by raw ID).
+- Do not invent item quantities; only send `--quantity` when the user asked for one.
 - Never send item metadata fields outside `name`, `deleted`, and optional `quantityOrUnit`.
