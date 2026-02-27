@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useI18n } from "../i18n";
 
 type BottomBarProps = {
@@ -11,6 +12,8 @@ type BottomBarProps = {
 
 const BottomBar = ({ onOpenDrawer, onAddItem, onShareList, canShareList, backendConnection, isBackendBusy }: BottomBarProps) => {
   const { t } = useI18n();
+  const [showOfflineInfo, setShowOfflineInfo] = useState(false);
+  const showOfflineBadge = backendConnection === "offline";
 
   return (
     <footer className="bottom-bar">
@@ -40,20 +43,29 @@ const BottomBar = ({ onOpenDrawer, onAddItem, onShareList, canShareList, backend
               aria-label={t("header.backendSyncing")}
               title={t("header.backendSyncing")}
             />
-          ) : (
-            <span
-              className={`connection-icon connection-icon--${backendConnection}`}
+          ) : null}
+          {showOfflineBadge ? (
+            <button
+              className="connection-badge"
+              type="button"
               aria-label={t("header.backendStatus", { status: backendConnection })}
-              title={t("header.backendStatus", { status: backendConnection })}
+              aria-expanded={showOfflineInfo}
+              onClick={() => setShowOfflineInfo((current) => !current)}
+              onBlur={() => setShowOfflineInfo(false)}
             >
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path
-                  d="M19 18H6a4 4 0 1 1 .6-7.96A5.5 5.5 0 0 1 17.06 9a3.75 3.75 0 0 1 1.94 7z"
-                  fill="currentColor"
-                />
-              </svg>
-            </span>
-          )}
+              <span className="connection-icon connection-icon--offline" aria-hidden="true">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path
+                    d="M19 18H6a4 4 0 1 1 .6-7.96A5.5 5.5 0 0 1 17.06 9a3.75 3.75 0 0 1 1.94 7z"
+                    fill="currentColor"
+                  />
+                </svg>
+              </span>
+              <span className={`connection-badge__tooltip ${showOfflineInfo ? "connection-badge__tooltip--visible" : ""}`}>
+                {t("header.backendStatusOfflineInfo")}
+              </span>
+            </button>
+          ) : null}
         </span>
         {canShareList ? (
           <button className="bottom-icon" type="button" aria-label={t("bottom.shareList")} onClick={onShareList}>
