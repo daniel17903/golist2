@@ -21,6 +21,7 @@ const AppHeader = ({
   onCancelRename,
 }: AppHeaderProps) => {
   const renameInputRef = useRef<HTMLInputElement | null>(null);
+  const saveButtonRef = useRef<HTMLButtonElement | null>(null);
   const { t } = useI18n();
 
   useEffect(() => {
@@ -29,6 +30,32 @@ const AppHeader = ({
       renameInputRef.current?.select();
     }
   }, [isEditingName]);
+
+  useEffect(() => {
+    if (!isEditingName) {
+      return;
+    }
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node)) {
+        return;
+      }
+
+      const clickedInput = renameInputRef.current?.contains(target);
+      const clickedSave = saveButtonRef.current?.contains(target);
+      if (clickedInput || clickedSave) {
+        return;
+      }
+
+      onCancelRename();
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+    };
+  }, [isEditingName, onCancelRename]);
 
   return (
     <header className="app__header" aria-label={t("header.activeList")}>
@@ -54,11 +81,13 @@ const AppHeader = ({
                 maxLength={120}
               />
               <div className="title-edit__actions">
-                <button type="button" className="header-chip-button" onClick={onSaveRename}>
+                <button
+                  ref={saveButtonRef}
+                  type="button"
+                  className="header-chip-button"
+                  onClick={onSaveRename}
+                >
                   {t("common.save")}
-                </button>
-                <button type="button" className="header-chip-button" onClick={onCancelRename}>
-                  {t("common.cancel")}
                 </button>
               </div>
             </div>
