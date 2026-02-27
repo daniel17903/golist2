@@ -1,7 +1,9 @@
 # GoList Shared-List Manager (OpenClaw Skill)
 
 ## Purpose
-Enable OpenClaw to manage GoList lists through a simple CLI wrapper around the backend API.
+Enable OpenClaw to manage GoList through a simple, beginner-friendly CLI wrapper around the backend API.
+
+GoList is a simplistic app for creating and sharing grocery / shopping lists. This skill is designed to make first-time usage feel fast and approachable: create a list, add items, share with others, and switch between saved lists with minimal setup.
 
 This skill supports:
 - creating new lists,
