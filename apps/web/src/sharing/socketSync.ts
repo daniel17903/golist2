@@ -54,6 +54,9 @@ class SocketSyncManager {
   private queue: OutboundPatch[] = [];
   private listMetadataQueue: OutboundListMetadataPatch[] = [];
   private forceReconnectPending = false;
+  private forcedReconnectPromise: Promise<'success' | 'failed'> | null = null;
+  private forcedReconnectResolver: ((result: 'success' | 'failed') => void) | null = null;
+  private forcedReconnectTimeout: number | null = null;
 
   init(deviceId: string, callbacks: SocketSyncCallbacks) {
     this.deviceId = deviceId;
@@ -120,7 +123,23 @@ class SocketSyncManager {
     this.sendDigest(this.subscribedListId);
   }
 
-  forceReconnect() {
+  forceReconnect(): Promise<'success' | 'failed'> {
+    if (this.forcedReconnectPromise) {
+      return this.forcedReconnectPromise;
+    }
+
+    this.forcedReconnectPromise = new Promise((resolve) => {
+      this.forcedReconnectResolver = resolve;
+    });
+
+    if (this.forcedReconnectTimeout !== null) {
+      window.clearTimeout(this.forcedReconnectTimeout);
+    }
+
+    this.forcedReconnectTimeout = window.setTimeout(() => {
+      this.finishForcedReconnect('failed');
+    }, 8000);
+
     if (this.reconnectTimer !== null) {
       window.clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
@@ -132,10 +151,11 @@ class SocketSyncManager {
     if (this.socket && (this.socket.readyState === WebSocket.OPEN || this.socket.readyState === WebSocket.CONNECTING)) {
       this.forceReconnectPending = true;
       this.socket.close();
-      return;
+      return this.forcedReconnectPromise;
     }
 
     this.connect();
+    return this.forcedReconnectPromise;
   }
 
   private connect() {
@@ -167,6 +187,7 @@ class SocketSyncManager {
         this.send({ type: 'subscribe_list', listId: this.subscribedListId });
       }
       this.flushQueue();
+      this.finishForcedReconnect('success');
     });
 
     this.socket.addEventListener('message', (event) => {
@@ -185,12 +206,34 @@ class SocketSyncManager {
         return;
       }
 
+      if (this.forcedReconnectPromise) {
+        this.finishForcedReconnect('failed');
+      }
+
       this.scheduleReconnect();
     });
 
     this.socket.addEventListener('error', () => {
       this.callbacks?.onConnectionState('offline');
+      if (this.forcedReconnectPromise && !this.forceReconnectPending) {
+        this.finishForcedReconnect('failed');
+      }
     });
+  }
+
+  private finishForcedReconnect(result: 'success' | 'failed') {
+    if (this.forcedReconnectTimeout !== null) {
+      window.clearTimeout(this.forcedReconnectTimeout);
+      this.forcedReconnectTimeout = null;
+    }
+
+    const resolver = this.forcedReconnectResolver;
+    this.forcedReconnectResolver = null;
+    this.forcedReconnectPromise = null;
+
+    if (resolver) {
+      resolver(result);
+    }
   }
 
   private scheduleReconnect() {

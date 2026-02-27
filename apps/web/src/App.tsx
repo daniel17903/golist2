@@ -93,7 +93,6 @@ const App = () => {
   const [appToasts, setAppToasts] = useState<AppToast[]>([]);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [activeLegalModal, setActiveLegalModal] = useState<LegalModalType | null>(null);
-  const appRef = useRef<HTMLDivElement | null>(null);
   const pullStartYRef = useRef<number | null>(null);
   const [pullDistance, setPullDistance] = useState(0);
   const [isPullRefreshing, setIsPullRefreshing] = useState(false);
@@ -247,22 +246,12 @@ const App = () => {
   }, [showBackendLogs, syncNotice, clearSyncNotice]);
 
   useEffect(() => {
-    const container = appRef.current;
-    if (!container) {
-      return;
-    }
-
     const pullThreshold = 72;
     const maxPull = 96;
     const getScrollY = () => window.scrollY || document.scrollingElement?.scrollTop || 0;
 
     const onTouchStart = (event: TouchEvent) => {
-      if (isDrawerOpen || isPullRefreshing || event.touches.length !== 1) {
-        pullStartYRef.current = null;
-        return;
-      }
-
-      if (getScrollY() > 0) {
+      if (isDrawerOpen || isPullRefreshing || event.touches.length !== 1 || getScrollY() > 0) {
         pullStartYRef.current = null;
         return;
       }
@@ -289,41 +278,43 @@ const App = () => {
       }
 
       event.preventDefault();
-      const easedDistance = Math.min(maxPull, rawDistance * 0.45);
-      setPullDistance(easedDistance);
+      setPullDistance(Math.min(maxPull, rawDistance * 0.45));
     };
 
     const onTouchEnd = () => {
       pullStartYRef.current = null;
       const shouldRefresh = pullDistance >= pullThreshold && !isDrawerOpen && !isPullRefreshing;
-      setPullDistance(0);
 
       if (!shouldRefresh) {
+        setPullDistance(0);
         return;
       }
 
+      setPullDistance(pullThreshold);
       setIsPullRefreshing(true);
-      refreshRealtimeConnection();
-      window.setTimeout(() => {
-        setIsPullRefreshing(false);
-      }, 700);
+      void refreshRealtimeConnection()
+        .catch(() => "failed")
+        .finally(() => {
+          setIsPullRefreshing(false);
+          setPullDistance(0);
+        });
     };
 
-    container.addEventListener("touchstart", onTouchStart, { passive: true });
-    container.addEventListener("touchmove", onTouchMove, { passive: false });
-    container.addEventListener("touchend", onTouchEnd);
-    container.addEventListener("touchcancel", onTouchEnd);
+    window.addEventListener("touchstart", onTouchStart, { passive: true });
+    window.addEventListener("touchmove", onTouchMove, { passive: false });
+    window.addEventListener("touchend", onTouchEnd);
+    window.addEventListener("touchcancel", onTouchEnd);
 
     return () => {
-      container.removeEventListener("touchstart", onTouchStart);
-      container.removeEventListener("touchmove", onTouchMove);
-      container.removeEventListener("touchend", onTouchEnd);
-      container.removeEventListener("touchcancel", onTouchEnd);
+      window.removeEventListener("touchstart", onTouchStart);
+      window.removeEventListener("touchmove", onTouchMove);
+      window.removeEventListener("touchend", onTouchEnd);
+      window.removeEventListener("touchcancel", onTouchEnd);
     };
   }, [isDrawerOpen, isPullRefreshing, pullDistance, refreshRealtimeConnection]);
 
   return (
-    <div className="app" ref={appRef}>
+    <div className="app">
       <div
         className={`pull-refresh-indicator${isPullRefreshing ? " pull-refresh-indicator--active" : ""}`}
         style={{ transform: `translate(-50%, ${-56 + pullDistance}px)` }}
