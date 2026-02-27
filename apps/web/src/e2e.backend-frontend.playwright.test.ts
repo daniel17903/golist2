@@ -35,6 +35,12 @@ let browser: Browser | null = null;
 let context: BrowserContext | null = null;
 let page: Page | null = null;
 let observedRequests: { method: string; url: string }[] = [];
+let observedWebSockets: Array<{
+  url: string;
+  sent: string[];
+  received: string[];
+  closed: boolean;
+}> = [];
 
 const shouldRun = process.env.RUN_PLAYWRIGHT_E2E === "1";
 const runE2E = shouldRun ? it : it.skip;
@@ -66,7 +72,7 @@ describe("frontend/backend integration via playwright", () => {
 
     backendUrl = `http://127.0.0.1:${backendAddress.port}`;
 
-    process.env.API_BASE_URL = `http://127.0.0.1:${frontendPort}`;
+    process.env.API_BASE_URL = `http://127.0.0.1:${frontendPort}/api`;
     process.env.ENVIRONMENT = "preview";
 
     const currentFile = fileURLToPath(import.meta.url);
@@ -77,16 +83,17 @@ describe("frontend/backend integration via playwright", () => {
       configFile: path.resolve(webRoot, "vite.config.ts"),
       logLevel: "error",
       define: {
-        __API_BASE_URL__: JSON.stringify(`http://127.0.0.1:${frontendPort}`),
+        __API_BASE_URL__: JSON.stringify(`http://127.0.0.1:${frontendPort}/api`),
       },
       server: {
         host: "127.0.0.1",
         port: frontendPort,
         strictPort: true,
         proxy: {
-          "/v1": {
+          "/api": {
             target: backendUrl,
             ws: true,
+            rewrite: (requestPath) => requestPath.replace(/^\/api/, ""),
           },
           "/health": backendUrl,
         },
@@ -115,9 +122,35 @@ describe("frontend/backend integration via playwright", () => {
     context = launchedContext;
     page = await launchedContext.newPage();
     observedRequests = [];
+    observedWebSockets = [];
 
     page.on("request", (request) => {
       observedRequests.push({ method: request.method(), url: request.url() });
+    });
+
+    page.on("websocket", (websocket) => {
+      const observedSocket: {
+        url: string;
+        sent: string[];
+        received: string[];
+        closed: boolean;
+      } = {
+        url: websocket.url(),
+        sent: [],
+        received: [],
+        closed: false,
+      };
+      observedWebSockets.push(observedSocket);
+
+      websocket.on("framesent", (frame) => {
+        observedSocket.sent.push(typeof frame.payload === "string" ? frame.payload : frame.payload.toString("utf8"));
+      });
+      websocket.on("framereceived", (frame) => {
+        observedSocket.received.push(typeof frame.payload === "string" ? frame.payload : frame.payload.toString("utf8"));
+      });
+      websocket.on("close", () => {
+        observedSocket.closed = true;
+      });
     });
 
     page.on("dialog", async (dialog: { accept: () => Promise<void> }) => {
@@ -163,6 +196,16 @@ describe("frontend/backend integration via playwright", () => {
     ).toBe(true);
 
     expectListPutBeforeFirstGet(defaultList!.data.id);
+
+    await expect.poll(() =>
+      observedWebSockets.some((socket) =>
+        socket.url.includes("/api/v1/ws") &&
+        socket.sent.some((frame) => frame.includes('"type":"hello"')) &&
+        socket.sent.some((frame) => frame.includes('"type":"subscribe_list"')) &&
+        socket.received.some((frame) => frame.includes('"type":"hello_ack"')) &&
+        socket.received.some((frame) => frame.includes('"type":"subscribed"')),
+      ),
+    ).toBe(true);
   });
 
   runE2E("creates an additional list from the list drawer", async () => {

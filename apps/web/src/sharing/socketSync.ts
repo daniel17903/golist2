@@ -19,7 +19,8 @@ const createWebSocketUrl = (): string | null => {
 
   const url = new URL(__API_BASE_URL__);
   url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
-  url.pathname = '/v1/ws';
+  const basePath = url.pathname.replace(/\/$/, '');
+  url.pathname = `${basePath}/v1/ws`;
   return url.toString();
 };
 
