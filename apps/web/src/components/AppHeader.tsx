@@ -53,12 +53,14 @@ const AppHeader = ({
                 aria-label={t("modal.listName")}
                 maxLength={120}
               />
-              <button type="button" className="header-chip-button" onClick={onSaveRename}>
-                {t("common.save")}
-              </button>
-              <button type="button" className="header-chip-button" onClick={onCancelRename}>
-                {t("common.cancel")}
-              </button>
+              <div className="title-edit__actions">
+                <button type="button" className="header-chip-button" onClick={onSaveRename}>
+                  {t("common.save")}
+                </button>
+                <button type="button" className="header-chip-button" onClick={onCancelRename}>
+                  {t("common.cancel")}
+                </button>
+              </div>
             </div>
           ) : (
             <>
