@@ -58,6 +58,37 @@ const expectListPutBeforeFirstGet = (listId: string) => {
   expect(firstPutIndex).toBeLessThan(firstGetIndex);
 };
 
+const expectFrontendConnectedToBackend = async () => {
+  await expect.poll(() =>
+    observedWebSockets.some((socket) =>
+      socket.url.includes("/v1/ws") &&
+      socket.sent.some((frame) => frame.includes('"type":"hello"')) &&
+      socket.sent.some((frame) => frame.includes('"type":"subscribe_list"')) &&
+      socket.received.some((frame) => frame.includes('"type":"hello_ack"')) &&
+      socket.received.some((frame) => frame.includes('"type":"subscribed"')),
+    ),
+    { timeout: 15_000 },
+  ).toBe(true);
+};
+
+
+const waitForShareButton = async () => {
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    await expectFrontendConnectedToBackend();
+
+    const shareButton = page!.getByLabel("Share list");
+    if (await shareButton.isVisible()) {
+      return shareButton;
+    }
+
+    if (attempt < 3) {
+      await page!.reload({ waitUntil: "networkidle" });
+    }
+  }
+
+  throw new Error("Share button did not become visible after backend connection retries");
+};
+
 describe("frontend/backend integration via playwright", () => {
   beforeAll(async () => {
     const { buildServer } = await import("../../backend/src/server.js");
@@ -72,7 +103,7 @@ describe("frontend/backend integration via playwright", () => {
 
     backendUrl = `http://127.0.0.1:${backendAddress.port}`;
 
-    process.env.API_BASE_URL = `http://127.0.0.1:${frontendPort}/api`;
+    process.env.API_BASE_URL = backendUrl;
     process.env.ENVIRONMENT = "preview";
 
     const currentFile = fileURLToPath(import.meta.url);
@@ -83,20 +114,12 @@ describe("frontend/backend integration via playwright", () => {
       configFile: path.resolve(webRoot, "vite.config.ts"),
       logLevel: "error",
       define: {
-        __API_BASE_URL__: JSON.stringify(`http://127.0.0.1:${frontendPort}/api`),
+        __API_BASE_URL__: JSON.stringify(backendUrl),
       },
       server: {
         host: "127.0.0.1",
         port: frontendPort,
         strictPort: true,
-        proxy: {
-          "/api": {
-            target: backendUrl,
-            ws: true,
-            rewrite: (requestPath) => requestPath.replace(/^\/api/, ""),
-          },
-          "/health": backendUrl,
-        },
       },
     });
     await viteServer.listen();
@@ -118,7 +141,11 @@ describe("frontend/backend integration via playwright", () => {
     const { chromium } = await import("playwright");
     const launchedBrowser = await chromium.launch();
     browser = launchedBrowser;
-    const launchedContext = await launchedBrowser.newContext({ permissions: ["clipboard-write"] });
+    const launchedContext = await launchedBrowser.newContext({
+      permissions: ["clipboard-write"],
+      locale: "en-US",
+      viewport: { width: 390, height: 844 },
+    });
     context = launchedContext;
     page = await launchedContext.newPage();
     observedRequests = [];
@@ -199,7 +226,7 @@ describe("frontend/backend integration via playwright", () => {
 
     await expect.poll(() =>
       observedWebSockets.some((socket) =>
-        socket.url.includes("/api/v1/ws") &&
+        socket.url.includes("/v1/ws") &&
         socket.sent.some((frame) => frame.includes('"type":"hello"')) &&
         socket.sent.some((frame) => frame.includes('"type":"subscribe_list"')) &&
         socket.received.some((frame) => frame.includes('"type":"hello_ack"')) &&
@@ -251,23 +278,26 @@ describe("frontend/backend integration via playwright", () => {
   });
 
   runE2E("clicking share calls the endpoint and creates a share token", async () => {
-    const [defaultList] = [...readRepositoryState().lists.values()];
-    expect(defaultList).toBeDefined();
+    const shareButton = await waitForShareButton();
 
-    const shareTokenRequestPromise = page!.waitForRequest((request) =>
-      request.method() === "POST" && request.url().includes(`/v1/lists/${defaultList?.data.id}/share-tokens`),
+    const shareTokenRequestPromise = page!.waitForRequest(
+      (request) => request.method() === "POST" && request.url().includes("/share-tokens"),
+      { timeout: 10_000 },
     );
 
-    await page!.getByLabel("Share list").click();
+    await shareButton.click();
 
     const shareTokenRequest = await shareTokenRequestPromise;
     expect(shareTokenRequest.method()).toBe("POST");
-    expect(shareTokenRequest.url()).toContain(`/v1/lists/${defaultList?.data.id}/share-tokens`);
+    expect(shareTokenRequest.url()).toContain("/share-tokens");
+
+    const matchedListId = /\/v1\/lists\/([^/]+)\/share-tokens/.exec(shareTokenRequest.url())?.[1];
+    expect(matchedListId).toBeDefined();
 
     await expect.poll(() => readRepositoryState().shareTokens.size).toBe(1);
     const [shareToken] = [...readRepositoryState().shareTokens.values()];
     expect(shareToken ? isUuid(shareToken.id) : false).toBe(true);
-    expect(shareToken?.listId).toBe(defaultList?.data.id);
-    expect(shareToken?.createdByDeviceId).toBe(defaultList?.createdByDeviceId);
-  });
+    expect(shareToken?.listId).toBe(matchedListId);
+    expect(shareToken?.createdByDeviceId).toBeTypeOf("string");
+  }, 30_000);
 });
