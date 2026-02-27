@@ -966,6 +966,13 @@ body {
   }
 }
 
+
+.connection-icon__image {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
 .connection-icon--online { color: #66f57f; }
 .connection-icon--offline { color: #f6f294; }
 .connection-icon--unknown { color: #ffd980; }

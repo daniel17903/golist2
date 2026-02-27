@@ -55,23 +55,7 @@ const BottomBar = ({ onOpenDrawer, onAddItem, onShareList, canShareList, backend
               onBlur={() => setShowOfflineInfo(false)}
             >
               <span className="connection-icon connection-icon--offline" aria-hidden="true">
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path
-                    d="M19 18H6a4 4 0 1 1 .6-7.96A5.5 5.5 0 0 1 17.06 9a3.75 3.75 0 0 1 1.94 7z"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                  <path
-                    d="M5 19L19 5"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                  />
-                </svg>
+                <img src="/icons/backend_offline_status.svg" alt="" className="connection-icon__image" />
               </span>
               <span className={`connection-badge__tooltip ${showOfflineInfo ? "connection-badge__tooltip--visible" : ""}`}>
                 {t("header.backendStatusOfflineInfo")}
