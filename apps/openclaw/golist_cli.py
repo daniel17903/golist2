@@ -266,7 +266,11 @@ def cmd_create_list(state: RuntimeState, args: argparse.Namespace) -> None:
 
 
 def cmd_join(state: RuntimeState, args: argparse.Namespace) -> None:
-    known_list = redeem_share_token(state=state, share_token=args.share_token, list_name=args.name)
+    share_token = args.share_token or args.share_token_arg or os.environ.get("GOLIST_SHARE_TOKEN")
+    if not share_token:
+        raise CliError("A share token is required. Pass one as an argument, --share-token, or GOLIST_SHARE_TOKEN.")
+
+    known_list = redeem_share_token(state=state, share_token=share_token, list_name=args.name)
     print(json.dumps({"deviceId": state.device_id, "activeList": {"id": known_list.id, "name": known_list.name}}, indent=2))
 
 
@@ -413,7 +417,8 @@ def build_parser() -> argparse.ArgumentParser:
     create_list_parser.set_defaults(func=cmd_create_list)
 
     join_parser = subparsers.add_parser("join", help="Join an existing shared list with a share token")
-    join_parser.add_argument("share_token", help="Share token UUID")
+    join_parser.add_argument("share_token_arg", nargs="?", help="Share token UUID")
+    join_parser.add_argument("--share-token", dest="share_token", help="Share token UUID")
     join_parser.add_argument("--name", help="Friendly name to save for the joined list")
     join_parser.set_defaults(func=cmd_join)
 
@@ -456,7 +461,7 @@ def main() -> int:
     args = parser.parse_args()
     state = load_state()
 
-    if hasattr(args, "share_token") and not args.share_token:
+    if args.command == "bootstrap" and not args.share_token:
         print("A share token is required. Set --share-token or GOLIST_SHARE_TOKEN.", file=sys.stderr)
         return 1
 
