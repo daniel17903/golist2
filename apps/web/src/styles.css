@@ -967,7 +967,7 @@ body {
 }
 
 .connection-icon--online { color: #66f57f; }
-.connection-icon--offline { color: #ff847f; }
+.connection-icon--offline { color: #f6f294; }
 .connection-icon--unknown { color: #ffd980; }
 
 .connection-spinner {
