@@ -795,8 +795,10 @@ body {
 
 .item-card--dialog {
   background: rgba(213, 254, 181, 0.39);
-  height: var(--item-size);
-  width: var(--item-size);
+  width: 100%;
+  min-width: 100px;
+  height: auto;
+  aspect-ratio: 1 / 1;
   color: #ffffff;
 }
 
