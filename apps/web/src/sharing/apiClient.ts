@@ -1,8 +1,6 @@
 import type {
-  ApiItemUpsertRequest,
   ApiListDocument,
   ApiListItem,
-  ApiListItemsUpdatedAfterResponse,
   ApiListUpsertRequest,
   ApiListUpsertResponse,
   ApiShareTokenCreateResponse,
@@ -203,17 +201,6 @@ const parseShareTokenRedeemResponse = (payload: unknown): ApiShareTokenRedeemRes
   return { listId };
 };
 
-const parseListItemsUpdatedAfterResponse = (payload: unknown): ApiListItemsUpdatedAfterResponse => {
-  const rawItems = typeof payload === "object" && payload !== null ? Reflect.get(payload, "items") : null;
-  if (!Array.isArray(rawItems)) {
-    throw new Error("Invalid list items response payload");
-  }
-
-  return {
-    items: rawItems.map((item) => parseApiListItem(item)),
-  };
-};
-
 const parseListDocumentResponse = (payload: unknown): ApiListDocument => {
   const listId = readString(payload, "listId");
   const name = readString(payload, "name");
@@ -266,23 +253,6 @@ export const sharingApiClient = {
     return parseListDocumentResponse(await response.json());
   },
 
-  async fetchItemsUpdatedAfter(params: {
-    deviceId: string;
-    listId: string;
-    updatedAfter: string;
-  }): Promise<ApiListItemsUpdatedAfterResponse> {
-    const query = new URLSearchParams({ updatedAfter: params.updatedAfter });
-    const response = await fetchWithTimeout(
-      `${requireApiBaseUrl()}/v1/lists/${params.listId}/items?${query.toString()}`,
-      {
-        method: "GET",
-        headers: createHeaders(params.deviceId),
-      },
-      "fetch list items updated after",
-    );
-    await assertOk(response, "fetch list items updated after");
-    return parseListItemsUpdatedAfterResponse(await response.json());
-  },
 
   async redeemShareToken(params: { deviceId: string; shareToken: string }): Promise<ApiShareTokenRedeemResponse> {
     const response = await fetchWithTimeout(
@@ -314,24 +284,6 @@ export const sharingApiClient = {
     );
     await assertOk(response, "share token create");
     return parseShareTokenCreateResponse(await response.json());
-  },
-
-  async upsertItem(params: {
-    deviceId: string;
-    listId: string;
-    itemId: string;
-    body: ApiItemUpsertRequest;
-  }): Promise<void> {
-    const response = await fetchWithTimeout(
-      `${requireApiBaseUrl()}/v1/lists/${params.listId}/items/${params.itemId}`,
-      {
-        method: "PUT",
-        headers: createHeaders(params.deviceId, { includeJsonContentType: true }),
-        body: JSON.stringify(params.body),
-      },
-      "item upsert",
-    );
-    await assertOk(response, "item upsert");
   },
 };
 

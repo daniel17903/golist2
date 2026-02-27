@@ -169,6 +169,161 @@ components:
         listId:
           type: string
           format: uuid
+
+    SyncItemSummary:
+      type: object
+      required: [itemId, itemHash, updatedAt]
+      properties:
+        itemId:
+          type: string
+          format: uuid
+        itemHash:
+          type: string
+        updatedAt:
+          type: integer
+    SyncItem:
+      allOf:
+        - $ref: "#/components/schemas/ListItem"
+        - type: object
+          required: [listId]
+          properties:
+            listId:
+              type: string
+              format: uuid
+            createdAt:
+              type: integer
+            updatedAt:
+              type: integer
+    WebSocketClientMessage:
+      description: Client-to-server websocket sync messages.
+      oneOf:
+        - type: object
+          required: [type, deviceId]
+          properties:
+            type:
+              const: hello
+            deviceId:
+              type: string
+              format: uuid
+        - type: object
+          required: [type, listId]
+          properties:
+            type:
+              enum: [subscribe_list, unsubscribe_list]
+            listId:
+              type: string
+              format: uuid
+        - type: object
+          required: [type, listId, digest]
+          properties:
+            type:
+              const: list_digest
+            listId:
+              type: string
+              format: uuid
+            digest:
+              type: string
+        - type: object
+          required: [type, listId, summaries]
+          properties:
+            type:
+              const: hash_diff
+            listId:
+              type: string
+              format: uuid
+            summaries:
+              type: array
+              items:
+                $ref: "#/components/schemas/SyncItemSummary"
+        - type: object
+          required: [type, listId, items]
+          properties:
+            type:
+              const: item_patch
+            listId:
+              type: string
+              format: uuid
+            items:
+              type: array
+              items:
+                $ref: "#/components/schemas/SyncItem"
+        - type: object
+          required: [type, listId, name, updatedAt]
+          properties:
+            type:
+              const: list_metadata_patch
+            listId:
+              type: string
+              format: uuid
+            name:
+              type: string
+            updatedAt:
+              type: integer
+    WebSocketServerMessage:
+      description: Server-to-client websocket sync messages.
+      oneOf:
+        - type: object
+          required: [type]
+          properties:
+            type:
+              const: hello_ack
+        - type: object
+          required: [type, listId, listName, listUpdatedAt, serverListDigest]
+          properties:
+            type:
+              const: subscribed
+            listId:
+              type: string
+              format: uuid
+            listName:
+              type: string
+            listUpdatedAt:
+              type: integer
+            serverListDigest:
+              type: string
+        - type: object
+          required: [type, listId, summaries]
+          properties:
+            type:
+              const: hash_diff
+            listId:
+              type: string
+              format: uuid
+            summaries:
+              type: array
+              items:
+                $ref: "#/components/schemas/SyncItemSummary"
+        - type: object
+          required: [type, listId, items]
+          properties:
+            type:
+              const: item_patch
+            listId:
+              type: string
+              format: uuid
+            items:
+              type: array
+              items:
+                $ref: "#/components/schemas/SyncItem"
+        - type: object
+          required: [type, listId, name, updatedAt]
+          properties:
+            type:
+              const: list_metadata_patch
+            listId:
+              type: string
+              format: uuid
+            name:
+              type: string
+            updatedAt:
+              type: integer
+        - type: object
+          required: [type, message]
+          properties:
+            type:
+              const: error
+            message:
+              type: string
 security:
   - BearerAuth: []
 paths:
@@ -260,6 +415,23 @@ paths:
           description: Item updated
         "409":
           description: Item id belongs to another list
+
+  /v1/ws:
+    get:
+      summary: WebSocket endpoint for realtime list item synchronization
+      description: |
+        Upgrades to a websocket connection. Client must send `hello` first, then list-scoped
+        subscribe/unsubscribe and digest/hash/item-patch messages as documented in
+        `docs/websocket-sync-protocol.md`.
+      security: []
+      responses:
+        "101":
+          description: Switching Protocols (WebSocket upgrade)
+      x-websocket-messages:
+        client:
+          $ref: "#/components/schemas/WebSocketClientMessage"
+        server:
+          $ref: "#/components/schemas/WebSocketServerMessage"
   /v1/share-tokens/{shareToken}/redeem:
     parameters:
       - $ref: "#/components/parameters/ShareToken"

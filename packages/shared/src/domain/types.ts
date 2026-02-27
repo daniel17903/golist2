@@ -1,5 +1,3 @@
-import type { CategoryLanguage } from './item-category-mapping';
-
 export type SharedList = {
   id: string;
   name: string;
@@ -54,9 +52,6 @@ export type ApiListDocument = {
   items: ApiListItem[];
 };
 
-export type ApiListItemsUpdatedAfterResponse = {
-  items: ApiListItem[];
-};
 
 export type ApiListUpsertRequest = {
   name: string;
@@ -77,12 +72,3 @@ export type ApiShareTokenRedeemResponse = {
   listId: string;
 };
 
-export type ApiItemUpsertRequest = {
-  name: string;
-  iconName?: string;
-  quantityOrUnit?: string;
-  category?: string;
-  language?: CategoryLanguage;
-  deleted: boolean;
-  updatedAt: string;
-};

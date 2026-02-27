@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type { AppMetadata, Item, List } from "@golist/shared/domain/types";
+import { buildItemHash } from "@golist/shared/domain/sync";
 import { getCategoryIdForItem, getItemIconName } from "../domain/categories";
 import { db } from "../storage/db";
 import { t } from "../i18n";
@@ -10,12 +11,12 @@ import {
   setActiveBackendRequestLogger,
   isBackendSharingEnabled,
 } from "../sharing/apiClient";
+import { socketSyncManager } from "../sharing/socketSync";
 
 const createId = () => crypto.randomUUID();
 const appVersion = __APP_VERSION__;
 const selectedListStorageKey = "golist.selectedListId";
 
-const toIsoTimestamp = (value: number) => new Date(value).toISOString();
 const toMillis = (value: string) => new Date(value).getTime();
 
 const getOrCreateDeviceId = (): string => {
@@ -69,12 +70,6 @@ type StoreState = {
   appendBackendLog: (entry: { message: string; outcome: "success" | "error" | "skipped" }) => void;
 };
 
-const triggerSyncInBackground = (listId: string) => {
-  void useStore
-    .getState()
-    .syncList(listId)
-    .catch(() => undefined);
-};
 
 const syncListNameImmediately = async (listId: string, listName: string) => {
   const state = useStore.getState();
@@ -91,30 +86,13 @@ const syncListNameImmediately = async (listId: string, listName: string) => {
     },
   });
 
-  markBackendOnline();
-};
-
-const syncItemImmediately = async (item: Item) => {
-  const state = useStore.getState();
-  if (!state.metadata?.deviceId) {
-    logSkippedBackendCall("Item sync skipped: device metadata missing.");
-    return;
-  }
-
-  await sharingApiClient.upsertItem({
+  await sharingApiClient.fetchList({
     deviceId: state.metadata.deviceId,
-    listId: item.listId,
-    itemId: item.id,
-    body: {
-      name: item.name,
-      iconName: item.iconName,
-      quantityOrUnit: item.quantityOrUnit,
-      category: item.category,
-      deleted: item.deleted,
-      updatedAt: toIsoTimestamp(item.updatedAt),
-    },
+    listId,
   });
 
+  socketSyncManager.setActiveList(listId);
+  socketSyncManager.requestResync();
   markBackendOnline();
 };
 
@@ -130,8 +108,6 @@ const describeSyncError = (error: unknown) => {
   return null;
 };
 
-const isFetchListForbiddenError = (error: unknown) =>
-  error instanceof Error && /fetch list failed:\s*403\b/i.test(error.message);
 
 const reportSyncError = (message: string) => {
   useStore.setState({
@@ -208,7 +184,78 @@ export const useStore = create<StoreState>((set, get) => ({
     });
 
     if (isBackendSharingEnabled) {
-      void get().syncAllLists();
+      socketSyncManager.init(metadata.deviceId, {
+        getItemsForList: (listId) => useStore.getState().items.filter((item) => item.listId === listId),
+        applyIncomingItems: async (listId, incomingItems) => {
+          const currentState = useStore.getState();
+          const localById = new Map(
+            currentState.items.filter((item) => item.listId === listId).map((item) => [item.id, item]),
+          );
+
+          const acceptedItems = incomingItems.filter((incoming) => {
+            const localItem = localById.get(incoming.id);
+            if (!localItem) {
+              return true;
+            }
+            if (incoming.updatedAt > localItem.updatedAt) {
+              return true;
+            }
+            if (incoming.updatedAt < localItem.updatedAt) {
+              return false;
+            }
+            return buildItemHash(incoming) >= buildItemHash(localItem);
+          });
+
+          if (acceptedItems.length === 0) {
+            return;
+          }
+
+          await db.items.bulkPut(acceptedItems);
+          useStore.setState((state) => {
+            const mergedById = new Map(state.items.map((item) => [item.id, item]));
+            for (const accepted of acceptedItems) {
+              mergedById.set(accepted.id, accepted);
+            }
+            return { items: Array.from(mergedById.values()) };
+          });
+        },
+        applyIncomingListMetadata: async (listId, payload) => {
+          const currentList = useStore.getState().lists.find((entry) => entry.id === listId);
+          if (!currentList) {
+            return;
+          }
+
+          if (payload.updatedAt < currentList.updatedAt) {
+            return;
+          }
+
+          if (payload.updatedAt === currentList.updatedAt && payload.name === currentList.name) {
+            return;
+          }
+
+          const updatedList = {
+            ...currentList,
+            name: payload.name,
+            updatedAt: payload.updatedAt,
+          };
+
+          await db.lists.put(updatedList);
+          useStore.setState((state) => ({
+            lists: state.lists.map((entry) =>
+              entry.id === listId
+                ? updatedList
+                : entry,
+            ),
+          }));
+        },
+        onConnectionState: (connectionState) => {
+          useStore.setState({ backendConnection: connectionState });
+        },
+        onError: (message) => {
+          reportSyncError(`${message} ${t("sync.pending")}`);
+        },
+      });
+      socketSyncManager.setActiveList(initialActiveListId);
     }
   },
   addList: async (name: string) => {
@@ -231,7 +278,7 @@ export const useStore = create<StoreState>((set, get) => ({
       t("sync.offline"),
     );
 
-    triggerSyncInBackground(list.id);
+    socketSyncManager.setActiveList(list.id);
   },
   renameList: async (listId: string, name: string) => {
     const now = Date.now();
@@ -245,8 +292,10 @@ export const useStore = create<StoreState>((set, get) => ({
       () => syncListNameImmediately(listId, name),
       t("sync.offline"),
     );
-
-    triggerSyncInBackground(listId);
+    socketSyncManager.queueLocalListMetadataPatch(listId, {
+      name,
+      updatedAt: now,
+    });
   },
   deleteList: async (listId: string) => {
     await db.items.where("listId").equals(listId).delete();
@@ -257,6 +306,7 @@ export const useStore = create<StoreState>((set, get) => ({
       const nextActiveListId =
         state.activeListId === listId ? remainingLists[0]?.id : state.activeListId;
       persistSelectedListId(nextActiveListId);
+      socketSyncManager.setActiveList(nextActiveListId);
       return {
         lists: remainingLists,
         items: state.items.filter((item) => item.listId !== listId),
@@ -267,6 +317,7 @@ export const useStore = create<StoreState>((set, get) => ({
   setActiveList: (listId: string) => {
     persistSelectedListId(listId);
     set({ activeListId: listId });
+    socketSyncManager.setActiveList(listId);
   },
   addItem: async (listId: string, name: string, quantityOrUnit?: string) => {
     const now = Date.now();
@@ -283,9 +334,7 @@ export const useStore = create<StoreState>((set, get) => ({
     };
     await db.items.add(item);
     set((state) => ({ items: [...state.items, item] }));
-    runBackendSyncInBackground(() => syncItemImmediately(item), t("sync.offline"));
-
-    triggerSyncInBackground(listId);
+    socketSyncManager.queueLocalItemPatch(item);
   },
   toggleItem: async (itemId: string) => {
     const { items } = get();
@@ -301,12 +350,7 @@ export const useStore = create<StoreState>((set, get) => ({
       items: state.items.map((entry) => (entry.id === itemId ? updated : entry)),
     }));
 
-    runBackendSyncInBackground(
-      () => syncItemImmediately(updated),
-      t("sync.offline"),
-    );
-
-    triggerSyncInBackground(updated.listId);
+    socketSyncManager.queueLocalItemPatch(updated);
   },
   updateItem: async (itemId: string, name: string, quantityOrUnit?: string) => {
     const { items } = get();
@@ -325,12 +369,7 @@ export const useStore = create<StoreState>((set, get) => ({
       items: state.items.map((entry) => (entry.id === itemId ? updated : entry)),
     }));
 
-    runBackendSyncInBackground(
-      () => syncItemImmediately(updated),
-      t("sync.offline"),
-    );
-
-    triggerSyncInBackground(updated.listId);
+    socketSyncManager.queueLocalItemPatch(updated);
   },
   ensureShareToken: async (listId: string) => {
     const state = get();
@@ -421,6 +460,7 @@ export const useStore = create<StoreState>((set, get) => ({
       });
 
       markBackendOnline();
+      socketSyncManager.setActiveList(localList.id);
       return localList.id;
     } catch (error) {
       const details = describeSyncError(error);
@@ -433,150 +473,19 @@ export const useStore = create<StoreState>((set, get) => ({
     }
   },
   syncList: async (listId: string) => {
-    const state = get();
-    if (!isBackendSharingEnabled || !state.metadata?.deviceId) {
-      return;
-    }
-
-    const localList = state.lists.find((entry) => entry.id === listId);
-    if (!localList) {
-      return;
-    }
-
-    const deviceId = state.metadata.deviceId;
-    const localItemsForList = state.items.filter((item) => item.listId === listId);
-    const localItemMap = new Map(localItemsForList.map((item) => [item.id, item]));
-    const listShare = await db.listShares.get(listId);
-    const previousLastSyncedAt = listShare?.lastSyncedAt;
-
-    let remoteList;
-
-    try {
-      remoteList = await sharingApiClient.fetchList({ deviceId, listId });
-    } catch (error) {
-      if (!isFetchListForbiddenError(error)) {
-        throw error;
-      }
-
-      await sharingApiClient.upsertList({
-        deviceId,
-        listId,
-        body: { name: localList.name },
-      });
-      remoteList = await sharingApiClient.fetchList({ deviceId, listId });
-    }
-
-    const remoteListUpdatedAt = toMillis(remoteList.updatedAt);
-    if (localList.updatedAt > remoteListUpdatedAt || localList.name !== remoteList.name) {
-      await sharingApiClient.upsertList({
-        deviceId,
-        listId,
-        body: { name: localList.name },
-      });
-    }
-
-    const localPushById = new Map<string, Item>();
-    for (const localItem of localItemsForList) {
-      if (
-        !previousLastSyncedAt
-        || localItem.updatedAt > previousLastSyncedAt
-        || localItem.createdAt > previousLastSyncedAt
-      ) {
-        localPushById.set(localItem.id, localItem);
-      }
-    }
-
-    for (const item of localPushById.values()) {
-      await sharingApiClient.upsertItem({
-        deviceId,
-        listId,
-        itemId: item.id,
-        body: {
-          name: item.name,
-          iconName: item.iconName,
-          quantityOrUnit: item.quantityOrUnit,
-          category: item.category,
-          deleted: item.deleted,
-          updatedAt: toIsoTimestamp(item.updatedAt),
-        },
-      });
-    }
-
-    const now = Date.now();
-    const updatedAfterIso = toIsoTimestamp(previousLastSyncedAt ?? 0);
-    const remoteItemsResponse = await sharingApiClient.fetchItemsUpdatedAfter({
-      deviceId,
-      listId,
-      updatedAfter: updatedAfterIso,
-    });
-
-    const remoteSyncedItems: Item[] = remoteItemsResponse.items.map((item) => ({
-      id: item.id,
-      listId,
-      name: item.name,
-      iconName: item.iconName,
-      quantityOrUnit: item.quantityOrUnit,
-      category: item.category,
-      deleted: item.deleted,
-      createdAt: toMillis(item.createdAt),
-      updatedAt: toMillis(item.updatedAt),
-    }));
-
-    const remoteItemsById = new Map(remoteSyncedItems.map((item) => [item.id, item]));
-    const nextItemsForList = localItemsForList.map((item) => remoteItemsById.get(item.id) ?? item);
-    for (const remoteItem of remoteSyncedItems) {
-      if (!localItemMap.has(remoteItem.id)) {
-        nextItemsForList.push(remoteItem);
-      }
-    }
-
-    const syncedList: List = {
-      id: remoteList.listId,
-      name: remoteList.name,
-      createdAt: toMillis(remoteList.createdAt),
-      updatedAt: toMillis(remoteList.updatedAt),
-    };
-
-    await db.lists.put(syncedList);
-    if (remoteSyncedItems.length > 0) {
-      await db.items.bulkPut(remoteSyncedItems);
-    }
-    await db.listShares.put({
-      listId,
-      lastSyncedAt: now,
-    });
-
-    set((current) => {
-      const remainingLists = current.lists.filter((entry) => entry.id !== listId);
-      const remainingItems = current.items.filter((entry) => entry.listId !== listId);
-      return {
-        lists: [...remainingLists, syncedList].sort((a, b) => a.createdAt - b.createdAt),
-        items: [...remainingItems, ...nextItemsForList],
-      };
-    });
-
-    markBackendOnline();
-  },
-  syncAllLists: async () => {
-    const state = get();
     if (!isBackendSharingEnabled) {
       return;
     }
 
-    await Promise.all(
-      state.lists.map(async (list) => {
-        try {
-          await get().syncList(list.id);
-        } catch (error) {
-          const details = describeSyncError(error);
-          reportSyncError(
-            details
-              ? `Backend derzeit nicht erreichbar (${details}). Synchronisierung wird erneut versucht.`
-              : "Backend derzeit nicht erreichbar. Synchronisierung wird erneut versucht.",
-          );
-        }
-      }),
-    );
+    socketSyncManager.setActiveList(listId);
+    socketSyncManager.requestResync();
+  },
+  syncAllLists: async () => {
+    if (!isBackendSharingEnabled) {
+      return;
+    }
+
+    socketSyncManager.requestResync();
   },
   clearSyncNotice: () => set({ syncNotice: undefined }),
   appendBackendLog: (entry) =>
