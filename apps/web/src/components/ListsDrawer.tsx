@@ -45,6 +45,7 @@ const ListsDrawer = ({
   const drawerRef = useRef<HTMLElement | null>(null);
   const dragStateRef = useRef<{ pointerId: number; startX: number; mode: DragMode } | null>(null);
   const [dragOffset, setDragOffset] = useState<number | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
   const [confirmDeleteListId, setConfirmDeleteListId] = useState<string | null>(null);
 
 
@@ -95,6 +96,7 @@ const ListsDrawer = ({
   const handleDragStart = (event: PointerEvent<HTMLElement>, mode: DragMode) => {
     if (event.pointerType !== "touch" && event.pointerType !== "pen") {return;}
     dragStateRef.current = { pointerId: event.pointerId, startX: event.clientX, mode };
+    setIsDragging(true);
     event.currentTarget.setPointerCapture(event.pointerId);
   };
 
@@ -107,6 +109,7 @@ const ListsDrawer = ({
       startX: touch.clientX,
       mode,
     };
+    setIsDragging(true);
   };
 
   const getTrackedTouch = (event: TouchEvent<HTMLElement>) => {
@@ -149,6 +152,7 @@ const ListsDrawer = ({
       onClose();
     }
 
+    setIsDragging(false);
     setDragOffset(null);
     dragStateRef.current = null;
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
@@ -191,11 +195,12 @@ const ListsDrawer = ({
       onClose();
     }
 
+    setIsDragging(false);
     setDragOffset(null);
     dragStateRef.current = null;
   };
 
-  const drawerStyle = dragOffset === null ? undefined : { transform: `translateX(${dragOffset}px)`, transition: "none" };
+  const drawerStyle = dragOffset === null ? undefined : { transform: `translateX(${dragOffset}px)` };
 
   return (
     <>
@@ -234,7 +239,7 @@ const ListsDrawer = ({
         />
         <aside
           ref={drawerRef}
-          className={`drawer ${isOpen ? "drawer--open" : ""}`}
+          className={`drawer ${isOpen ? "drawer--open" : ""} ${isDragging ? "drawer--dragging" : ""}`}
           style={drawerStyle}
           aria-hidden={!isOpen}
           onPointerDown={(event) => handleDragStart(event, "closing")}
