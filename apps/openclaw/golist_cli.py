@@ -226,7 +226,7 @@ def create_list(state: RuntimeState, list_name: str) -> KnownList:
     return known_list
 
 
-def redeem_share_token(state: RuntimeState, share_token: str, list_name: str | None = None) -> KnownList:
+def redeem_share_token(state: RuntimeState, share_token: str) -> KnownList:
     device_id = ensure_device_id(state)
 
     payload = api_request("POST", f"/v1/share-tokens/{share_token}/redeem", device_id=device_id)
@@ -235,11 +235,9 @@ def redeem_share_token(state: RuntimeState, share_token: str, list_name: str | N
     if not list_id:
         raise CliError("Token redemption succeeded but response did not include listId.")
 
-    resolved_name = list_name
-    if not resolved_name:
-        fetched = fetch_list(device_id=device_id, list_id=list_id)
-        fetched_name = fetched.get("name")
-        resolved_name = fetched_name if isinstance(fetched_name, str) and fetched_name else "Shared list"
+    fetched = fetch_list(device_id=device_id, list_id=list_id)
+    fetched_name = fetched.get("name")
+    resolved_name = fetched_name if isinstance(fetched_name, str) and fetched_name else "Shared list"
 
     known_list = upsert_known_list(state, list_id, resolved_name)
     state.active_list_id = list_id
@@ -248,7 +246,7 @@ def redeem_share_token(state: RuntimeState, share_token: str, list_name: str | N
 
 
 def cmd_bootstrap(state: RuntimeState, args: argparse.Namespace) -> None:
-    known_list = redeem_share_token(state=state, share_token=args.share_token, list_name=args.name)
+    known_list = redeem_share_token(state=state, share_token=args.share_token)
     print(
         json.dumps(
             {
@@ -270,7 +268,7 @@ def cmd_join(state: RuntimeState, args: argparse.Namespace) -> None:
     if not share_token:
         raise CliError("A share token is required. Pass one as an argument, --share-token, or GOLIST_SHARE_TOKEN.")
 
-    known_list = redeem_share_token(state=state, share_token=share_token, list_name=args.name)
+    known_list = redeem_share_token(state=state, share_token=share_token)
     print(json.dumps({"deviceId": state.device_id, "activeList": {"id": known_list.id, "name": known_list.name}}, indent=2))
 
 
@@ -329,7 +327,7 @@ def cmd_upsert(state: RuntimeState, args: argparse.Namespace) -> None:
 
     body: dict[str, Any] = {
         "name": args.name,
-        "deleted": False,
+        "deleted": bool(args.deleted),
         "updatedAt": now_iso(),
     }
     if args.quantity is not None:
@@ -409,7 +407,6 @@ def build_parser() -> argparse.ArgumentParser:
 
     bootstrap_parser = subparsers.add_parser("bootstrap", help="Redeem share token and set active list")
     bootstrap_parser.add_argument("--share-token", default=os.environ.get("GOLIST_SHARE_TOKEN"), help="Share token UUID")
-    bootstrap_parser.add_argument("--name", help="Friendly name to save for the joined list")
     bootstrap_parser.set_defaults(func=cmd_bootstrap)
 
     create_list_parser = subparsers.add_parser("create-list", help="Create a new list and set it active")
@@ -419,7 +416,6 @@ def build_parser() -> argparse.ArgumentParser:
     join_parser = subparsers.add_parser("join", help="Join an existing shared list with a share token")
     join_parser.add_argument("share_token_arg", nargs="?", help="Share token UUID")
     join_parser.add_argument("--share-token", dest="share_token", help="Share token UUID")
-    join_parser.add_argument("--name", help="Friendly name to save for the joined list")
     join_parser.set_defaults(func=cmd_join)
 
     use_list_parser = subparsers.add_parser("use-list", help="Set active list by saved list id or name")
@@ -436,6 +432,7 @@ def build_parser() -> argparse.ArgumentParser:
     upsert_parser = subparsers.add_parser("upsert", help="Create/update an item by name")
     upsert_parser.add_argument("name", help="Item name")
     upsert_parser.add_argument("--quantity", help="Optional quantity/unit text")
+    upsert_parser.add_argument("--deleted", action="store_true", help="Optionally mark the item as deleted (default: false)")
     upsert_parser.add_argument("--list", help="Optional list id or name. Defaults to active list")
     upsert_parser.set_defaults(func=cmd_upsert)
 

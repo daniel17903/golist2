@@ -12,6 +12,6 @@ The skill uses the fixed API base URL `https://go-list.app/api`, generates/persi
 python3 apps/openclaw/golist_cli.py create-list "Weekend groceries"
 python3 apps/openclaw/golist_cli.py upsert "milk" --quantity "2 L"
 python3 apps/openclaw/golist_cli.py share
-python3 apps/openclaw/golist_cli.py join <share-token-uuid> --name "Shared with me"
+python3 apps/openclaw/golist_cli.py join <share-token-uuid>
 python3 apps/openclaw/golist_cli.py lists
 ```

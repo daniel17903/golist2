@@ -18,7 +18,7 @@ This skill supports:
 3. Every request must include the `X-Device-Id` header.
 4. For item writes, OpenClaw must only set:
    - `name` (required),
-   - `deleted` (required),
+   - `deleted` (optional, defaults to `false`),
    - `quantityOrUnit` (optional).
 5. OpenClaw must generate all item UUIDs and timestamps in the Python CLI (never require the agent to provide them).
 
@@ -60,9 +60,9 @@ Creates a share token for the active list and returns both token + share URL.
 
 ### 3) Join an existing list via share token
 ```bash
-python3 apps/openclaw/golist_cli.py join <share-token-uuid> [--name "My alias"]
+python3 apps/openclaw/golist_cli.py join <share-token-uuid>
 ```
-Redeems the token, stores the list in known lists, and sets it active.
+Redeems the token, fetches the real list name from the API, stores that name+id mapping, and sets it active.
 
 ### 4) Switch/access saved lists
 ```bash
@@ -73,7 +73,7 @@ python3 apps/openclaw/golist_cli.py show
 
 ### 5) Item writes (restricted fields)
 ```bash
-python3 apps/openclaw/golist_cli.py upsert "milk" [--quantity "2 L"]
+python3 apps/openclaw/golist_cli.py upsert "milk" [--quantity "2 L"] [--deleted]
 python3 apps/openclaw/golist_cli.py delete "milk"
 ```
 
