@@ -278,8 +278,6 @@ export const useStore = create<StoreState>((set, get) => ({
       () => syncListNameImmediately(list.id, list.name),
       t("sync.offline"),
     );
-
-    socketSyncManager.setActiveList(list.id);
   },
   renameList: async (listId: string, name: string) => {
     const now = Date.now();
