@@ -8,6 +8,7 @@ type ItemGridProps = {
   onExitComplete: (itemId: string) => void;
   longPressTriggeredRef: MutableRefObject<boolean>;
   suppressItemPressRef: MutableRefObject<boolean>;
+  pressedItemId: string | null;
   onPointerDown: (itemId: string, name: string, quantityOrUnit?: string) => void;
   onPointerUp: (itemId: string) => void;
   onPointerCancel: () => void;
@@ -19,6 +20,7 @@ const ItemGrid = ({
   onExitComplete,
   longPressTriggeredRef,
   suppressItemPressRef,
+  pressedItemId,
   onPointerDown,
   onPointerUp,
   onPointerCancel,
@@ -31,6 +33,7 @@ const ItemGrid = ({
           item={item}
           isExiting={exitingItemIds.has(item.id)}
           onExitComplete={onExitComplete}
+          isPressing={pressedItemId === item.id}
           onPointerDown={onPointerDown}
           onPointerUp={onPointerUp}
           onPointerLeave={onPointerCancel}

@@ -235,11 +235,16 @@ const App = () => {
     await toggleItem(itemId);
   };
 
-  const { handlePointerDown, handlePointerUp, handlePointerCancel, longPressTriggeredRef } =
-    useLongPressItem({
-      onLongPress: openEditItem,
-      onShortPress: handleToggleItem,
-    });
+  const {
+    handlePointerDown,
+    handlePointerUp,
+    handlePointerCancel,
+    longPressTriggeredRef,
+    pressedItemId,
+  } = useLongPressItem({
+    onLongPress: openEditItem,
+    onShortPress: handleToggleItem,
+  });
 
   const showBackendLogs = __ENVIRONMENT__ !== "production";
 
@@ -376,6 +381,7 @@ const App = () => {
         onExitComplete={handleExitComplete}
         longPressTriggeredRef={longPressTriggeredRef}
         suppressItemPressRef={suppressItemPressRef}
+        pressedItemId={pressedItemId}
         onPointerDown={(itemId, name, quantityOrUnit) => {
           if (suppressItemPressRef.current) {
             return;

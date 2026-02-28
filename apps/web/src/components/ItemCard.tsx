@@ -6,6 +6,7 @@ type ItemCardProps = {
   item: Item;
   isExiting: boolean;
   onExitComplete: (itemId: string) => void;
+  isPressing: boolean;
   onPointerDown: (itemId: string, name: string, quantityOrUnit?: string) => void;
   onPointerUp: (itemId: string) => void;
   onPointerLeave: () => void;
@@ -17,6 +18,7 @@ const ItemCard = ({
   item,
   isExiting,
   onExitComplete,
+  isPressing,
   onPointerDown,
   onPointerUp,
   onPointerLeave,
@@ -26,7 +28,7 @@ const ItemCard = ({
   return (
     <button
       type="button"
-      className={`item-card ${isExiting ? "item-card--exit" : ""}`}
+      className={`item-card ${isPressing ? "item-card--pressing" : ""} ${isExiting ? "item-card--exit" : ""}`.trim()}
       onPointerDown={() => onPointerDown(item.id, item.name, item.quantityOrUnit)}
       onPointerUp={() => onPointerUp(item.id)}
       onPointerLeave={onPointerLeave}
