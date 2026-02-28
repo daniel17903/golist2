@@ -117,7 +117,7 @@ class SocketSyncManager {
   }
 
   requestResync() {
-    if (!this.subscribedListId || !this.callbacks) {
+    if (!this.subscribedListId || !this.callbacks || !this.isSubscribedReady) {
       return;
     }
 
@@ -373,7 +373,18 @@ class SocketSyncManager {
       const message = typeof payload.message === 'string' ? payload.message : 'sync error';
       if (message === 'forbidden') {
         this.isSubscribedReady = false;
+        this.callbacks?.onError(message);
+        return;
       }
+
+      if (message === 'not subscribed to list') {
+        this.isSubscribedReady = false;
+        if (this.subscribedListId) {
+          this.send({ type: 'subscribe_list', listId: this.subscribedListId });
+        }
+        return;
+      }
+
       this.callbacks?.onError(message);
     }
   }
