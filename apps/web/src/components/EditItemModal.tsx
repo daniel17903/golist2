@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { useI18n } from "../i18n";
 
 type EditItemModalProps = {
@@ -20,6 +21,28 @@ const EditItemModal = ({
   onSave,
 }: EditItemModalProps) => {
   const { t } = useI18n();
+  const nameInputRef = useRef<HTMLInputElement>(null);
+  const quantityInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    if (quantity.trim().length === 0) {
+      quantityInputRef.current?.focus();
+      return;
+    }
+
+    const nameInput = nameInputRef.current;
+    if (!nameInput) {
+      return;
+    }
+
+    const nameLength = nameInput.value.length;
+    nameInput.focus();
+    nameInput.setSelectionRange(nameLength, nameLength);
+  }, [isOpen, quantity]);
 
   if (!isOpen) {return null;}
 
@@ -38,6 +61,7 @@ const EditItemModal = ({
             <label htmlFor="item-name">{t("common.name")}</label>
             <input
               id="item-name"
+              ref={nameInputRef}
               value={name}
               onChange={(event) => onNameChange(event.target.value)}
               placeholder={t("common.name")}
@@ -47,6 +71,7 @@ const EditItemModal = ({
             <label htmlFor="item-quantity">{t("common.quantity")}</label>
             <input
               id="item-quantity"
+              ref={quantityInputRef}
               value={quantity}
               onChange={(event) => onQuantityChange(event.target.value)}
               placeholder={t("common.quantity")}
