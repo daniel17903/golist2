@@ -252,6 +252,7 @@ const App = () => {
 
   useEffect(() => {
     const pullThreshold = 72;
+    const pullSuppressionThreshold = 10;
     const maxPull = 96;
     const getScrollY = () => window.scrollY || document.scrollingElement?.scrollTop || 0;
 
@@ -283,10 +284,15 @@ const App = () => {
         return;
       }
 
+      const pullDistanceAfterThreshold = rawDistance - pullSuppressionThreshold;
+      if (pullDistanceAfterThreshold <= 0) {
+        return;
+      }
+
       suppressItemPressRef.current = true;
       handlePointerCancel();
       event.preventDefault();
-      setPullDistance(Math.min(maxPull, rawDistance * 0.45));
+      setPullDistance(Math.min(maxPull, pullDistanceAfterThreshold * 0.45));
     };
 
     const onTouchEnd = () => {
