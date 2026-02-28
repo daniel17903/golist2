@@ -506,6 +506,7 @@ body {
   align-items: center;
   justify-content: center;
   padding: 24px 20px calc(80px + env(safe-area-inset-bottom) + var(--keyboard-inset));
+  transition: padding-bottom 220ms ease;
   z-index: 20;
 }
 
@@ -520,6 +521,15 @@ body {
   gap: 18px;
   max-height: calc(100svh - 48px - var(--keyboard-inset));
   overflow-y: auto;
+  transition: max-height 220ms ease;
+}
+
+
+@media (prefers-reduced-motion: reduce) {
+  .modal-backdrop,
+  .modal {
+    transition: none;
+  }
 }
 
 .modal__header {
