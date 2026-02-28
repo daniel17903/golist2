@@ -43,6 +43,8 @@ export const useAppState = () => {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isCreateListModalOpen, setIsCreateListModalOpen] = useState(false);
   const [createListName, setCreateListName] = useState("");
+  const [isJoinListModalOpen, setIsJoinListModalOpen] = useState(false);
+  const [joinListValue, setJoinListValue] = useState("");
 
   useEffect(() => {
     void load();
@@ -242,6 +244,18 @@ export const useAppState = () => {
     setIsDrawerOpen(false);
   };
 
+  const handleOpenJoinList = () => {
+    setJoinListValue("");
+    setIsDrawerOpen(false);
+    setIsJoinListModalOpen(true);
+  };
+
+  const handleJoinList = async () => {
+    await joinSharedList(joinListValue);
+    setJoinListValue("");
+    setIsJoinListModalOpen(false);
+  };
+
   const handleShareActiveList = async () => {
     if (!activeListId) {
       throw new Error(t("sync.noActiveList"));
@@ -267,7 +281,9 @@ export const useAppState = () => {
     isDrawerOpen,
     isAddDialogOpen,
     isCreateListModalOpen,
+    isJoinListModalOpen,
     createListName,
+    joinListValue,
     setNewListName,
     setEditingTitle,
     setItemName,
@@ -277,7 +293,9 @@ export const useAppState = () => {
     setIsDrawerOpen,
     setIsAddDialogOpen,
     setIsCreateListModalOpen,
+    setIsJoinListModalOpen,
     setCreateListName,
+    setJoinListValue,
     setActiveList,
     toggleItem,
     openEditItem,
@@ -289,6 +307,8 @@ export const useAppState = () => {
     handleCreateList,
     handleConfirmCreateList,
     handleDeleteList,
+    handleOpenJoinList,
+    handleJoinList,
     handleShareActiveList,
     joinSharedList,
     backendConnection,
