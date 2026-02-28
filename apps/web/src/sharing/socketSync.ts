@@ -57,6 +57,7 @@ class SocketSyncManager {
   private forcedReconnectPromise: Promise<'success' | 'failed'> | null = null;
   private forcedReconnectResolver: ((result: 'success' | 'failed') => void) | null = null;
   private forcedReconnectTimeout: number | null = null;
+  private consecutiveForbiddenCount = 0;
 
   init(deviceId: string, callbacks: SocketSyncCallbacks) {
     this.deviceId = deviceId;
@@ -90,6 +91,7 @@ class SocketSyncManager {
     const previousListId = this.subscribedListId;
     this.subscribedListId = nextListId;
     this.isSubscribedReady = false;
+    this.consecutiveForbiddenCount = 0;
 
     if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
       this.connect();
@@ -196,6 +198,7 @@ class SocketSyncManager {
       this.reconnectAttempts = 0;
       this.callbacks?.onConnectionState('online');
       this.isSubscribedReady = false;
+      this.consecutiveForbiddenCount = 0;
       this.send({ type: 'hello', deviceId: this.deviceId });
       if (this.subscribedListId) {
         this.send({ type: 'subscribe_list', listId: this.subscribedListId });
@@ -299,6 +302,7 @@ class SocketSyncManager {
       const listUpdatedAt = typeof payload.listUpdatedAt === 'number' ? payload.listUpdatedAt : null;
       if (listId && listId === this.subscribedListId) {
         this.isSubscribedReady = true;
+        this.consecutiveForbiddenCount = 0;
         if (listName && listUpdatedAt !== null) {
           await this.callbacks?.applyIncomingListMetadata(listId, {
             name: listName,
@@ -373,7 +377,15 @@ class SocketSyncManager {
       const message = typeof payload.message === 'string' ? payload.message : 'sync error';
       if (message === 'forbidden') {
         this.isSubscribedReady = false;
-        this.callbacks?.onError(message);
+        this.consecutiveForbiddenCount += 1;
+
+        if (this.subscribedListId) {
+          this.send({ type: 'subscribe_list', listId: this.subscribedListId });
+        }
+
+        if (this.consecutiveForbiddenCount >= 3) {
+          this.callbacks?.onError(message);
+        }
         return;
       }
 

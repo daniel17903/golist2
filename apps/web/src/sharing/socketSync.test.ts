@@ -191,6 +191,76 @@ describe("socketSyncManager", () => {
     expect(socket?.sent.some((frame) => frame.includes('"type":"subscribe_list"') && frame.includes('"listId":"list-1"'))).toBe(true);
   });
 
+
+  it("retries forbidden subscriptions without surfacing an error immediately", async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal("__API_BASE_URL__", "http://localhost:3000");
+    vi.stubGlobal("__API_TIMEOUT_MS__", "4000");
+    vi.stubGlobal("WebSocket", FakeWebSocket);
+    vi.stubGlobal("window", {
+      addEventListener: () => undefined,
+      setTimeout: globalThis.setTimeout.bind(globalThis),
+      clearTimeout: globalThis.clearTimeout.bind(globalThis),
+    });
+
+    const onError = vi.fn();
+    const { socketSyncManager } = await import("./socketSync");
+
+    socketSyncManager.init("device-1", {
+      getItemsForList: () => [],
+      applyIncomingItems: async () => undefined,
+      applyIncomingListMetadata: async () => undefined,
+      onConnectionState: () => undefined,
+      onError,
+    });
+
+    const socket = FakeWebSocket.instances[0];
+    socket?.emit("open");
+    socketSyncManager.setActiveList("list-1");
+    socket!.sent = [];
+
+    socket?.emit("message", {
+      data: JSON.stringify({ type: "error", message: "forbidden" }),
+    });
+
+    expect(onError).not.toHaveBeenCalled();
+    expect(socket?.sent.some((frame) => frame.includes('"type":"subscribe_list"') && frame.includes('"listId":"list-1"'))).toBe(true);
+  });
+
+  it("surfaces forbidden after repeated failures", async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal("__API_BASE_URL__", "http://localhost:3000");
+    vi.stubGlobal("__API_TIMEOUT_MS__", "4000");
+    vi.stubGlobal("WebSocket", FakeWebSocket);
+    vi.stubGlobal("window", {
+      addEventListener: () => undefined,
+      setTimeout: globalThis.setTimeout.bind(globalThis),
+      clearTimeout: globalThis.clearTimeout.bind(globalThis),
+    });
+
+    const onError = vi.fn();
+    const { socketSyncManager } = await import("./socketSync");
+
+    socketSyncManager.init("device-1", {
+      getItemsForList: () => [],
+      applyIncomingItems: async () => undefined,
+      applyIncomingListMetadata: async () => undefined,
+      onConnectionState: () => undefined,
+      onError,
+    });
+
+    const socket = FakeWebSocket.instances[0];
+    socket?.emit("open");
+    socketSyncManager.setActiveList("list-1");
+
+    socket?.emit("message", { data: JSON.stringify({ type: "error", message: "forbidden" }) });
+    socket?.emit("message", { data: JSON.stringify({ type: "error", message: "forbidden" }) });
+    socket?.emit("message", { data: JSON.stringify({ type: "error", message: "forbidden" }) });
+
+    expect(onError).toHaveBeenCalledTimes(1);
+    expect(onError).toHaveBeenCalledWith("forbidden");
+  });
+
   it("schedules reconnect when websocket errors without a close event", async () => {
     vi.useFakeTimers();
     vi.stubGlobal("__API_BASE_URL__", "http://localhost:3000");
