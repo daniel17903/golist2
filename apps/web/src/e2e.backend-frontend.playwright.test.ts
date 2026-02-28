@@ -238,11 +238,7 @@ describe("frontend/backend integration via playwright", () => {
   runE2E("creates an additional list from the list drawer", async () => {
     await page!.getByLabel("Open list menu").click();
     await expect.poll(async () => page!.locator(".drawer.drawer--open").isVisible()).toBe(true);
-    await page!.locator(".drawer.drawer--open .drawer__new").evaluate((element: Element) => {
-      if (element instanceof HTMLButtonElement) {
-        element.click();
-      }
-    });
+    await page!.getByRole("button", { name: "Create new list" }).click();
 
     await expect.poll(async () => page!.getByRole("heading", { name: "Create new list" }).isVisible()).toBe(true);
     await page!.getByRole("textbox", { name: "Name" }).fill("Wochenmarkt");
