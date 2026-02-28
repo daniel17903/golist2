@@ -173,9 +173,22 @@ class SocketSyncManager {
       return;
     }
 
-    this.socket = new WebSocket(url);
+    let socket: WebSocket;
+    try {
+      socket = new WebSocket(url);
+    } catch {
+      this.callbacks?.onConnectionState('offline');
+      this.scheduleReconnect();
+      return;
+    }
 
-    this.socket.addEventListener('open', () => {
+    this.socket = socket;
+
+    socket.addEventListener('open', () => {
+      if (this.socket !== socket) {
+        return;
+      }
+
       if (this.reconnectTimer !== null) {
         window.clearTimeout(this.reconnectTimer);
         this.reconnectTimer = null;
@@ -191,11 +204,19 @@ class SocketSyncManager {
       this.finishForcedReconnect('success');
     });
 
-    this.socket.addEventListener('message', (event) => {
+    socket.addEventListener('message', (event) => {
+      if (this.socket !== socket) {
+        return;
+      }
+
       void this.handleMessage(event.data);
     });
 
-    this.socket.addEventListener('close', () => {
+    socket.addEventListener('close', () => {
+      if (this.socket !== socket) {
+        return;
+      }
+
       const shouldReconnectImmediately = this.forceReconnectPending;
       this.forceReconnectPending = false;
       this.socket = null;
@@ -214,11 +235,20 @@ class SocketSyncManager {
       this.scheduleReconnect();
     });
 
-    this.socket.addEventListener('error', () => {
+    socket.addEventListener('error', () => {
+      if (this.socket !== socket) {
+        return;
+      }
+
       this.callbacks?.onConnectionState('offline');
+      this.isSubscribedReady = false;
+
       if (this.forcedReconnectPromise && !this.forceReconnectPending) {
         this.finishForcedReconnect('failed');
       }
+
+      this.socket = null;
+      this.scheduleReconnect();
     });
   }
 

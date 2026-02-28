@@ -75,4 +75,70 @@ describe("socketSyncManager", () => {
 
     expect(FakeWebSocket.instances).toHaveLength(2);
   });
+
+  it("ignores close events from stale sockets while a newer socket is active", async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal("__API_BASE_URL__", "http://localhost:3000");
+    vi.stubGlobal("__API_TIMEOUT_MS__", "4000");
+    vi.stubGlobal("WebSocket", FakeWebSocket);
+    vi.stubGlobal("window", {
+      addEventListener: () => undefined,
+      setTimeout: globalThis.setTimeout.bind(globalThis),
+      clearTimeout: globalThis.clearTimeout.bind(globalThis),
+    });
+
+    const onConnectionState = vi.fn();
+    const { socketSyncManager } = await import("./socketSync");
+
+    socketSyncManager.init("device-1", {
+      getItemsForList: () => [],
+      applyIncomingItems: async () => undefined,
+      applyIncomingListMetadata: async () => undefined,
+      onConnectionState,
+      onError: () => undefined,
+    });
+
+    const firstSocket = FakeWebSocket.instances[0];
+    socketSyncManager.forceReconnect();
+    const secondSocket = FakeWebSocket.instances[1];
+
+    expect(secondSocket).toBeDefined();
+
+    secondSocket?.emit("open");
+    onConnectionState.mockClear();
+
+    firstSocket?.emit("close");
+
+    expect(onConnectionState).not.toHaveBeenCalled();
+  });
+
+  it("schedules reconnect when websocket errors without a close event", async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal("__API_BASE_URL__", "http://localhost:3000");
+    vi.stubGlobal("__API_TIMEOUT_MS__", "4000");
+    vi.stubGlobal("WebSocket", FakeWebSocket);
+    vi.stubGlobal("window", {
+      addEventListener: () => undefined,
+      setTimeout: globalThis.setTimeout.bind(globalThis),
+      clearTimeout: globalThis.clearTimeout.bind(globalThis),
+    });
+
+    const { socketSyncManager } = await import("./socketSync");
+
+    socketSyncManager.init("device-1", {
+      getItemsForList: () => [],
+      applyIncomingItems: async () => undefined,
+      applyIncomingListMetadata: async () => undefined,
+      onConnectionState: () => undefined,
+      onError: () => undefined,
+    });
+
+    expect(FakeWebSocket.instances).toHaveLength(1);
+
+    FakeWebSocket.instances[0]?.emit("error");
+    vi.advanceTimersByTime(3000);
+
+    expect(FakeWebSocket.instances).toHaveLength(2);
+  });
+
 });
