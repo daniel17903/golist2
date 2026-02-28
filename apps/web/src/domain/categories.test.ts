@@ -21,6 +21,11 @@ describe("categories helpers", () => {
     expect(["apple", "bread"]).toContain(getItemIconName("apple bread now", "en"));
   });
 
+  it("prefers the longest ending match when multiple endings match", () => {
+    expect(getCategoryIdForItem("Reis", "de")).toBe("cereals");
+    expect(getItemIconName("Reis", "de")).toBe("rice");
+  });
+
   it("matches category and icon when matching names are concatenated", () => {
     expect(getCategoryIdForItem("applebread", "en")).toBe("bread");
     expect(getItemIconName("applebread", "en")).toBe("bread");

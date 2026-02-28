@@ -2700,11 +2700,19 @@ const resolveCategoryEntryForItemName = (
     return matches[0]?.entry;
   }
 
-  const endingMatch = matches.find(({ normalizedName }) =>
+  const endingMatches = matches.filter(({ normalizedName }) =>
     normalizedItemName.endsWith(normalizedName),
   );
 
-  return endingMatch?.entry ?? matches[0]?.entry;
+  if (endingMatches.length > 0) {
+    return endingMatches.reduce((bestMatch, currentMatch) =>
+      currentMatch.normalizedName.length > bestMatch.normalizedName.length
+        ? currentMatch
+        : bestMatch,
+    ).entry;
+  }
+
+  return matches[0]?.entry;
 };
 
 export const getCategoryIdForItemName = (
