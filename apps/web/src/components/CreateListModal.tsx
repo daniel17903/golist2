@@ -1,3 +1,4 @@
+import type { FormEvent } from "react";
 import { useI18n } from "../i18n";
 
 type CreateListModalProps = {
@@ -21,10 +22,19 @@ const CreateListModal = ({
 
   const isSaveDisabled = !value.trim();
 
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (isSaveDisabled) {return;}
+
+    onSave();
+  };
+
   return (
     <div className="modal-backdrop" role="dialog" aria-modal="true" onClick={onCancel}>
-      <div
+      <form
         className="modal"
+        onSubmit={handleSubmit}
         onClick={(event) => {
           event.stopPropagation();
         }}
@@ -48,11 +58,11 @@ const CreateListModal = ({
           <button type="button" className="text-button" onClick={onCancel}>
             {t("common.cancel")}
           </button>
-          <button type="button" className="text-button" onClick={onSave} disabled={isSaveDisabled}>
+          <button type="submit" className="text-button" disabled={isSaveDisabled}>
             {t("modal.create")}
           </button>
         </div>
-      </div>
+      </form>
     </div>
   );
 };
