@@ -11,6 +11,7 @@ import SettingsModal from "./components/SettingsModal";
 import LegalModal from "./components/LegalModal";
 import { useAppState } from "./hooks/useAppState";
 import { useLongPressItem } from "./hooks/useLongPressItem";
+import { useKeyboardInset } from "./hooks/useKeyboardInset";
 import { useI18n } from "./i18n";
 
 type UndoToast = {
@@ -36,6 +37,8 @@ const isAbortError = (error: unknown): boolean => {
 
 const App = () => {
   const { t } = useI18n();
+
+  useKeyboardInset();
 
   const {
     lists,
