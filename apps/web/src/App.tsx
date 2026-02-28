@@ -97,6 +97,7 @@ const App = () => {
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [activeLegalModal, setActiveLegalModal] = useState<LegalModalType | null>(null);
   const pullStartYRef = useRef<number | null>(null);
+  const suppressItemPressRef = useRef(false);
   const [pullDistance, setPullDistance] = useState(0);
   const [isPullRefreshing, setIsPullRefreshing] = useState(false);
   const pullRefreshStartedAtRef = useRef<number | null>(null);
@@ -255,6 +256,7 @@ const App = () => {
     const getScrollY = () => window.scrollY || document.scrollingElement?.scrollTop || 0;
 
     const onTouchStart = (event: TouchEvent) => {
+      suppressItemPressRef.current = false;
       if (isDrawerOpen || isPullRefreshing || event.touches.length !== 1 || getScrollY() > 0) {
         pullStartYRef.current = null;
         return;
@@ -281,6 +283,8 @@ const App = () => {
         return;
       }
 
+      suppressItemPressRef.current = true;
+      handlePointerCancel();
       event.preventDefault();
       setPullDistance(Math.min(maxPull, rawDistance * 0.45));
     };
@@ -324,7 +328,7 @@ const App = () => {
       window.removeEventListener("touchend", onTouchEnd);
       window.removeEventListener("touchcancel", onTouchEnd);
     };
-  }, [isDrawerOpen, isPullRefreshing, pullDistance, refreshRealtimeConnection]);
+  }, [handlePointerCancel, isDrawerOpen, isPullRefreshing, pullDistance, refreshRealtimeConnection]);
 
   return (
     <div className="app">
@@ -358,8 +362,20 @@ const App = () => {
         exitingItemIds={exitingItemIds}
         onExitComplete={handleExitComplete}
         longPressTriggeredRef={longPressTriggeredRef}
-        onPointerDown={handlePointerDown}
-        onPointerUp={handlePointerUp}
+        suppressItemPressRef={suppressItemPressRef}
+        onPointerDown={(itemId, name, quantityOrUnit) => {
+          if (suppressItemPressRef.current) {
+            return;
+          }
+          handlePointerDown(itemId, name, quantityOrUnit);
+        }}
+        onPointerUp={(itemId) => {
+          if (suppressItemPressRef.current) {
+            suppressItemPressRef.current = false;
+            return;
+          }
+          handlePointerUp(itemId);
+        }}
         onPointerCancel={handlePointerCancel}
       />
 
