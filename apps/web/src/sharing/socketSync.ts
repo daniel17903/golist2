@@ -92,6 +92,7 @@ class SocketSyncManager {
     this.isSubscribedReady = false;
 
     if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
+      this.connect();
       return;
     }
 
