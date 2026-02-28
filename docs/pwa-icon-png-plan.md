@@ -25,7 +25,7 @@ Reintroduce PNG icons (192/512 + maskable variants) without blocking Codex Web u
    - Update `includeAssets` to include `icons/*.{svg,png}`.
 
 4. **Verify locally**
-   - Run `npm run build` and confirm `manifest.webmanifest` includes PNG icons.
+   - Run `npm run build -w apps/web` and confirm `manifest.webmanifest` includes PNG icons.
    - Install the PWA on a test device to confirm correct icon usage.
 
 5. **Optional follow-up**

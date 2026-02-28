@@ -11,11 +11,17 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "npm run dev -w apps/web",
-    "build": "npm run build -w apps/web",
-    "preview": "npm run preview -w apps/web",
-    "lint": "npm run lint -w apps/web",
-    "typecheck": "npm run typecheck -w apps/web",
-    "test": "npm run test -w apps/web"
+    "dev:web": "npm run dev -w apps/web",
+    "build:web": "npm run build -w apps/web",
+    "preview:web": "npm run preview -w apps/web",
+    "lint:web": "npm run lint -w apps/web",
+    "typecheck:web": "npm run typecheck -w apps/web",
+    "test:web": "npm run test -w apps/web",
+    "test:e2e:web": "npm run test:e2e -w apps/web",
+    "dev:backend": "npm run dev -w apps/backend",
+    "build:backend": "npm run build -w apps/backend",
+    "lint:backend": "npm run lint -w apps/backend",
+    "typecheck:backend": "npm run typecheck -w apps/backend",
+    "test:backend": "npm run test -w apps/backend"
   }
 }

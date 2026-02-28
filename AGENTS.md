@@ -4,7 +4,7 @@
 - `apps/web/` contains the existing React + TypeScript + Vite PWA.
 - `apps/backend/` contains a Fastify + TypeScript backend scaffold with env validation, a `/health` endpoint, and local Docker Compose config (`apps/backend/docker-compose.yml`).
 - `packages/shared/` contains shared domain code that can be reused by web and backend (currently shared types).
-- Root `package.json` is a workspace manifest with scripts that proxy to `apps/web`; backend scripts run from `apps/backend` or via `-w apps/backend`.
+- Root `package.json` is a workspace manifest; run workspace commands with `-w apps/web` or `-w apps/backend`, or use root aliases like `npm run dev:web` and `npm run dev:backend`.
 
 ## Project snapshot (web app)
 - **Stack**: React + TypeScript + Vite, Dexie (IndexedDB), Zustand, Vite PWA plugin.
@@ -16,7 +16,7 @@
 
 ## Quickstart
 - `npm install`
-- `npm run dev` (runs web app dev server via workspace script, default http://localhost:5173)
+- `npm run dev:web` (runs web app dev server from root, default http://localhost:5173)
 - Direct web command equivalent: `npm run dev -w apps/web`
 
 ## Key behaviors
@@ -32,11 +32,11 @@
 
 ## Development commands
 - `npm install`
-- `npm run dev`
-- `npm run lint`
-- `npm run typecheck`
-- `npm run build`
-- `npm run test`
+- `npm run dev:web`
+- `npm run lint -w apps/web`
+- `npm run typecheck -w apps/web`
+- `npm run build -w apps/web`
+- `npm run test -w apps/web`
 - `npm run db:migrate -w apps/backend`
 - `npm run db:seed -w apps/backend`
 
@@ -46,12 +46,12 @@
 - Deploy workflow builds on `main`.
 
 ## Testing expectations
-- Always run `npm run typecheck` before commit (`-w apps/web` or `-w apps/backend` as appropriate).
-- Always run `npm run lint` before commit (`-w apps/web` or `-w apps/backend` as appropriate).
-- Run `npm run test` for changes to `apps/web/src/domain/`, `apps/web/src/state/`, or `apps/web/src/storage/`.
+- Always run `npm run typecheck -w apps/web` for web changes and `npm run typecheck -w apps/backend` for backend changes before commit.
+- Always run `npm run lint -w apps/web` for web changes and `npm run lint -w apps/backend` for backend changes before commit.
+- Run `npm run test -w apps/web` for changes to `apps/web/src/domain/`, `apps/web/src/state/`, or `apps/web/src/storage/`.
 - Run `npm run test -w apps/backend` for backend endpoint/config changes.
 - Run `npm run db:migrate -w apps/backend` for backend schema/migration changes.
-- Run `npm run build` for changes that touch PWA assets or build config; run `npm run build -w apps/backend` when backend runtime/build config changes.
+- Run `npm run build -w apps/web` for changes that touch PWA assets or build config; run `npm run build -w apps/backend` when backend runtime/build config changes.
 
 ## PWA assets
 - `apps/web/public/favicon.svg`.
