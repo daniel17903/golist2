@@ -54,6 +54,7 @@ class SocketSyncManager {
   private queue: OutboundPatch[] = [];
   private listMetadataQueue: OutboundListMetadataPatch[] = [];
   private forceReconnectPending = false;
+  private resubscribeTimer: number | null = null;
   private forcedReconnectPromise: Promise<'success' | 'failed'> | null = null;
   private forcedReconnectResolver: ((result: 'success' | 'failed') => void) | null = null;
   private forcedReconnectTimeout: number | null = null;
@@ -85,6 +86,11 @@ class SocketSyncManager {
     const nextListId = listId ?? null;
     if (this.subscribedListId === nextListId && this.isSubscribedReady) {
       return;
+    }
+
+    if (this.resubscribeTimer !== null) {
+      window.clearTimeout(this.resubscribeTimer);
+      this.resubscribeTimer = null;
     }
 
     const previousListId = this.subscribedListId;
@@ -199,6 +205,10 @@ class SocketSyncManager {
       this.forceReconnectPending = false;
       this.socket = null;
       this.isSubscribedReady = false;
+      if (this.resubscribeTimer !== null) {
+        window.clearTimeout(this.resubscribeTimer);
+        this.resubscribeTimer = null;
+      }
       this.callbacks?.onConnectionState('offline');
 
       if (shouldReconnectImmediately) {
@@ -342,9 +352,28 @@ class SocketSyncManager {
       const message = typeof payload.message === 'string' ? payload.message : 'sync error';
       if (message === 'forbidden') {
         this.isSubscribedReady = false;
+        this.scheduleResubscribe();
+        return;
       }
       this.callbacks?.onError(message);
     }
+  }
+
+
+
+  private scheduleResubscribe() {
+    if (this.resubscribeTimer !== null) {
+      return;
+    }
+
+    this.resubscribeTimer = window.setTimeout(() => {
+      this.resubscribeTimer = null;
+      if (!this.subscribedListId) {
+        return;
+      }
+
+      this.send({ type: 'subscribe_list', listId: this.subscribedListId });
+    }, 500);
   }
 
   private sendDigest(listId: string) {

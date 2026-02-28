@@ -275,6 +275,7 @@ describe("useStore", () => {
       "00000000-0000-0000-0000-000000000001",
     );
     expect(listAdd).toHaveBeenCalledTimes(1);
+    expect(socketSetActiveListMock).toHaveBeenCalledWith("00000000-0000-0000-0000-000000000001");
     uuidSpy.mockRestore();
   });
 
