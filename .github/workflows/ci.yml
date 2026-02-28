@@ -14,10 +14,10 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - run: npm run lint
-      - run: npm run typecheck
-      - run: npm test
-      - run: npm run build
+      - run: npm run lint -w apps/web
+      - run: npm run typecheck -w apps/web
+      - run: npm run test -w apps/web
+      - run: npm run build -w apps/web
 
   web-e2e-playwright:
     runs-on: ubuntu-latest
