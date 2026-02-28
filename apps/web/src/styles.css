@@ -2,6 +2,7 @@
   font-family: "Inter", system-ui, -apple-system, sans-serif;
   color: #0b1f2a;
   --item-size: 120px;
+  --keyboard-inset: 0px;
   background: radial-gradient(
     circle at bottom,
     #e4b2d2 0%,
@@ -504,7 +505,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 24px 20px 80px;
+  padding: 24px 20px calc(80px + env(safe-area-inset-bottom) + var(--keyboard-inset));
   z-index: 20;
 }
 
@@ -517,6 +518,8 @@ body {
   display: flex;
   flex-direction: column;
   gap: 18px;
+  max-height: calc(100svh - 48px - var(--keyboard-inset));
+  overflow-y: auto;
 }
 
 .modal__header {
