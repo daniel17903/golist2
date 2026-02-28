@@ -1,0 +1,54 @@
+services:
+  postgres:
+    image: postgres:17.6-alpine3.22
+    container_name: golist-postgres
+    environment:
+      POSTGRES_DB: golist
+      POSTGRES_USER: golist
+      POSTGRES_PASSWORD: golist
+    ports:
+      - '5432:5432'
+    volumes:
+      - golist-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U golist -d golist']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: .
+      dockerfile: apps/backend/Dockerfile
+    container_name: golist-backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      HOST: 0.0.0.0
+      PORT: 3000
+      NODE_ENV: development
+      PGHOST: postgres
+      PGUSER: golist
+      PGDATABASE: golist
+      PGPASSWORD: golist
+      PGSSLMODE: disable
+    ports:
+      - '3000:3000'
+
+  frontend:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    container_name: golist-frontend
+    depends_on:
+      backend:
+        condition: service_started
+    environment:
+      API_BASE_URL: http://backend:3000
+      API_TIMEOUT_MS: 15000
+    ports:
+      - '5173:80'
+
+volumes:
+  golist-postgres-data:
