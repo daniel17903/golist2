@@ -16,6 +16,7 @@ type ListsDrawerProps = {
   onSelectList: (listId: string) => void;
   onDeleteList: (listId: string) => void;
   onCreateList: () => void;
+  onJoinList: () => void;
   onOpenSettings: () => void;
   onOpenImprint: () => void;
   onOpenPrivacy: () => void;
@@ -37,6 +38,7 @@ const ListsDrawer = ({
   onSelectList,
   onDeleteList,
   onCreateList,
+  onJoinList,
   onOpenSettings,
   onOpenImprint,
   onOpenPrivacy,
@@ -326,6 +328,14 @@ const ListsDrawer = ({
                   </svg>
                 </span>
                 {t("drawer.createList")}
+              </button>
+              <button type="button" className="drawer__new" onClick={onJoinList}>
+                <span className="drawer__item-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24">
+                    <path d="M12 5a3 3 0 1 1 0 6 3 3 0 0 1 0-6Zm-6 14a6 6 0 0 1 12 0H6Zm13-4v-3h-3v-2h3V7h2v3h3v2h-3v3h-2Z" fill="currentColor" />
+                  </svg>
+                </span>
+                {t("drawer.joinList")}
               </button>
             </div>
           </div>

@@ -7,6 +7,7 @@ import EditItemModal from "./components/EditItemModal";
 import ItemGrid from "./components/ItemGrid";
 import ListsDrawer from "./components/ListsDrawer";
 import CreateListModal from "./components/CreateListModal";
+import JoinListModal from "./components/JoinListModal";
 import SettingsModal from "./components/SettingsModal";
 import LegalModal from "./components/LegalModal";
 import { useAppState } from "./hooks/useAppState";
@@ -57,7 +58,9 @@ const App = () => {
     isDrawerOpen,
     isAddDialogOpen,
     isCreateListModalOpen,
+    isJoinListModalOpen,
     createListName,
+    joinListValue,
     backendBusyRequests,
     backendSharingEnabled,
     refreshRealtimeConnection,
@@ -70,7 +73,9 @@ const App = () => {
     setIsDrawerOpen,
     setIsAddDialogOpen,
     setIsCreateListModalOpen,
+    setIsJoinListModalOpen,
     setCreateListName,
+    setJoinListValue,
     setActiveList,
     toggleItem,
     openEditItem,
@@ -82,6 +87,8 @@ const App = () => {
     handleCreateList,
     handleConfirmCreateList,
     handleDeleteList,
+    handleOpenJoinList,
+    handleJoinList,
     handleShareActiveList,
     backendConnection,
     syncNotice,
@@ -486,6 +493,7 @@ const App = () => {
         }}
         onDeleteList={handleDeleteList}
         onCreateList={handleCreateList}
+        onJoinList={handleOpenJoinList}
         onOpenSettings={() => {
           setIsDrawerOpen(false);
           setIsSettingsModalOpen(true);
@@ -521,6 +529,19 @@ const App = () => {
         }}
         onSave={() => {
           void handleConfirmCreateList();
+        }}
+      />
+
+      <JoinListModal
+        isOpen={isJoinListModalOpen}
+        value={joinListValue}
+        onChange={setJoinListValue}
+        onCancel={() => {
+          setJoinListValue("");
+          setIsJoinListModalOpen(false);
+        }}
+        onJoin={() => {
+          void handleJoinList();
         }}
       />
 
