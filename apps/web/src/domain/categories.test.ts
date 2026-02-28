@@ -44,16 +44,22 @@ describe("categories helpers", () => {
     expect(getItemIconName("kräuter", "de")).toBe("herbs");
     expect(getCategoryIdForItem("rosmarin", "de")).toBe("spicesCanned");
     expect(getItemIconName("rosmarin", "de")).toBe("herbs");
+    expect(getCategoryIdForItem("thymian", "de")).toBe("spicesCanned");
+    expect(getItemIconName("thymian", "de")).toBe("herbs");
 
     expect(getCategoryIdForItem("herbs", "en")).toBe("spicesCanned");
     expect(getItemIconName("herbs", "en")).toBe("herbs");
     expect(getCategoryIdForItem("rosemary", "en")).toBe("spicesCanned");
     expect(getItemIconName("rosemary", "en")).toBe("herbs");
+    expect(getCategoryIdForItem("thyme", "en")).toBe("spicesCanned");
+    expect(getItemIconName("thyme", "en")).toBe("herbs");
 
     expect(getCategoryIdForItem("hierbas", "es")).toBe("spicesCanned");
     expect(getItemIconName("hierbas", "es")).toBe("herbs");
     expect(getCategoryIdForItem("romero", "es")).toBe("spicesCanned");
     expect(getItemIconName("romero", "es")).toBe("herbs");
+    expect(getCategoryIdForItem("tomillo", "es")).toBe("spicesCanned");
+    expect(getItemIconName("tomillo", "es")).toBe("herbs");
   });
 
   it("maps granola to the box icon and household category across locales", () => {
