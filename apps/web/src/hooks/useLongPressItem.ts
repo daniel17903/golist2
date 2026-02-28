@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import type { MutableRefObject } from "react";
 
 type LongPressHandlers = {
@@ -12,6 +12,7 @@ type LongPressReturn = {
   handlePointerUp: (itemId: string) => void;
   handlePointerCancel: () => void;
   longPressTriggeredRef: MutableRefObject<boolean>;
+  pressedItemId: string | null;
 };
 
 export const useLongPressItem = ({
@@ -21,6 +22,7 @@ export const useLongPressItem = ({
 }: LongPressHandlers): LongPressReturn => {
   const longPressTimerRef = useRef<number | null>(null);
   const longPressTriggeredRef = useRef(false);
+  const [pressedItemId, setPressedItemId] = useState<string | null>(null);
 
   const clearLongPressTimer = () => {
     if (longPressTimerRef.current === null) {
@@ -33,6 +35,7 @@ export const useLongPressItem = ({
   const handlePointerDown = (itemId: string, name: string, quantityOrUnit?: string) => {
     clearLongPressTimer();
     longPressTriggeredRef.current = false;
+    setPressedItemId(itemId);
     longPressTimerRef.current = window.setTimeout(() => {
       longPressTriggeredRef.current = true;
       onLongPress(itemId, name, quantityOrUnit);
@@ -41,6 +44,7 @@ export const useLongPressItem = ({
 
   const handlePointerUp = (itemId: string) => {
     clearLongPressTimer();
+    setPressedItemId((current) => (current === itemId ? null : current));
     if (!longPressTriggeredRef.current) {
       void onShortPress(itemId);
     }
@@ -50,6 +54,7 @@ export const useLongPressItem = ({
   const handlePointerCancel = () => {
     clearLongPressTimer();
     longPressTriggeredRef.current = false;
+    setPressedItemId(null);
   };
 
   return {
@@ -57,5 +62,6 @@ export const useLongPressItem = ({
     handlePointerUp,
     handlePointerCancel,
     longPressTriggeredRef,
+    pressedItemId,
   };
 };
