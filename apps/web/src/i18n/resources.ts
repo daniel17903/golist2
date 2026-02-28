@@ -63,7 +63,7 @@ export const resources: Record<Locale, Dictionary> = {
     "sync.offlineWithDetails": "Connection to backend failed ({{details}})",
     "sync.pending": "Changes remain local and will sync later.",
     "sync.noActiveList": "No active list selected",
-    "share.text": "Share this shopping list",
+    "share.text": "join my golist",
   },
   de: {
     "app.defaultListName": "Einkaufsliste",
@@ -125,7 +125,7 @@ export const resources: Record<Locale, Dictionary> = {
     "sync.offlineWithDetails": "Backend-Verbindung fehlgeschlagen ({{details}})",
     "sync.pending": "Änderungen bleiben lokal und werden später synchronisiert.",
     "sync.noActiveList": "Keine aktive Liste ausgewählt",
-    "share.text": "Teile diese Einkaufsliste",
+    "share.text": "Tritt meiner golist bei",
   },
   es: {
     "app.defaultListName": "Lista de compras",
@@ -187,6 +187,6 @@ export const resources: Record<Locale, Dictionary> = {
     "sync.offlineWithDetails": "Falló la conexión al backend ({{details}})",
     "sync.pending": "Los cambios siguen locales y se sincronizarán más tarde.",
     "sync.noActiveList": "No hay lista activa seleccionada",
-    "share.text": "Comparte esta lista de compras",
+    "share.text": "Únete a mi golist",
   },
 };
