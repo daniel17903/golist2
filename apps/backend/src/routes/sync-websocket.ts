@@ -19,6 +19,7 @@ type ClientMessage =
 type ServerMessage =
   | { type: 'hello_ack' }
   | { type: 'subscribed'; listId: string; listName: string; listUpdatedAt: number; serverListDigest: string }
+  | { type: 'presence'; listId: string; otherEditorsCount: number }
   | { type: 'hash_diff'; listId: string; summaries: Array<{ itemId: string; itemHash: string; updatedAt: number }> }
   | { type: 'item_patch'; listId: string; items: Item[] }
   | { type: 'list_metadata_patch'; listId: string; name: string; updatedAt: number }
@@ -177,6 +178,21 @@ export function registerSyncWebsocketRoute(app: FastifyInstance, listRepository:
     state.subscribedListId = undefined
   }
 
+  const broadcastPresence = (listId: string) => {
+    const listSockets = subscribers.get(listId)
+    if (!listSockets) {
+      return
+    }
+
+    for (const socket of listSockets.values()) {
+      send(socket, {
+        type: 'presence',
+        listId,
+        otherEditorsCount: Math.max(0, listSockets.size - 1),
+      })
+    }
+  }
+
   const broadcastItemPatch = (listId: string, items: Item[], sender: ServerSocket) => {
     const listSockets = subscribers.get(listId)
     if (!listSockets) {
@@ -241,6 +257,7 @@ export function registerSyncWebsocketRoute(app: FastifyInstance, listRepository:
           if (parsedPayload.type === 'unsubscribe_list') {
             if (state.subscribedListId === parsedPayload.listId) {
               removeFromSubscription(socket, state)
+              broadcastPresence(parsedPayload.listId)
             }
             return
           }
@@ -273,6 +290,7 @@ export function registerSyncWebsocketRoute(app: FastifyInstance, listRepository:
               listId: parsedPayload.listId,
               summaries: buildItemSummaries(serverItems),
             })
+            broadcastPresence(parsedPayload.listId)
             return
           }
 
@@ -367,7 +385,11 @@ export function registerSyncWebsocketRoute(app: FastifyInstance, listRepository:
       })
 
       socket.on('close', () => {
+        const listId = state.subscribedListId
         removeFromSubscription(socket, state)
+        if (listId) {
+          broadcastPresence(listId)
+        }
       })
     })
   })

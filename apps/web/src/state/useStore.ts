@@ -53,6 +53,7 @@ type StoreState = {
   backendLogs: Array<{ id: string; message: string; outcome: "success" | "error" | "skipped" }>;
   backendBusyRequests: number;
   backendSharingEnabled: boolean;
+  activeListOtherEditorsCount: number;
   isLoaded: boolean;
   load: () => Promise<void>;
   addList: (name: string) => Promise<void>;
@@ -157,6 +158,7 @@ export const useStore = create<StoreState>((set, get) => ({
   backendLogs: [],
   backendBusyRequests: 0,
   backendSharingEnabled: isBackendSharingEnabled,
+  activeListOtherEditorsCount: 0,
   load: async () => {
     const [lists, items] = await Promise.all([
       db.lists.toArray(),
@@ -181,6 +183,7 @@ export const useStore = create<StoreState>((set, get) => ({
       items,
       activeListId: initialActiveListId,
       metadata,
+      activeListOtherEditorsCount: 0,
       isLoaded: true,
     });
 
@@ -255,6 +258,12 @@ export const useStore = create<StoreState>((set, get) => ({
         onError: (message) => {
           reportSyncError(`${message} ${t("sync.pending")}`);
         },
+        onPresenceCount: (listId, otherEditorsCount) => {
+          if (listId !== useStore.getState().activeListId) {
+            return;
+          }
+          useStore.setState({ activeListOtherEditorsCount: otherEditorsCount });
+        },
       });
       socketSyncManager.setActiveList(initialActiveListId);
     }
@@ -312,12 +321,13 @@ export const useStore = create<StoreState>((set, get) => ({
         lists: remainingLists,
         items: state.items.filter((item) => item.listId !== listId),
         activeListId: nextActiveListId,
+        activeListOtherEditorsCount: 0,
       };
     });
   },
   setActiveList: (listId: string) => {
     persistSelectedListId(listId);
-    set({ activeListId: listId });
+    set({ activeListId: listId, activeListOtherEditorsCount: 0 });
     socketSyncManager.setActiveList(listId);
   },
   addItem: async (listId: string, name: string, quantityOrUnit?: string) => {

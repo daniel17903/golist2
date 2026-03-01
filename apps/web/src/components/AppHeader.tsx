@@ -9,6 +9,7 @@ type AppHeaderProps = {
   onStartRename: () => void;
   onSaveRename: () => void;
   onCancelRename: () => void;
+  otherEditorsCount: number;
 };
 
 const AppHeader = ({
@@ -19,6 +20,7 @@ const AppHeader = ({
   onStartRename,
   onSaveRename,
   onCancelRename,
+  otherEditorsCount,
 }: AppHeaderProps) => {
   const renameInputRef = useRef<HTMLInputElement | null>(null);
   const saveButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -61,6 +63,18 @@ const AppHeader = ({
     <header className="app__header" aria-label={t("header.activeList")}>
       <div className="header-card">
         <div className="title-row">
+          {otherEditorsCount > 0 ? (
+            <div
+              className="presence-indicator"
+              role="status"
+              aria-live="polite"
+              aria-label={t("header.otherEditors", { count: otherEditorsCount })}
+              title={t("header.otherEditors", { count: otherEditorsCount })}
+            >
+              <span className="presence-indicator__pulse" aria-hidden="true" />
+              <span className="presence-indicator__count">{otherEditorsCount}</span>
+            </div>
+          ) : null}
           {isEditingName ? (
             <div className="title-edit" role="group" aria-label={t("header.editListName")}>
               <input

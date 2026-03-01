@@ -78,6 +78,7 @@ describe("socketSyncManager", () => {
       applyIncomingListMetadata: async () => undefined,
       onConnectionState: () => undefined,
       onError: () => undefined,
+      onPresenceCount: () => undefined,
     });
 
     expect(FakeWebSocket.instances).toHaveLength(1);
@@ -108,6 +109,7 @@ describe("socketSyncManager", () => {
       applyIncomingListMetadata: async () => undefined,
       onConnectionState,
       onError: () => undefined,
+      onPresenceCount: () => undefined,
     });
 
     const firstSocket = FakeWebSocket.instances[0];
@@ -144,6 +146,7 @@ describe("socketSyncManager", () => {
       applyIncomingListMetadata: async () => undefined,
       onConnectionState: () => undefined,
       onError: () => undefined,
+      onPresenceCount: () => undefined,
     });
 
     const socket = FakeWebSocket.instances[0];
@@ -176,6 +179,7 @@ describe("socketSyncManager", () => {
       applyIncomingListMetadata: async () => undefined,
       onConnectionState: () => undefined,
       onError,
+      onPresenceCount: () => undefined,
     });
 
     const socket = FakeWebSocket.instances[0];
@@ -212,6 +216,7 @@ describe("socketSyncManager", () => {
       applyIncomingListMetadata: async () => undefined,
       onConnectionState: () => undefined,
       onError,
+      onPresenceCount: () => undefined,
     });
 
     const socket = FakeWebSocket.instances[0];
@@ -247,6 +252,7 @@ describe("socketSyncManager", () => {
       applyIncomingListMetadata: async () => undefined,
       onConnectionState: () => undefined,
       onError,
+      onPresenceCount: () => undefined,
     });
 
     const socket = FakeWebSocket.instances[0];
@@ -259,6 +265,41 @@ describe("socketSyncManager", () => {
 
     expect(onError).toHaveBeenCalledTimes(1);
     expect(onError).toHaveBeenCalledWith("forbidden");
+  });
+
+
+  it("emits presence updates for active list", async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal("__API_BASE_URL__", "http://localhost:3000");
+    vi.stubGlobal("__API_TIMEOUT_MS__", "4000");
+    vi.stubGlobal("WebSocket", FakeWebSocket);
+    vi.stubGlobal("window", {
+      addEventListener: () => undefined,
+      setTimeout: globalThis.setTimeout.bind(globalThis),
+      clearTimeout: globalThis.clearTimeout.bind(globalThis),
+    });
+
+    const onPresenceCount = vi.fn();
+    const { socketSyncManager } = await import("./socketSync");
+
+    socketSyncManager.init("device-1", {
+      getItemsForList: () => [],
+      applyIncomingItems: async () => undefined,
+      applyIncomingListMetadata: async () => undefined,
+      onConnectionState: () => undefined,
+      onError: () => undefined,
+      onPresenceCount,
+    });
+
+    const socket = FakeWebSocket.instances[0];
+    socket?.emit("open");
+    socketSyncManager.setActiveList("list-1");
+
+    socket?.emit("message", {
+      data: JSON.stringify({ type: "presence", listId: "list-1", otherEditorsCount: 2 }),
+    });
+
+    expect(onPresenceCount).toHaveBeenCalledWith("list-1", 2);
   });
 
   it("schedules reconnect when websocket errors without a close event", async () => {
@@ -280,6 +321,7 @@ describe("socketSyncManager", () => {
       applyIncomingListMetadata: async () => undefined,
       onConnectionState: () => undefined,
       onError: () => undefined,
+      onPresenceCount: () => undefined,
     });
 
     expect(FakeWebSocket.instances).toHaveLength(1);

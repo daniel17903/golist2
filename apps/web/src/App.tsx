@@ -63,6 +63,7 @@ const App = () => {
     joinListValue,
     backendBusyRequests,
     backendSharingEnabled,
+    activeListOtherEditorsCount,
     refreshRealtimeConnection,
     setNewListName,
     setEditingTitle,
@@ -373,6 +374,7 @@ const App = () => {
           setNewListName(activeList?.name ?? "");
           setEditingTitle(false);
         }}
+        otherEditorsCount={activeListOtherEditorsCount}
       />
 
       <ItemGrid

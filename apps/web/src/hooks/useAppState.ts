@@ -31,6 +31,7 @@ export const useAppState = () => {
     backendLogs,
     backendBusyRequests,
     backendSharingEnabled,
+    activeListOtherEditorsCount,
   } = useStore();
 
   const [newListName, setNewListName] = useState("");
@@ -317,6 +318,7 @@ export const useAppState = () => {
     backendLogs,
     backendBusyRequests,
     backendSharingEnabled,
+    activeListOtherEditorsCount,
     refreshRealtimeConnection,
   };
 };

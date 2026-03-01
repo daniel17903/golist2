@@ -9,6 +9,7 @@ type SocketSyncCallbacks = {
   applyIncomingListMetadata: (listId: string, payload: { name: string; updatedAt: number }) => Promise<void>;
   onConnectionState: (state: 'online' | 'offline') => void;
   onError: (message: string) => void;
+  onPresenceCount: (listId: string, otherEditorsCount: number) => void;
 };
 
 type OutboundPatch = { listId: string; item: Item };
@@ -311,6 +312,19 @@ class SocketSyncManager {
         }
         this.sendDigest(listId);
         this.flushQueue();
+      }
+      return;
+    }
+
+
+    if (payload.type === 'presence') {
+      const listId = typeof payload.listId === 'string' ? payload.listId : null;
+      const otherEditorsCount =
+        typeof payload.otherEditorsCount === 'number' && Number.isFinite(payload.otherEditorsCount)
+          ? Math.max(0, Math.floor(payload.otherEditorsCount))
+          : null;
+      if (listId && otherEditorsCount !== null) {
+        this.callbacks?.onPresenceCount(listId, otherEditorsCount);
       }
       return;
     }
