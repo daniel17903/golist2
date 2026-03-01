@@ -95,16 +95,32 @@ describe('backend runtime integration', () => {
     const response = await fetch(`${baseUrl}/v1/lists/${listId}`, {
       method: 'OPTIONS',
       headers: {
-        origin: 'http://localhost:5173',
+        origin: 'https://app.go-list.app',
         'access-control-request-method': 'PUT',
         'access-control-request-headers': 'content-type,x-device-id',
       },
     })
 
     expect(response.status).toBe(204)
-    expect(response.headers.get('access-control-allow-origin')).toBe('http://localhost:5173')
+    expect(response.headers.get('access-control-allow-origin')).toBe('https://app.go-list.app')
     expect(response.headers.get('access-control-allow-methods')).toContain('PUT')
     expect(response.headers.get('access-control-allow-headers')).toContain('X-Device-Id')
+  })
+
+
+
+  it('rejects CORS preflight from non go-list domains', async () => {
+    const listId = crypto.randomUUID()
+    const response = await fetch(`${baseUrl}/v1/lists/${listId}`, {
+      method: 'OPTIONS',
+      headers: {
+        origin: 'http://localhost:5173',
+        'access-control-request-method': 'PUT',
+      },
+    })
+
+    expect(response.status).toBe(404)
+    expect(response.headers.get('access-control-allow-origin')).toBeNull()
   })
 
   it('creates items via PUT and enforces deterministic LWW tie-break conflicts', async () => {

@@ -14,8 +14,24 @@ export function buildServer(deps: { listRepository?: ListRepository } = {}) {
   const app = Fastify({ logger: true })
   const listRepository = deps.listRepository ?? postgresListRepository
 
+  const isAllowedOrigin = (origin: string) => {
+    try {
+      const { hostname } = new URL(origin)
+      return hostname === 'go-list.app' || hostname.endsWith('.go-list.app')
+    } catch {
+      return false
+    }
+  }
+
   void app.register(cors, {
-    origin: true,
+    origin: (origin, callback) => {
+      if (!origin) {
+        callback(null, false)
+        return
+      }
+
+      callback(null, isAllowedOrigin(origin))
+    },
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'X-Device-Id'],
   })
