@@ -78,6 +78,23 @@ describe("categories helpers", () => {
     expect(getItemIconName("granola", "es")).toBe("box");
   });
 
+  it("maps Haferflocken to the seeds icon in german", () => {
+    expect(getCategoryIdForItem("Haferflocken", "de")).toBe("cereals");
+    expect(getItemIconName("Haferflocken", "de")).toBe("seeds");
+    expect(getItemIcon("Haferflocken", "de")).toBe("/icons/seeds.svg");
+  });
+
+
+  it("maps oat terms to the seeds icon across locales", () => {
+    expect(getCategoryIdForItem("oatmeal", "en")).toBe("cereals");
+    expect(getItemIconName("oatmeal", "en")).toBe("seeds");
+    expect(getItemIcon("oatmeal", "en")).toBe("/icons/seeds.svg");
+
+    expect(getCategoryIdForItem("avena", "es")).toBe("cereals");
+    expect(getItemIconName("avena", "es")).toBe("seeds");
+    expect(getItemIcon("avena", "es")).toBe("/icons/seeds.svg");
+  });
+
   it("renders list icons from stored icon names", () => {
     expect(getListItemIcon("banana")).toBe("/icons/banana.svg");
     expect(getListItemIcon("cream")).toBe("/icons/cream.svg");

@@ -157,7 +157,6 @@ const categoryEntriesDe: CategoryEntry[] = [
       "linsen",
       "erbsen",
       "hirse",
-      "haferflocken",
       "quinoa",
       "bulgur",
     ],
@@ -723,6 +722,7 @@ const categoryEntriesDe: CategoryEntry[] = [
     "matchingNames": [
       "kerne",
       "flocken",
+      "haferflocken",
     ],
     "category": "cereals",
   },
@@ -1000,7 +1000,6 @@ const categoryEntriesEn: CategoryEntry[] = [
       "seeds",
       "peas",
       "bulgur",
-      "oatmeal",
       "grains",
     ],
     "category": "cereals",
@@ -1576,6 +1575,7 @@ const categoryEntriesEn: CategoryEntry[] = [
     "assetFileName": "seeds",
     "matchingNames": [
       "flakes",
+      "oatmeal",
       "cores",
     ],
     "category": "cereals",
@@ -1859,11 +1859,9 @@ const categoryEntriesEs: CategoryEntry[] = [
   {
     "assetFileName": "corn",
     "matchingNames": [
-      "avena",
       "bulgur",
       "granos",
       "guisantes",
-      "harina de avena",
       "lentes",
       "mijo",
       "quinoa",
@@ -2481,6 +2479,8 @@ const categoryEntriesEs: CategoryEntry[] = [
     "assetFileName": "seeds",
     "matchingNames": [
       "copos",
+      "avena",
+      "harina de avena",
       "escamas",
       "núcleos",
     ],
