@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { parseItemInput } from "../domain/inputParser";
 import { sortItemsForList } from "../domain/sort";
 import { useStore } from "../state/useStore";
@@ -173,22 +173,22 @@ export const useAppState = () => {
     };
   }, [itemName, locale, currentItemNames]);
 
-  const handleAddItem = async () => {
+  const handleAddItem = useCallback(async () => {
     if (!activeListId) {return;}
     const parsed = parseItemInput(itemName, locale);
     if (!parsed.name.trim()) {return;}
     await addItem(activeListId, parsed.name, parsed.quantityOrUnit);
     setItemName("");
     setIsAddDialogOpen(false);
-  };
+  }, [activeListId, addItem, itemName, locale]);
 
-  const handleAddSuggestion = async (name: string, quantityOrUnit?: string) => {
+  const handleAddSuggestion = useCallback(async (name: string, quantityOrUnit?: string) => {
     if (!activeListId) {return;}
     if (!name.trim()) {return;}
     await addItem(activeListId, name, quantityOrUnit);
     setItemName("");
     setIsAddDialogOpen(false);
-  };
+  }, [activeListId, addItem]);
 
   const handleRenameList = async () => {
     if (!activeListId) {return;}
