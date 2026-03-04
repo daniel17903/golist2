@@ -1,7 +1,8 @@
-import { useEffect, useRef } from "react";
+import { memo, useEffect, useMemo, useRef } from "react";
 import { getItemIcon } from "../domain/categories";
 import { parseItemInput } from "../domain/inputParser";
 import { useI18n } from "../i18n";
+import type { Locale } from "../i18n/config";
 
 type AddItemDialogProps = {
   isOpen: boolean;
@@ -17,6 +18,42 @@ type AddItemDialogProps = {
   onAddSuggestion: (name: string, quantityOrUnit?: string) => void;
 };
 
+type DuplicatePreviewCardProps = {
+  name: string;
+  quantityOrUnit?: string;
+  locale: Locale;
+  duplicateWarningLabel: string;
+  duplicateAriaLabel: string;
+  onAddSuggestion: (name: string, quantityOrUnit?: string) => void;
+};
+
+const DuplicatePreviewCard = memo(({
+  name,
+  quantityOrUnit,
+  locale,
+  duplicateWarningLabel,
+  duplicateAriaLabel,
+  onAddSuggestion,
+}: DuplicatePreviewCardProps) => (
+  <button
+    type="button"
+    className="item-card item-card--dialog item-card--duplicate"
+    aria-label={duplicateAriaLabel}
+    onClick={() => {
+      void onAddSuggestion(name, quantityOrUnit);
+    }}
+  >
+    <span className="item-icon" aria-hidden="true">
+      <img src={getItemIcon(name, locale)} alt="" />
+    </span>
+    <div className="item-text item-text--duplicate">
+      <span className="item-warning">{duplicateWarningLabel}</span>
+    </div>
+  </button>
+));
+
+DuplicatePreviewCard.displayName = "DuplicatePreviewCard";
+
 const AddItemDialog = ({
   isOpen,
   itemName,
@@ -29,6 +66,11 @@ const AddItemDialog = ({
 }: AddItemDialogProps) => {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const { locale, t } = useI18n();
+  const duplicateWarningLabel = t("addItem.duplicateWarning");
+  const duplicateAriaLabel = useMemo(
+    () => (duplicatePreview ? `${duplicatePreview.name}. ${duplicateWarningLabel}` : ""),
+    [duplicatePreview, duplicateWarningLabel],
+  );
 
   useEffect(() => {
     if (!isOpen) {return;}
@@ -62,23 +104,16 @@ const AddItemDialog = ({
           />
         </form>
         <div className="modal__grid">
-          {duplicatePreview && (
-            <button
-              type="button"
-              className="item-card item-card--dialog item-card--duplicate"
-              aria-label={`${duplicatePreview.name}. ${t("addItem.duplicateWarning")}`}
-              onClick={() => {
-                void onAddSuggestion(duplicatePreview.name, duplicatePreview.quantityOrUnit);
-              }}
-            >
-              <span className="item-icon" aria-hidden="true">
-                <img src={getItemIcon(duplicatePreview.name, locale)} alt="" />
-              </span>
-              <div className="item-text item-text--duplicate">
-                <span className="item-warning">{t("addItem.duplicateWarning")}</span>
-              </div>
-            </button>
-          )}
+          {duplicatePreview ? (
+            <DuplicatePreviewCard
+              name={duplicatePreview.name}
+              quantityOrUnit={duplicatePreview.quantityOrUnit}
+              locale={locale}
+              duplicateWarningLabel={duplicateWarningLabel}
+              duplicateAriaLabel={duplicateAriaLabel}
+              onAddSuggestion={onAddSuggestion}
+            />
+          ) : null}
           {suggestions.map((name) => {
             const parsed = parseItemInput(name, locale);
             const displayName = parsed.name || name;
