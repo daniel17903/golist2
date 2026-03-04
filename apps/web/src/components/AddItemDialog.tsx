@@ -54,6 +54,41 @@ const DuplicatePreviewCard = memo(({
 
 DuplicatePreviewCard.displayName = "DuplicatePreviewCard";
 
+
+type SuggestionCardProps = {
+  name: string;
+  locale: Locale;
+  onAddSuggestion: (name: string, quantityOrUnit?: string) => void;
+};
+
+const SuggestionCard = memo(({ name, locale, onAddSuggestion }: SuggestionCardProps) => {
+  const parsed = parseItemInput(name, locale);
+  const displayName = parsed.name || name;
+
+  return (
+    <button
+      type="button"
+      className="item-card item-card--dialog"
+      onClick={() => {
+        if (!parsed.name) {return;}
+        void onAddSuggestion(parsed.name, parsed.quantityOrUnit);
+      }}
+    >
+      <span className="item-icon" aria-hidden="true">
+        <img src={getItemIcon(displayName, locale)} alt="" />
+      </span>
+      <div className="item-text">
+        <span className="item-name">{displayName}</span>
+        {parsed.quantityOrUnit && (
+          <span className="item-quantity">{parsed.quantityOrUnit}</span>
+        )}
+      </div>
+    </button>
+  );
+});
+
+SuggestionCard.displayName = "SuggestionCard";
+
 const AddItemDialog = ({
   isOpen,
   itemName,
@@ -71,6 +106,7 @@ const AddItemDialog = ({
     () => (duplicatePreview ? `${duplicatePreview.name}. ${duplicateWarningLabel}` : ""),
     [duplicatePreview, duplicateWarningLabel],
   );
+  const trimmedItemName = itemName.trim();
 
   useEffect(() => {
     if (!isOpen) {return;}
@@ -114,31 +150,14 @@ const AddItemDialog = ({
               onAddSuggestion={onAddSuggestion}
             />
           ) : null}
-          {suggestions.map((name) => {
-            const parsed = parseItemInput(name, locale);
-            const displayName = parsed.name || name;
-            return (
-              <button
-                key={name}
-                type="button"
-                className="item-card item-card--dialog"
-                onClick={() => {
-                  if (!parsed.name) {return;}
-                  void onAddSuggestion(parsed.name, parsed.quantityOrUnit);
-                }}
-              >
-                <span className="item-icon" aria-hidden="true">
-                  <img src={getItemIcon(displayName, locale)} alt="" />
-                </span>
-                <div className="item-text">
-                  <span className="item-name">{displayName}</span>
-                  {parsed.quantityOrUnit && (
-                    <span className="item-quantity">{parsed.quantityOrUnit}</span>
-                  )}
-                </div>
-              </button>
-            );
-          })}
+          {suggestions.map((name) => (
+            <SuggestionCard
+              key={name === trimmedItemName ? "__typed-preview__" : name}
+              name={name}
+              locale={locale}
+              onAddSuggestion={onAddSuggestion}
+            />
+          ))}
         </div>
       </div>
     </div>
