@@ -863,19 +863,22 @@ body {
 }
 
 .modal__grid {
+  --preview-grid-gap: 8px;
+  --preview-item-size: calc((100% - (2 * var(--preview-grid-gap))) / 3);
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  column-gap: 8px;
-  row-gap: 8px;
+  column-gap: var(--preview-grid-gap);
+  row-gap: var(--preview-grid-gap);
+  grid-auto-rows: var(--preview-item-size);
 }
 
 .item-card--dialog {
   background: rgba(213, 254, 181, 0.39);
-  height: auto;
   width: 100%;
+  height: 100%;
+  min-height: var(--preview-item-size);
   min-width: 0;
   box-sizing: border-box;
-  aspect-ratio: 1 / 1;
   color: #ffffff;
   animation: item-pop-dialog 220ms ease-out;
 }
