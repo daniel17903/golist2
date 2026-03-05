@@ -844,7 +844,7 @@ body {
   border-radius: 12px;
   width: min(460px, 100%);
   padding: 16px;
-  max-height: calc(100svh - 60px - 80px - env(safe-area-inset-bottom) - var(--keyboard-inset));
+  max-height: calc(100dvh - 60px - 24px - env(safe-area-inset-bottom));
 }
 
 .add-dialog .add-panel input {
@@ -907,7 +907,7 @@ body {
 }
 
 .add-dialog .modal__grid {
-  max-height: min(420px, calc(100svh - 240px - var(--keyboard-inset)));
+  max-height: min(420px, calc(100dvh - 240px));
   overflow-y: auto;
   padding-bottom: 4px;
 }
