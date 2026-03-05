@@ -863,7 +863,8 @@ body {
 .modal__grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
+  column-gap: 8px;
+  row-gap: 8px;
 }
 
 .item-card--dialog {
@@ -871,6 +872,7 @@ body {
   height: auto;
   width: 100%;
   min-width: 0;
+  box-sizing: border-box;
   aspect-ratio: 1 / 1;
   color: #ffffff;
   animation: item-pop-dialog 220ms ease-out;
