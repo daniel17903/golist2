@@ -249,6 +249,28 @@ const App = () => {
   const showBackendLogs = __ENVIRONMENT__ !== "production";
 
   useEffect(() => {
+    const getHistoryState = (): Record<string, unknown> => {
+      const { state } = window.history;
+      return typeof state === "object" && state !== null ? state : {};
+    };
+
+    const historyState = getHistoryState();
+    if (historyState.golistBackBlocked !== true) {
+      window.history.pushState({ ...historyState, golistBackBlocked: true }, "");
+    }
+
+    const handlePopState = () => {
+      window.history.pushState({ ...getHistoryState(), golistBackBlocked: true }, "");
+    };
+
+    window.addEventListener("popstate", handlePopState);
+
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+    };
+  }, []);
+
+  useEffect(() => {
     if (!showBackendLogs || !syncNotice) {
       return;
     }
