@@ -864,20 +864,21 @@ body {
 
 .modal__grid {
   --preview-grid-gap: 8px;
-  --preview-item-size: 120px;
+  --preview-item-size: min(var(--item-size), calc((100% - (2 * var(--preview-grid-gap))) / 3));
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(3, var(--preview-item-size));
   column-gap: var(--preview-grid-gap);
   row-gap: var(--preview-grid-gap);
   grid-auto-rows: var(--preview-item-size);
+  justify-content: center;
 }
 
 .item-card--dialog {
   background: rgba(213, 254, 181, 0.39);
-  width: 100%;
+  width: var(--preview-item-size);
   height: var(--preview-item-size);
   min-height: var(--preview-item-size);
-  min-width: 0;
+  min-width: var(--preview-item-size);
   box-sizing: border-box;
   color: #ffffff;
   animation: item-pop-dialog 220ms ease-out;
