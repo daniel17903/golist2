@@ -10,6 +10,12 @@ export const sortItemsForList = (items: Item[]): Item[] => {
       return orderA - orderB;
     }
 
+    const nameOrder = a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+
+    if (nameOrder !== 0) {
+      return nameOrder;
+    }
+
     return a.createdAt - b.createdAt;
   });
 };
