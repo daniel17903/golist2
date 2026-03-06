@@ -108,6 +108,14 @@ const App = () => {
   const [pullDistance, setPullDistance] = useState(0);
   const [isPullRefreshing, setIsPullRefreshing] = useState(false);
   const pullRefreshStartedAtRef = useRef<number | null>(null);
+  const isPopupOpen =
+    isDrawerOpen ||
+    isAddDialogOpen ||
+    isCreateListModalOpen ||
+    isJoinListModalOpen ||
+    isSettingsModalOpen ||
+    activeLegalModal !== null ||
+    Boolean(editingItemId);
 
   const listMetaById = useMemo(() => {
     const updatedAtByList = new Map<string, number>();
@@ -292,7 +300,7 @@ const App = () => {
 
     const onTouchStart = (event: TouchEvent) => {
       suppressItemPressRef.current = false;
-      if (isDrawerOpen || isPullRefreshing || event.touches.length !== 1 || getScrollY() > 0) {
+      if (isPopupOpen || isPullRefreshing || event.touches.length !== 1 || getScrollY() > 0) {
         pullStartYRef.current = null;
         return;
       }
@@ -301,7 +309,7 @@ const App = () => {
     };
 
     const onTouchMove = (event: TouchEvent) => {
-      if (pullStartYRef.current === null || isDrawerOpen || isPullRefreshing) {
+      if (pullStartYRef.current === null || isPopupOpen || isPullRefreshing) {
         return;
       }
 
@@ -331,7 +339,7 @@ const App = () => {
 
     const onTouchEnd = () => {
       pullStartYRef.current = null;
-      const shouldRefresh = pullDistance >= pullThreshold && !isDrawerOpen && !isPullRefreshing;
+      const shouldRefresh = pullDistance >= pullThreshold && !isPopupOpen && !isPullRefreshing;
 
       if (!shouldRefresh) {
         setPullDistance(0);
@@ -368,7 +376,7 @@ const App = () => {
       window.removeEventListener("touchend", onTouchEnd);
       window.removeEventListener("touchcancel", onTouchEnd);
     };
-  }, [handlePointerCancel, isDrawerOpen, isPullRefreshing, pullDistance, refreshRealtimeConnection]);
+  }, [handlePointerCancel, isPopupOpen, isPullRefreshing, pullDistance, refreshRealtimeConnection]);
 
   return (
     <div className="app">
