@@ -40,6 +40,7 @@ type AppToast = {
 };
 
 type LegalModalType = "imprint" | "privacy";
+const MAX_UNDO_TOASTS = 3;
 
 const isAbortError = (error: unknown): boolean => {
   if (error instanceof DOMException) {
@@ -182,6 +183,30 @@ const App = () => {
     setAppToasts((current) => current.filter((toast) => toast.id !== toastId));
   };
 
+  const enqueueUndoToast = (nextToast: UndoToast, options?: { replaceRenameForListId?: string }) => {
+    setUndoToasts((current) => {
+      const nextQueue = options?.replaceRenameForListId
+        ? current.filter((toast) => {
+            const shouldRemove = toast.kind === "list-rename" && toast.listId === options.replaceRenameForListId;
+            if (shouldRemove) {
+              clearUndoTimeout(toast.id);
+            }
+            return !shouldRemove;
+          })
+        : current;
+      const queueWithNext = [...nextQueue, nextToast];
+
+      if (queueWithNext.length <= MAX_UNDO_TOASTS) {
+        return queueWithNext;
+      }
+
+      const overflow = queueWithNext.length - MAX_UNDO_TOASTS;
+      const removedToasts = queueWithNext.slice(0, overflow);
+      removedToasts.forEach((toast) => clearUndoTimeout(toast.id));
+      return queueWithNext.slice(overflow);
+    });
+  };
+
   const pushAppToast = (message: string, tone: "success" | "error") => {
     const toastId = crypto.randomUUID();
     setAppToasts((current) => [...current, { id: toastId, message, tone }]);
@@ -193,7 +218,7 @@ const App = () => {
 
   const showUndoDelete = (item: Item) => {
     const toastId = crypto.randomUUID();
-    setUndoToasts((current) => [...current, { id: toastId, kind: "item-delete", item }]);
+    enqueueUndoToast({ id: toastId, kind: "item-delete", item });
     const timeout = window.setTimeout(() => {
       removeUndoToast(toastId);
     }, 5000);
@@ -202,10 +227,10 @@ const App = () => {
 
   const showUndoRename = (listId: string, previousName: string, nextName: string) => {
     const toastId = crypto.randomUUID();
-    setUndoToasts((current) => [
-      ...current.filter((toast) => !(toast.kind === "list-rename" && toast.listId === listId)),
+    enqueueUndoToast(
       { id: toastId, kind: "list-rename", listId, previousName, nextName },
-    ]);
+      { replaceRenameForListId: listId },
+    );
     const timeout = window.setTimeout(() => {
       removeUndoToast(toastId);
     }, 5000);
