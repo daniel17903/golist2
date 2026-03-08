@@ -10,10 +10,12 @@ import CreateListModal from "./components/CreateListModal";
 import JoinListModal from "./components/JoinListModal";
 import SettingsModal from "./components/SettingsModal";
 import LegalModal from "./components/LegalModal";
+import ListStatsModal from "./components/ListStatsModal";
 import { useAppState } from "./hooks/useAppState";
 import { useLongPressItem } from "./hooks/useLongPressItem";
 import { useKeyboardInset } from "./hooks/useKeyboardInset";
 import { useI18n } from "./i18n";
+import { calculateListStats } from "./domain/listStats";
 
 type UndoToast = {
   id: string;
@@ -102,6 +104,7 @@ const App = () => {
   const [undoToasts, setUndoToasts] = useState<UndoToast[]>([]);
   const [appToasts, setAppToasts] = useState<AppToast[]>([]);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+  const [isListStatsOpen, setIsListStatsOpen] = useState(false);
   const [activeLegalModal, setActiveLegalModal] = useState<LegalModalType | null>(null);
   const pullStartYRef = useRef<number | null>(null);
   const suppressItemPressRef = useRef(false);
@@ -114,8 +117,11 @@ const App = () => {
     isCreateListModalOpen ||
     isJoinListModalOpen ||
     isSettingsModalOpen ||
+    isListStatsOpen ||
     activeLegalModal !== null ||
     Boolean(editingItemId);
+
+  const listStats = useMemo(() => calculateListStats(items, activeListId), [items, activeListId]);
 
   const listMetaById = useMemo(() => {
     const updatedAtByList = new Map<string, number>();
@@ -391,6 +397,7 @@ const App = () => {
         activeListName={activeList?.name ?? ""}
         renameValue={newListName}
         isEditingName={editingTitle}
+        onOpenStats={() => setIsListStatsOpen(true)}
         onRenameValueChange={setNewListName}
         onStartRename={() => {
           setNewListName(activeList?.name ?? "");
@@ -403,6 +410,16 @@ const App = () => {
           setNewListName(activeList?.name ?? "");
           setEditingTitle(false);
         }}
+      />
+
+      <ListStatsModal
+        isOpen={isListStatsOpen}
+        listName={activeList?.name ?? ""}
+        totalItemsEver={listStats.totalItemsEver}
+        openItems={listStats.openItems}
+        topItems={listStats.topItems}
+        lastBoughtAt={listStats.lastBoughtAt}
+        onClose={() => setIsListStatsOpen(false)}
       />
 
       <ItemGrid

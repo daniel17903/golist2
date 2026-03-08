@@ -5,6 +5,7 @@ type AppHeaderProps = {
   activeListName: string;
   renameValue: string;
   isEditingName: boolean;
+  onOpenStats: () => void;
   onRenameValueChange: (value: string) => void;
   onStartRename: () => void;
   onSaveRename: () => void;
@@ -15,6 +16,7 @@ const AppHeader = ({
   activeListName,
   renameValue,
   isEditingName,
+  onOpenStats,
   onRenameValueChange,
   onStartRename,
   onSaveRename,
@@ -92,14 +94,29 @@ const AppHeader = ({
               </div>
             </div>
           ) : (
-            <button
-              type="button"
-              className="title-button"
-              onClick={onStartRename}
-              aria-label={t("header.editListName")}
-            >
-              {activeListName}
-            </button>
+            <>
+              <button
+                type="button"
+                className="title-button"
+                onClick={onStartRename}
+                aria-label={t("header.editListName")}
+              >
+                {activeListName}
+              </button>
+              <button
+                type="button"
+                className="header-icon-button"
+                onClick={onOpenStats}
+                aria-label={t("header.openStats")}
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path
+                    d="M5 9.2h2.6V19H5V9.2zm5.7-4.2h2.6V19h-2.6V5zm5.7 7.1H19V19h-2.6v-6.9z"
+                    fill="currentColor"
+                  />
+                </svg>
+              </button>
+            </>
           )}
         </div>
 
