@@ -142,28 +142,35 @@ const App = () => {
   const topHistoryItems = useMemo(() => {
     const counts = new Map<string, number>();
     const createdAtByName = new Map<string, number[]>();
+    const displayNameByKey = new Map<string, string>();
 
     statsHistory.forEach((item) => {
-      const key = item.name.trim();
-      if (!key) {
+      const trimmedName = item.name.trim();
+      const normalizedName = trimmedName.toLocaleLowerCase();
+      if (!normalizedName) {
         return;
       }
 
-      counts.set(key, (counts.get(key) ?? 0) + 1);
-      const createdAtEntries = createdAtByName.get(key) ?? [];
+      if (!displayNameByKey.has(normalizedName)) {
+        displayNameByKey.set(normalizedName, trimmedName);
+      }
+
+      counts.set(normalizedName, (counts.get(normalizedName) ?? 0) + 1);
+      const createdAtEntries = createdAtByName.get(normalizedName) ?? [];
       createdAtEntries.push(item.createdAt);
-      createdAtByName.set(key, createdAtEntries);
+      createdAtByName.set(normalizedName, createdAtEntries);
     });
 
     return Array.from(counts.entries())
-      .map(([name, count]) => {
-        const timestamps = (createdAtByName.get(name) ?? []).sort((a, b) => a - b);
+      .map(([normalizedName, count]) => {
+        const timestamps = (createdAtByName.get(normalizedName) ?? []).sort((a, b) => a - b);
         const intervals = timestamps.slice(1).map((timestamp, index) => timestamp - timestamps[index]);
         const averageFrequencyMs = intervals.length > 0
           ? Math.round(intervals.reduce((sum, interval) => sum + interval, 0) / intervals.length)
           : undefined;
+        const displayName = displayNameByKey.get(normalizedName) ?? normalizedName;
 
-        return { name, count, averageFrequencyMs };
+        return { name: displayName, count, averageFrequencyMs };
       })
       .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
       .slice(0, 5);
