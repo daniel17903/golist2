@@ -414,7 +414,6 @@ const App = () => {
 
       <ListStatsModal
         isOpen={isListStatsOpen}
-        listName={activeList?.name ?? ""}
         totalItemsEver={listStats.totalItemsEver}
         openItems={listStats.openItems}
         topItems={listStats.topItems}

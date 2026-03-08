@@ -981,11 +981,6 @@ body {
   gap: 14px;
 }
 
-.list-stats-modal__list-name {
-  margin: 0;
-  font-weight: 600;
-  color: #2f2433;
-}
 
 .list-stats-modal__grid {
   margin: 0;
