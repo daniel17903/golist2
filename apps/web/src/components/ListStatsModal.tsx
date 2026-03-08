@@ -12,7 +12,6 @@ type ListStatsModalProps = {
   listName: string;
   totalItemsEver: number;
   openItems: number;
-  boughtItems: number;
   topItems: TopItem[];
   lastBoughtAt?: number;
   onClose: () => void;
@@ -23,20 +22,11 @@ const ListStatsModal = ({
   listName,
   totalItemsEver,
   openItems,
-  boughtItems,
   topItems,
   lastBoughtAt,
   onClose,
 }: ListStatsModalProps) => {
   const { locale, t } = useI18n();
-
-  const completionRate = useMemo(() => {
-    if (totalItemsEver === 0) {
-      return 0;
-    }
-
-    return Math.round((boughtItems / totalItemsEver) * 100);
-  }, [boughtItems, totalItemsEver]);
 
   const formattedLastBought = useMemo(() => {
     if (!lastBoughtAt) {
@@ -90,14 +80,6 @@ const ListStatsModal = ({
             <li>
               <span>{t("stats.openItems")}</span>
               <strong>{openItems}</strong>
-            </li>
-            <li>
-              <span>{t("stats.boughtItems")}</span>
-              <strong>{boughtItems}</strong>
-            </li>
-            <li>
-              <span>{t("stats.completionRate")}</span>
-              <strong>{completionRate}%</strong>
             </li>
           </ul>
 

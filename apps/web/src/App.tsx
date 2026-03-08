@@ -476,7 +476,6 @@ const App = () => {
         listName={activeList?.name ?? ""}
         totalItemsEver={statsHistory.length}
         openItems={statsHistory.filter((item) => !item.deleted).length}
-        boughtItems={statsHistory.filter((item) => item.deleted).length}
         topItems={topHistoryItems}
         lastBoughtAt={lastBoughtAt}
         onClose={() => setIsListStatsOpen(false)}
