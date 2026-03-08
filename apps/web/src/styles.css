@@ -863,8 +863,9 @@ body {
 
 .item-card--dialog {
   background: rgba(213, 254, 181, 0.39);
-  height: clamp(112px, 28vw, 156px);
   width: 100%;
+  height: auto;
+  aspect-ratio: 1 / 1;
   min-width: 0;
   flex: 0 0 auto;
   color: #ffffff;
