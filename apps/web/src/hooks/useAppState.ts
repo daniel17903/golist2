@@ -4,6 +4,11 @@ import { sortItemsForList } from "../domain/sort";
 import { useStore } from "../state/useStore";
 import { useI18n } from "../i18n";
 
+type RenameListResult = {
+  listId: string;
+  previousName: string;
+  nextName: string;
+};
 
 export const useAppState = () => {
   const { t, locale } = useI18n();
@@ -190,13 +195,26 @@ export const useAppState = () => {
     setIsAddDialogOpen(false);
   }, [activeListId, addItem]);
 
-  const handleRenameList = async () => {
-    if (!activeListId) {return;}
+  const handleRenameList = async (): Promise<RenameListResult | null> => {
+    if (!activeListId || !activeList) {return null;}
     const trimmed = newListName.trim();
-    if (!trimmed) {return;}
+    if (!trimmed) {return null;}
+
+    setEditingTitle(false);
+
+    if (trimmed === activeList.name) {
+      setNewListName(trimmed);
+      return null;
+    }
+
     await renameList(activeListId, trimmed);
     setNewListName(trimmed);
-    setEditingTitle(false);
+
+    return {
+      listId: activeListId,
+      previousName: activeList.name,
+      nextName: trimmed,
+    };
   };
 
   const openEditItem = (itemId: string, name: string, quantityOrUnit?: string) => {
@@ -297,6 +315,7 @@ export const useAppState = () => {
     setCreateListName,
     setJoinListValue,
     setActiveList,
+    renameList,
     toggleItem,
     openEditItem,
     handleAddItem,

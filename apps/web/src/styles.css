@@ -130,24 +130,29 @@ body {
 
 .title-edit {
   display: flex;
-  gap: 8px;
-  align-items: center;
-  flex-wrap: wrap;
-}
-
-.title-edit__actions {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: nowrap;
+  width: 100%;
+  min-width: 0;
 }
 
 .title-edit input {
+  width: 100%;
+  min-width: 0;
   padding: 8px 12px;
-  border-radius: 12px;
-  border: none;
-  background: rgba(255, 255, 255, 0.9);
-  font-size: 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  background: rgba(4, 34, 49, 0.28);
+  color: #f3f8f6;
+  font-size: 16px;
+  outline: none;
+}
+
+.title-edit input::placeholder {
+  color: rgba(243, 248, 246, 0.75);
+}
+
+.title-edit input:focus {
+  border-color: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.2);
 }
 
 .header-actions {
@@ -936,15 +941,8 @@ body {
   display: grid;
   width: 100%;
   min-width: 0;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr);
   align-items: center;
-}
-
-.title-edit__actions {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: nowrap;
 }
 
 .title-edit input {
@@ -1283,9 +1281,6 @@ body {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .title-edit__actions {
-    justify-self: start;
-  }
 
   .drawer {
     width: min(336px, 88vw);

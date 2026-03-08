@@ -17,10 +17,21 @@ import { useKeyboardInset } from "./hooks/useKeyboardInset";
 import { useI18n } from "./i18n";
 import { calculateListStats } from "./domain/listStats";
 
-type UndoToast = {
+type UndoDeleteToast = {
   id: string;
+  kind: "item-delete";
   item: Item;
 };
+
+type UndoRenameToast = {
+  id: string;
+  kind: "list-rename";
+  listId: string;
+  previousName: string;
+  nextName: string;
+};
+
+type UndoToast = UndoDeleteToast | UndoRenameToast;
 
 type AppToast = {
   id: string;
@@ -79,6 +90,7 @@ const App = () => {
     setCreateListName,
     setJoinListValue,
     setActiveList,
+    renameList,
     toggleItem,
     openEditItem,
     handleAddItem,
@@ -179,9 +191,21 @@ const App = () => {
     toastTimeoutsRef.current.set(toastId, timeout);
   };
 
-  const showUndo = (item: Item) => {
+  const showUndoDelete = (item: Item) => {
     const toastId = crypto.randomUUID();
-    setUndoToasts((current) => [...current, { id: toastId, item }]);
+    setUndoToasts((current) => [...current, { id: toastId, kind: "item-delete", item }]);
+    const timeout = window.setTimeout(() => {
+      removeUndoToast(toastId);
+    }, 5000);
+    undoTimeoutsRef.current.set(toastId, timeout);
+  };
+
+  const showUndoRename = (listId: string, previousName: string, nextName: string) => {
+    const toastId = crypto.randomUUID();
+    setUndoToasts((current) => [
+      ...current.filter((toast) => !(toast.kind === "list-rename" && toast.listId === listId)),
+      { id: toastId, kind: "list-rename", listId, previousName, nextName },
+    ]);
     const timeout = window.setTimeout(() => {
       removeUndoToast(toastId);
     }, 5000);
@@ -205,7 +229,7 @@ const App = () => {
 
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
       await toggleItem(itemId);
-      showUndo(itemToDelete);
+      showUndoDelete(itemToDelete);
       return;
     }
     setExitingItemIds((current) => new Set(current).add(itemId));
@@ -216,7 +240,7 @@ const App = () => {
     const deletedItem = items.find((item) => item.id === itemId);
     await toggleItem(itemId);
     if (deletedItem) {
-      showUndo(deletedItem);
+      showUndoDelete(deletedItem);
     }
     setExitingItemIds((current) => {
       const next = new Set(current);
@@ -247,6 +271,14 @@ const App = () => {
   const handleUndoDelete = async (toastId: string, itemId: string) => {
     removeUndoToast(toastId);
     await toggleItem(itemId);
+  };
+
+  const handleUndoRename = async (toastId: string, listId: string, previousName: string) => {
+    removeUndoToast(toastId);
+    await renameList(listId, previousName);
+    if (activeListId === listId) {
+      setNewListName(previousName);
+    }
   };
 
   const {
@@ -404,7 +436,13 @@ const App = () => {
           setEditingTitle(true);
         }}
         onSaveRename={() => {
-          void handleRenameList();
+          void (async () => {
+            const renameResult = await handleRenameList();
+            if (!renameResult) {
+              return;
+            }
+            showUndoRename(renameResult.listId, renameResult.previousName, renameResult.nextName);
+          })();
         }}
         onCancelRename={() => {
           setNewListName(activeList?.name ?? "");
@@ -521,11 +559,19 @@ const App = () => {
       <div className="undo-toast-stack" aria-live="polite" aria-atomic="false">
         {undoToasts.map((toast) => (
           <div key={toast.id} className="undo-toast" role="status">
-            <span className="undo-toast__text">{t("toast.undoDeleted", { name: toast.item.name })}</span>
+            <span className="undo-toast__text">
+              {toast.kind === "item-delete"
+                ? t("toast.undoDeleted", { name: toast.item.name })
+                : t("toast.undoRenamed", { name: toast.nextName })}
+            </span>
             <button
               type="button"
               className="undo-toast__action"
-              onClick={() => void handleUndoDelete(toast.id, toast.item.id)}
+              onClick={() => void (
+                toast.kind === "item-delete"
+                  ? handleUndoDelete(toast.id, toast.item.id)
+                  : handleUndoRename(toast.id, toast.listId, toast.previousName)
+              )}
             >
               {t("toast.undo")}
             </button>
