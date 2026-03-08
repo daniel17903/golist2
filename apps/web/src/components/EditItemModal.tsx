@@ -23,11 +23,19 @@ const EditItemModal = ({
   const { t } = useI18n();
   const nameInputRef = useRef<HTMLInputElement>(null);
   const quantityInputRef = useRef<HTMLInputElement>(null);
+  const wasOpenRef = useRef(false);
 
   useEffect(() => {
     if (!isOpen) {
+      wasOpenRef.current = false;
       return;
     }
+
+    if (wasOpenRef.current) {
+      return;
+    }
+
+    wasOpenRef.current = true;
 
     if (quantity.trim().length === 0) {
       quantityInputRef.current?.focus();
