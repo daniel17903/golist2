@@ -23,7 +23,7 @@ const AppHeader = ({
   onCancelRename,
 }: AppHeaderProps) => {
   const renameInputRef = useRef<HTMLInputElement | null>(null);
-  const saveButtonRef = useRef<HTMLButtonElement | null>(null);
+  const skipBlurSaveRef = useRef(false);
   const { t } = useI18n();
 
   useEffect(() => {
@@ -32,32 +32,6 @@ const AppHeader = ({
       renameInputRef.current?.select();
     }
   }, [isEditingName]);
-
-  useEffect(() => {
-    if (!isEditingName) {
-      return;
-    }
-
-    const handlePointerDown = (event: PointerEvent) => {
-      const target = event.target;
-      if (!(target instanceof Node)) {
-        return;
-      }
-
-      const clickedInput = renameInputRef.current?.contains(target);
-      const clickedSave = saveButtonRef.current?.contains(target);
-      if (clickedInput || clickedSave) {
-        return;
-      }
-
-      onCancelRename();
-    };
-
-    document.addEventListener("pointerdown", handlePointerDown);
-    return () => {
-      document.removeEventListener("pointerdown", handlePointerDown);
-    };
-  }, [isEditingName, onCancelRename]);
 
   return (
     <header className="app__header" aria-label={t("header.activeList")}>
@@ -69,6 +43,13 @@ const AppHeader = ({
                 ref={renameInputRef}
                 value={renameValue}
                 onChange={(event) => onRenameValueChange(event.target.value)}
+                onBlur={() => {
+                  if (skipBlurSaveRef.current) {
+                    skipBlurSaveRef.current = false;
+                    return;
+                  }
+                  onSaveRename();
+                }}
                 onKeyDown={(event) => {
                   if (event.key === "Enter") {
                     event.preventDefault();
@@ -76,22 +57,13 @@ const AppHeader = ({
                   }
                   if (event.key === "Escape") {
                     event.preventDefault();
+                    skipBlurSaveRef.current = true;
                     onCancelRename();
                   }
                 }}
                 aria-label={t("modal.listName")}
                 maxLength={120}
               />
-              <div className="title-edit__actions">
-                <button
-                  ref={saveButtonRef}
-                  type="button"
-                  className="header-chip-button"
-                  onClick={onSaveRename}
-                >
-                  {t("common.save")}
-                </button>
-              </div>
             </div>
           ) : (
             <>
