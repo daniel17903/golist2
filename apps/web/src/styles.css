@@ -1031,7 +1031,19 @@ body {
   color: #3d3240;
 }
 
-.list-stats-modal__last-completed {
+.list-stats-modal__top-items li span {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.list-stats-modal__avg-frequency {
+  color: #6f6a77;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.list-stats-modal__last-bought {
   margin: 0;
   color: #3d3240;
 }

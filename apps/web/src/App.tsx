@@ -28,6 +28,7 @@ type AppToast = {
 };
 
 type LegalModalType = "imprint" | "privacy";
+const QUICK_TOGGLE_WINDOW_MS = 30_000;
 
 const isAbortError = (error: unknown): boolean => {
   if (error instanceof DOMException) {
@@ -125,26 +126,52 @@ const App = () => {
     [activeListId, items],
   );
 
+  const statsHistory = useMemo(
+    () =>
+      activeListHistory.filter((item) => {
+        const wasToggled = item.updatedAt !== item.createdAt;
+        if (!wasToggled) {
+          return true;
+        }
+
+        return item.updatedAt - item.createdAt > QUICK_TOGGLE_WINDOW_MS;
+      }),
+    [activeListHistory],
+  );
+
   const topHistoryItems = useMemo(() => {
     const counts = new Map<string, number>();
-    activeListHistory.forEach((item) => {
+    const createdAtByName = new Map<string, number[]>();
+
+    statsHistory.forEach((item) => {
       const key = item.name.trim();
       if (!key) {
         return;
       }
 
       counts.set(key, (counts.get(key) ?? 0) + 1);
+      const createdAtEntries = createdAtByName.get(key) ?? [];
+      createdAtEntries.push(item.createdAt);
+      createdAtByName.set(key, createdAtEntries);
     });
 
     return Array.from(counts.entries())
-      .map(([name, count]) => ({ name, count }))
+      .map(([name, count]) => {
+        const timestamps = (createdAtByName.get(name) ?? []).sort((a, b) => a - b);
+        const intervals = timestamps.slice(1).map((timestamp, index) => timestamp - timestamps[index]);
+        const averageFrequencyMs = intervals.length > 0
+          ? Math.round(intervals.reduce((sum, interval) => sum + interval, 0) / intervals.length)
+          : undefined;
+
+        return { name, count, averageFrequencyMs };
+      })
       .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
       .slice(0, 5);
-  }, [activeListHistory]);
+  }, [statsHistory]);
 
-  const lastCompletedAt = useMemo(
+  const lastBoughtAt = useMemo(
     () =>
-      activeListHistory
+      statsHistory
         .filter((item) => item.deleted)
         .reduce<number | undefined>((latest, item) => {
           if (!latest || item.updatedAt > latest) {
@@ -152,7 +179,7 @@ const App = () => {
           }
           return latest;
         }, undefined),
-    [activeListHistory],
+    [statsHistory],
   );
 
   const listMetaById = useMemo(() => {
@@ -447,11 +474,11 @@ const App = () => {
       <ListStatsModal
         isOpen={isListStatsOpen}
         listName={activeList?.name ?? ""}
-        totalItemsEver={activeListHistory.length}
-        openItems={activeListHistory.filter((item) => !item.deleted).length}
-        completedItems={activeListHistory.filter((item) => item.deleted).length}
+        totalItemsEver={statsHistory.length}
+        openItems={statsHistory.filter((item) => !item.deleted).length}
+        boughtItems={statsHistory.filter((item) => item.deleted).length}
         topItems={topHistoryItems}
-        lastCompletedAt={lastCompletedAt}
+        lastBoughtAt={lastBoughtAt}
         onClose={() => setIsListStatsOpen(false)}
       />
 

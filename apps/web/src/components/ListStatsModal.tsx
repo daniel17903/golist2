@@ -4,6 +4,7 @@ import { useI18n } from "../i18n";
 type TopItem = {
   name: string;
   count: number;
+  averageFrequencyMs?: number;
 };
 
 type ListStatsModalProps = {
@@ -11,9 +12,9 @@ type ListStatsModalProps = {
   listName: string;
   totalItemsEver: number;
   openItems: number;
-  completedItems: number;
+  boughtItems: number;
   topItems: TopItem[];
-  lastCompletedAt?: number;
+  lastBoughtAt?: number;
   onClose: () => void;
 };
 
@@ -22,9 +23,9 @@ const ListStatsModal = ({
   listName,
   totalItemsEver,
   openItems,
-  completedItems,
+  boughtItems,
   topItems,
-  lastCompletedAt,
+  lastBoughtAt,
   onClose,
 }: ListStatsModalProps) => {
   const { locale, t } = useI18n();
@@ -34,19 +35,35 @@ const ListStatsModal = ({
       return 0;
     }
 
-    return Math.round((completedItems / totalItemsEver) * 100);
-  }, [completedItems, totalItemsEver]);
+    return Math.round((boughtItems / totalItemsEver) * 100);
+  }, [boughtItems, totalItemsEver]);
 
-  const formattedLastCompleted = useMemo(() => {
-    if (!lastCompletedAt) {
+  const formattedLastBought = useMemo(() => {
+    if (!lastBoughtAt) {
       return t("stats.noneYet");
     }
 
     return new Intl.DateTimeFormat(locale, {
       dateStyle: "medium",
       timeStyle: "short",
-    }).format(new Date(lastCompletedAt));
-  }, [lastCompletedAt, locale, t]);
+    }).format(new Date(lastBoughtAt));
+  }, [lastBoughtAt, locale, t]);
+
+  const formatAverageFrequency = (value: number) => {
+    const minute = 60_000;
+    const hour = 60 * minute;
+    const day = 24 * hour;
+
+    if (value >= day) {
+      return t("stats.avgEveryDays", { count: Math.round(value / day) });
+    }
+
+    if (value >= hour) {
+      return t("stats.avgEveryHours", { count: Math.round(value / hour) });
+    }
+
+    return t("stats.avgEveryMinutes", { count: Math.max(1, Math.round(value / minute)) });
+  };
 
   if (!isOpen) {
     return null;
@@ -75,8 +92,8 @@ const ListStatsModal = ({
               <strong>{openItems}</strong>
             </li>
             <li>
-              <span>{t("stats.completedItems")}</span>
-              <strong>{completedItems}</strong>
+              <span>{t("stats.boughtItems")}</span>
+              <strong>{boughtItems}</strong>
             </li>
             <li>
               <span>{t("stats.completionRate")}</span>
@@ -92,7 +109,14 @@ const ListStatsModal = ({
               <ol className="list-stats-modal__top-items">
                 {topItems.map((entry) => (
                   <li key={entry.name}>
-                    <span>{entry.name}</span>
+                    <span>
+                      {entry.name}
+                      {entry.averageFrequencyMs ? (
+                        <small className="list-stats-modal__avg-frequency">
+                          {formatAverageFrequency(entry.averageFrequencyMs)}
+                        </small>
+                      ) : null}
+                    </span>
                     <strong>{t("stats.timesAdded", { count: entry.count })}</strong>
                   </li>
                 ))}
@@ -100,8 +124,8 @@ const ListStatsModal = ({
             )}
           </section>
 
-          <p className="list-stats-modal__last-completed">
-            <strong>{t("stats.lastCompleted")}</strong> {formattedLastCompleted}
+          <p className="list-stats-modal__last-bought">
+            <strong>{t("stats.lastBought")}</strong> {formattedLastBought}
           </p>
         </div>
         <div className="modal__actions">
