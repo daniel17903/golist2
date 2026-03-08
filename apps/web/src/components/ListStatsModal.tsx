@@ -9,7 +9,6 @@ type TopItem = {
 
 type ListStatsModalProps = {
   isOpen: boolean;
-  listName: string;
   totalItemsEver: number;
   openItems: number;
   topItems: TopItem[];
@@ -19,7 +18,6 @@ type ListStatsModalProps = {
 
 const ListStatsModal = ({
   isOpen,
-  listName,
   totalItemsEver,
   openItems,
   topItems,
@@ -33,10 +31,32 @@ const ListStatsModal = ({
       return t("stats.noneYet");
     }
 
+    const now = new Date();
+    const lastBoughtDate = new Date(lastBoughtAt);
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const startOfLastBoughtDay = new Date(
+      lastBoughtDate.getFullYear(),
+      lastBoughtDate.getMonth(),
+      lastBoughtDate.getDate(),
+    ).getTime();
+    const dayDifference = Math.round((startOfToday - startOfLastBoughtDay) / 86_400_000);
+
+    if (dayDifference === 0) {
+      return t("stats.today");
+    }
+
+    if (dayDifference === 1) {
+      return t("stats.yesterday");
+    }
+
+    if (dayDifference > 1 && dayDifference < 7) {
+      return new Intl.DateTimeFormat(locale, { weekday: "long" }).format(lastBoughtDate);
+    }
+
     return new Intl.DateTimeFormat(locale, {
       dateStyle: "medium",
       timeStyle: "short",
-    }).format(new Date(lastBoughtAt));
+    }).format(lastBoughtDate);
   }, [lastBoughtAt, locale, t]);
 
   const formatAverageFrequency = (value: number) => {
@@ -71,7 +91,6 @@ const ListStatsModal = ({
           <h2>{t("stats.title")}</h2>
         </div>
         <div className="modal__body list-stats-modal__body">
-          <p className="list-stats-modal__list-name">{listName}</p>
           <ul className="list-stats-modal__grid" aria-label={t("stats.summary")}>
             <li>
               <span>{t("stats.totalItemsEver")}</span>
