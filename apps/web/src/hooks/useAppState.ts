@@ -23,6 +23,7 @@ export const useAppState = () => {
     renameList,
     setActiveList,
     addItem,
+    recategorizeSuggestedItems,
     toggleItem,
     updateItem,
     deleteList,
@@ -36,6 +37,7 @@ export const useAppState = () => {
     backendLogs,
     backendBusyRequests,
     backendSharingEnabled,
+    metadata,
   } = useStore();
 
   const [newListName, setNewListName] = useState("");
@@ -337,5 +339,8 @@ export const useAppState = () => {
     backendBusyRequests,
     backendSharingEnabled,
     refreshRealtimeConnection,
+    isLoaded,
+    deviceId: metadata?.deviceId,
+    recategorizeSuggestedItems,
   };
 };
