@@ -21,6 +21,14 @@ export type FindLanguageSuggestionInput = {
   now?: number;
 };
 
+export type LanguageSuggestion = {
+  suggestedLocale: Locale;
+  itemUpdates: Array<{
+    itemId: string;
+    category: string;
+  }>;
+};
+
 const isLocale = (value: unknown): value is Locale =>
   typeof value === "string" && supportedLocales.some((locale) => locale === value);
 
@@ -38,7 +46,7 @@ export const findLanguageSuggestion = ({
   currentDeviceId,
   items,
   now = Date.now(),
-}: FindLanguageSuggestionInput): Locale | null => {
+}: FindLanguageSuggestionInput): LanguageSuggestion | null => {
   const cutoffTime = now - sevenDaysInMs;
   const eligibleItems = items.filter((item) => isEligibleItem(item, currentDeviceId, cutoffTime));
 
@@ -49,13 +57,25 @@ export const findLanguageSuggestion = ({
   const candidateLocales = supportedLocales.filter((locale) => locale !== currentLocale);
 
   for (const candidateLocale of candidateLocales) {
-    const allItemsResolve = eligibleItems.every((item) => {
+    const itemUpdates = eligibleItems.map((item) => {
       const category = getCategoryIdForItem(item.name, candidateLocale);
-      return Boolean(category && category !== "other");
+      if (!category || category === "other") {
+        return null;
+      }
+
+      return {
+        itemId: item.id,
+        category,
+      };
     });
 
+    const allItemsResolve = itemUpdates.every((update) => update !== null);
+
     if (allItemsResolve) {
-      return candidateLocale;
+      return {
+        suggestedLocale: candidateLocale,
+        itemUpdates: itemUpdates.filter((update): update is { itemId: string; category: string } => update !== null),
+      };
     }
   }
 

@@ -84,7 +84,8 @@ describe("languageSuggestion", () => {
       ],
     });
 
-    expect(suggestion).toBe("de");
+    expect(suggestion?.suggestedLocale).toBe("de");
+    expect(suggestion?.itemUpdates).toHaveLength(2);
   });
 
   it("ignores items created by another device", () => {
@@ -111,7 +112,8 @@ describe("languageSuggestion", () => {
       ],
     });
 
-    expect(suggestion).toBe("es");
+    expect(suggestion?.suggestedLocale).toBe("es");
+    expect(suggestion?.itemUpdates).toHaveLength(2);
   });
 
   it("returns null when no single locale resolves all items", () => {

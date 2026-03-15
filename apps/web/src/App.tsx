@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Item } from "@golist/shared/domain/types";
 import AppHeader from "./components/AppHeader";
 import BottomBar from "./components/BottomBar";
@@ -22,7 +22,6 @@ import {
   isLanguageSuggestionHandled,
   markLanguageSuggestionHandled,
 } from "./domain/languageSuggestion";
-import type { Locale } from "./i18n/config";
 
 type UndoDeleteToast = {
   id: string;
@@ -118,6 +117,7 @@ const App = () => {
     backendLogs,
     isLoaded,
     deviceId,
+    recategorizeSuggestedItems,
   } = useAppState();
 
   const undoTimeoutsRef = useRef<Map<string, number>>(new Map());
@@ -128,8 +128,6 @@ const App = () => {
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [isListStatsOpen, setIsListStatsOpen] = useState(false);
   const [activeLegalModal, setActiveLegalModal] = useState<LegalModalType | null>(null);
-  const [suggestedLocale, setSuggestedLocale] = useState<Locale | null>(null);
-  const hasCheckedLanguageSuggestionRef = useRef(false);
   const pullStartYRef = useRef<number | null>(null);
   const suppressItemPressRef = useRef(false);
   const [pullDistance, setPullDistance] = useState(0);
@@ -143,8 +141,43 @@ const App = () => {
     isSettingsModalOpen ||
     isListStatsOpen ||
     activeLegalModal !== null ||
-    Boolean(editingItemId) ||
-    Boolean(suggestedLocale);
+    Boolean(editingItemId);
+
+  const languageSuggestion = useMemo(() => {
+    if (!isLoaded || !deviceId || isLanguageSuggestionHandled()) {
+      return null;
+    }
+
+    return findLanguageSuggestion({
+      currentLocale: locale,
+      currentDeviceId: deviceId,
+      items,
+    });
+  }, [deviceId, isLoaded, items, locale]);
+
+  const handleAcceptLanguageSuggestion = useCallback(async () => {
+    if (!languageSuggestion) {
+      return;
+    }
+
+    setLanguagePreference(languageSuggestion.suggestedLocale);
+    await recategorizeSuggestedItems(languageSuggestion.itemUpdates, languageSuggestion.suggestedLocale);
+    markLanguageSuggestionHandled({
+      suggestedLocale: languageSuggestion.suggestedLocale,
+      action: "accepted",
+    });
+  }, [languageSuggestion, recategorizeSuggestedItems, setLanguagePreference]);
+
+  const handleDismissLanguageSuggestion = useCallback(() => {
+    if (!languageSuggestion) {
+      return;
+    }
+
+    markLanguageSuggestionHandled({
+      suggestedLocale: languageSuggestion.suggestedLocale,
+      action: "dismissed",
+    });
+  }, [languageSuggestion]);
 
   const listStats = useMemo(() => calculateListStats(items, activeListId), [items, activeListId]);
 
@@ -330,34 +363,6 @@ const App = () => {
   });
 
   const showBackendLogs = __ENVIRONMENT__ !== "production";
-
-  useEffect(() => {
-    if (!isLoaded || !deviceId || hasCheckedLanguageSuggestionRef.current) {
-      return;
-    }
-
-    hasCheckedLanguageSuggestionRef.current = true;
-
-    if (isLanguageSuggestionHandled()) {
-      return;
-    }
-
-    const suggestion = findLanguageSuggestion({
-      currentLocale: locale,
-      currentDeviceId: deviceId,
-      items,
-    });
-
-    if (suggestion) {
-      const timeout = window.setTimeout(() => {
-        setSuggestedLocale(suggestion);
-      }, 0);
-
-      return () => {
-        window.clearTimeout(timeout);
-      };
-    }
-  }, [deviceId, isLoaded, items, locale]);
 
   useEffect(() => {
     const getHistoryState = (): Record<string, unknown> => {
@@ -729,24 +734,15 @@ const App = () => {
         onSave={handleSaveItem}
       />
 
-      {suggestedLocale ? (
+      {languageSuggestion ? (
         <LanguageSuggestionModal
           isOpen
-          suggestedLocale={suggestedLocale}
+          suggestedLocale={languageSuggestion.suggestedLocale}
           onAccept={() => {
-            setLanguagePreference(suggestedLocale);
-            markLanguageSuggestionHandled({
-              suggestedLocale,
-              action: "accepted",
-            });
-            setSuggestedLocale(null);
+            void handleAcceptLanguageSuggestion();
           }}
           onDismiss={() => {
-            markLanguageSuggestionHandled({
-              suggestedLocale,
-              action: "dismissed",
-            });
-            setSuggestedLocale(null);
+            handleDismissLanguageSuggestion();
           }}
         />
       ) : null}

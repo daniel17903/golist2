@@ -23,6 +23,7 @@ export const useAppState = () => {
     renameList,
     setActiveList,
     addItem,
+    recategorizeSuggestedItems,
     toggleItem,
     updateItem,
     deleteList,
@@ -340,5 +341,6 @@ export const useAppState = () => {
     refreshRealtimeConnection,
     isLoaded,
     deviceId: metadata?.deviceId,
+    recategorizeSuggestedItems,
   };
 };

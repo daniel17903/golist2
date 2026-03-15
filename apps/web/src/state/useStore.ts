@@ -4,6 +4,7 @@ import { buildItemHash } from "@golist/shared/domain/sync";
 import { getCategoryIdForItem, getItemIconName } from "../domain/categories";
 import { db } from "../storage/db";
 import { t } from "../i18n";
+import type { Locale } from "../i18n/config";
 import {
   extractShareToken,
   setBackendCallLogger,
@@ -60,6 +61,10 @@ type StoreState = {
   deleteList: (listId: string) => Promise<void>;
   setActiveList: (listId: string) => void;
   addItem: (listId: string, name: string, quantityOrUnit?: string) => Promise<void>;
+  recategorizeSuggestedItems: (
+    itemUpdates: Array<{ itemId: string; category: string }>,
+    locale: Locale,
+  ) => Promise<void>;
   toggleItem: (itemId: string) => Promise<void>;
   updateItem: (itemId: string, name: string, quantityOrUnit?: string) => Promise<void>;
   ensureShareToken: (listId: string) => Promise<string>;
@@ -338,6 +343,39 @@ export const useStore = create<StoreState>((set, get) => ({
     await db.items.add(item);
     set((state) => ({ items: [...state.items, item] }));
     socketSyncManager.queueLocalItemPatch(item);
+  },
+  recategorizeSuggestedItems: async (itemUpdates, locale) => {
+    if (itemUpdates.length === 0) {
+      return;
+    }
+
+    const updatesByItemId = new Map(itemUpdates.map((update) => [update.itemId, update.category]));
+    const updatedAt = Date.now();
+    const nextItems = get().items.map((item) => {
+      const nextCategory = updatesByItemId.get(item.id);
+      if (!nextCategory) {
+        return item;
+      }
+
+      return {
+        ...item,
+        category: nextCategory,
+        iconName: getItemIconName(item.name, locale) ?? item.iconName,
+        updatedAt,
+      };
+    });
+
+    const changedItems = nextItems.filter((item) => updatesByItemId.has(item.id));
+    if (changedItems.length === 0) {
+      return;
+    }
+
+    await db.items.bulkPut(changedItems);
+    set({ items: nextItems });
+
+    changedItems.forEach((item) => {
+      socketSyncManager.queueLocalItemPatch(item);
+    });
   },
   toggleItem: async (itemId: string) => {
     const { items } = get();

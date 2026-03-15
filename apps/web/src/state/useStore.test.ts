@@ -278,6 +278,47 @@ describe("useStore", () => {
     uuidSpy.mockRestore();
   });
 
+  it("recategorizes suggested items when language suggestion is accepted", async () => {
+    itemsData = [
+      {
+        id: "item-1",
+        listId: "list-1",
+        name: "apfel",
+        iconName: "default",
+        category: "other",
+        deleted: false,
+        createdAt: 1,
+        updatedAt: 1,
+      },
+      {
+        id: "item-2",
+        listId: "list-1",
+        name: "brot",
+        iconName: "default",
+        category: "other",
+        deleted: false,
+        createdAt: 2,
+        updatedAt: 2,
+      },
+    ];
+
+    await useStore.getState().load();
+
+    await useStore.getState().recategorizeSuggestedItems(
+      [
+        { itemId: "item-1", category: "fruitsVegetables" },
+        { itemId: "item-2", category: "bread" },
+      ],
+      "de",
+    );
+
+    const recategorized = useStore.getState().items;
+    expect(recategorized.find((item) => item.id === "item-1")?.category).toBe("fruitsVegetables");
+    expect(recategorized.find((item) => item.id === "item-1")?.iconName).toBe("apple");
+    expect(recategorized.find((item) => item.id === "item-2")?.category).toBe("bread");
+    expect(recategorized.find((item) => item.id === "item-2")?.iconName).toBe("bread");
+  });
+
   it("persists selected list when setting active list", () => {
     useStore.getState().setActiveList("list-10");
 
