@@ -162,13 +162,14 @@ const parseApiListItem = (payload: unknown): ApiListItem => {
   const createdAt = readString(payload, "createdAt");
   const updatedAt = readString(payload, "updatedAt");
   const quantityOrUnit = readString(payload, "quantityOrUnit") ?? undefined;
+  const createdByDeviceId = readString(payload, "createdByDeviceId") ?? undefined;
   const deleted = readBoolean(payload, "deleted");
 
   if (!id || !name || !iconName || !category || !createdAt || !updatedAt || deleted === null) {
     throw new Error("Invalid item payload");
   }
 
-  return { id, name, iconName, category, createdAt, updatedAt, deleted, quantityOrUnit };
+  return { id, name, iconName, category, createdAt, updatedAt, deleted, quantityOrUnit, createdByDeviceId };
 };
 
 const parseListUpsertResponse = (payload: unknown): ApiListUpsertResponse => {

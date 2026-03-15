@@ -322,6 +322,7 @@ export const useStore = create<StoreState>((set, get) => ({
   },
   addItem: async (listId: string, name: string, quantityOrUnit?: string) => {
     const now = Date.now();
+    const deviceId = get().metadata?.deviceId;
     const item: Item = {
       id: createId(),
       listId,
@@ -330,6 +331,7 @@ export const useStore = create<StoreState>((set, get) => ({
       iconName: getItemIconName(name) ?? "default",
       category: getCategoryIdForItem(name) ?? "other",
       deleted: false,
+      createdByDeviceId: deviceId,
       createdAt: now,
       updatedAt: now,
     };
@@ -438,6 +440,7 @@ export const useStore = create<StoreState>((set, get) => ({
         quantityOrUnit: item.quantityOrUnit,
         category: item.category,
         deleted: item.deleted,
+        createdByDeviceId: item.createdByDeviceId,
         createdAt: toMillis(item.createdAt),
         updatedAt: toMillis(item.updatedAt),
       }));

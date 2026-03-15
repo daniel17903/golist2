@@ -13,6 +13,7 @@ export type SharedItem = {
   quantityOrUnit?: string;
   category: string;
   deleted: boolean;
+  createdByDeviceId?: string;
   createdAt: number;
   updatedAt: number;
 };
@@ -40,6 +41,7 @@ export type ApiListItem = {
   quantityOrUnit?: string;
   category: string;
   deleted: boolean;
+  createdByDeviceId?: string;
   createdAt: string;
   updatedAt: string;
 };
@@ -71,4 +73,3 @@ export type ApiShareTokenCreateResponse = {
 export type ApiShareTokenRedeemResponse = {
   listId: string;
 };
-

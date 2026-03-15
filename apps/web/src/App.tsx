@@ -11,11 +11,18 @@ import JoinListModal from "./components/JoinListModal";
 import SettingsModal from "./components/SettingsModal";
 import LegalModal from "./components/LegalModal";
 import ListStatsModal from "./components/ListStatsModal";
+import LanguageSuggestionModal from "./components/LanguageSuggestionModal";
 import { useAppState } from "./hooks/useAppState";
 import { useLongPressItem } from "./hooks/useLongPressItem";
 import { useKeyboardInset } from "./hooks/useKeyboardInset";
 import { useI18n } from "./i18n";
 import { calculateListStats } from "./domain/listStats";
+import {
+  findLanguageSuggestion,
+  isLanguageSuggestionHandled,
+  markLanguageSuggestionHandled,
+} from "./domain/languageSuggestion";
+import type { Locale } from "./i18n/config";
 
 type UndoDeleteToast = {
   id: string;
@@ -51,7 +58,7 @@ const isAbortError = (error: unknown): boolean => {
 };
 
 const App = () => {
-  const { t } = useI18n();
+  const { t, locale, setLanguagePreference } = useI18n();
 
   useKeyboardInset();
 
@@ -109,6 +116,8 @@ const App = () => {
     syncNotice,
     clearSyncNotice,
     backendLogs,
+    isLoaded,
+    deviceId,
   } = useAppState();
 
   const undoTimeoutsRef = useRef<Map<string, number>>(new Map());
@@ -119,6 +128,8 @@ const App = () => {
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [isListStatsOpen, setIsListStatsOpen] = useState(false);
   const [activeLegalModal, setActiveLegalModal] = useState<LegalModalType | null>(null);
+  const [suggestedLocale, setSuggestedLocale] = useState<Locale | null>(null);
+  const hasCheckedLanguageSuggestionRef = useRef(false);
   const pullStartYRef = useRef<number | null>(null);
   const suppressItemPressRef = useRef(false);
   const [pullDistance, setPullDistance] = useState(0);
@@ -132,7 +143,8 @@ const App = () => {
     isSettingsModalOpen ||
     isListStatsOpen ||
     activeLegalModal !== null ||
-    Boolean(editingItemId);
+    Boolean(editingItemId) ||
+    Boolean(suggestedLocale);
 
   const listStats = useMemo(() => calculateListStats(items, activeListId), [items, activeListId]);
 
@@ -318,6 +330,34 @@ const App = () => {
   });
 
   const showBackendLogs = __ENVIRONMENT__ !== "production";
+
+  useEffect(() => {
+    if (!isLoaded || !deviceId || hasCheckedLanguageSuggestionRef.current) {
+      return;
+    }
+
+    hasCheckedLanguageSuggestionRef.current = true;
+
+    if (isLanguageSuggestionHandled()) {
+      return;
+    }
+
+    const suggestion = findLanguageSuggestion({
+      currentLocale: locale,
+      currentDeviceId: deviceId,
+      items,
+    });
+
+    if (suggestion) {
+      const timeout = window.setTimeout(() => {
+        setSuggestedLocale(suggestion);
+      }, 0);
+
+      return () => {
+        window.clearTimeout(timeout);
+      };
+    }
+  }, [deviceId, isLoaded, items, locale]);
 
   useEffect(() => {
     const getHistoryState = (): Record<string, unknown> => {
@@ -688,6 +728,28 @@ const App = () => {
         onCancel={() => setEditingItemId(null)}
         onSave={handleSaveItem}
       />
+
+      {suggestedLocale ? (
+        <LanguageSuggestionModal
+          isOpen
+          suggestedLocale={suggestedLocale}
+          onAccept={() => {
+            setLanguagePreference(suggestedLocale);
+            markLanguageSuggestionHandled({
+              suggestedLocale,
+              action: "accepted",
+            });
+            setSuggestedLocale(null);
+          }}
+          onDismiss={() => {
+            markLanguageSuggestionHandled({
+              suggestedLocale,
+              action: "dismissed",
+            });
+            setSuggestedLocale(null);
+          }}
+        />
+      ) : null}
     </div>
   );
 };
