@@ -138,13 +138,14 @@ vi.mock("../storage/db", () => ({
   },
 }));
 
-const { useStore } = await import("./useStore");
+const { useStore, resetBackendSyncInitializationForTests } = await import("./useStore");
 const { sharingApiClient } = await import("../sharing/apiClient");
 const { socketSyncManager } = await import("../sharing/socketSync");
 
 const upsertListMock = vi.mocked(sharingApiClient.upsertList);
 const createShareTokenMock = vi.mocked(sharingApiClient.createShareToken);
 const fetchListMock = vi.mocked(sharingApiClient.fetchList);
+const redeemShareTokenMock = vi.mocked(sharingApiClient.redeemShareToken);
 const socketInitMock = vi.mocked(socketSyncManager.init);
 const socketSetActiveListMock = vi.mocked(socketSyncManager.setActiveList);
 const socketQueueLocalItemPatchMock = vi.mocked(socketSyncManager.queueLocalItemPatch);
@@ -183,11 +184,13 @@ describe("useStore", () => {
     upsertListMock.mockReset();
     createShareTokenMock.mockReset();
     fetchListMock.mockReset();
+    redeemShareTokenMock.mockReset();
     socketInitMock.mockReset();
     socketSetActiveListMock.mockReset();
     socketQueueLocalItemPatchMock.mockReset();
     socketQueueLocalListMetadataPatchMock.mockReset();
     socketRequestResyncMock.mockReset();
+    resetBackendSyncInitializationForTests();
     globalThis.localStorage.clear();
     resetStore();
     vi.useFakeTimers();
@@ -427,11 +430,66 @@ describe("useStore", () => {
 
   it("load initializes websocket sync manager", async () => {
     listsData = [{ id: "list-1", name: "Groceries", createdAt: 1, updatedAt: 1 }];
+    itemsData = [
+      {
+        id: "item-1",
+        listId: "list-1",
+        name: "Milk",
+        iconName: "milk",
+        category: "other",
+        deleted: false,
+        createdAt: 1,
+        updatedAt: 1,
+      },
+    ];
 
     await useStore.getState().load();
 
     expect(socketInitMock).toHaveBeenCalledTimes(1);
     expect(socketSetActiveListMock).toHaveBeenCalledWith("list-1");
+  });
+
+  it("load does not initialize websocket sync manager when no items exist", async () => {
+    listsData = [{ id: "list-1", name: "Groceries", createdAt: 1, updatedAt: 1 }];
+
+    await useStore.getState().load();
+
+    expect(socketInitMock).not.toHaveBeenCalled();
+  });
+
+  it("defers backend list sync until first item is added", async () => {
+    await useStore.getState().load();
+    await useStore.getState().addList("Groceries");
+
+    expect(upsertListMock).not.toHaveBeenCalled();
+    expect(fetchListMock).not.toHaveBeenCalled();
+
+    await useStore.getState().addItem(useStore.getState().activeListId!, "Milk", "1L");
+
+    expect(upsertListMock).toHaveBeenCalledTimes(1);
+    expect(fetchListMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("still supports joinSharedList before any local item exists", async () => {
+    await useStore.getState().load();
+
+    redeemShareTokenMock.mockResolvedValue({
+      listId: "list-joined",
+    });
+    fetchListMock.mockResolvedValue({
+      listId: "list-joined",
+      name: "Shared",
+      createdAt: new Date(1).toISOString(),
+      updatedAt: new Date(2).toISOString(),
+      items: [],
+    });
+
+    const listId = await useStore.getState().joinSharedList("token");
+
+    expect(listId).toBe("list-joined");
+    expect(redeemShareTokenMock).toHaveBeenCalledTimes(1);
+    expect(fetchListMock).toHaveBeenCalledTimes(1);
+    expect(socketInitMock).toHaveBeenCalledTimes(1);
   });
 
 
