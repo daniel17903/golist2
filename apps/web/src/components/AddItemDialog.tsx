@@ -1,4 +1,5 @@
 import { memo, useEffect, useMemo, useRef } from "react";
+import { createPortal } from "react-dom";
 import { getItemIcon } from "../domain/categories";
 import { parseItemInput } from "../domain/inputParser";
 import { useI18n } from "../i18n";
@@ -116,7 +117,7 @@ const AddItemDialog = ({
 
   if (!isOpen) {return null;}
 
-  return (
+  const dialog = (
     <div className="modal-backdrop add-dialog" role="dialog" aria-modal="true" onClick={onClose}>
       <div
         className="modal"
@@ -162,6 +163,8 @@ const AddItemDialog = ({
       </div>
     </div>
   );
+
+  return createPortal(dialog, document.body);
 };
 
 export default AddItemDialog;

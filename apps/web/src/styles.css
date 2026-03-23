@@ -837,6 +837,7 @@ body {
 .add-dialog {
   align-items: flex-start;
   padding-top: 60px;
+  z-index: 70;
 }
 
 .add-dialog .modal {
@@ -844,6 +845,8 @@ body {
   border-radius: 12px;
   width: min(460px, 100%);
   padding: 16px;
+  isolation: isolate;
+  transform: translateZ(0);
 }
 
 .add-dialog .add-panel input {
