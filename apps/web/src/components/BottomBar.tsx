@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { memo, useState } from "react";
 import { useI18n } from "../i18n";
 
 type BottomBarProps = {
@@ -10,7 +10,7 @@ type BottomBarProps = {
   isBackendBusy: boolean;
 };
 
-const BottomBar = ({ onOpenDrawer, onAddItem, onShareList, canShareList, backendConnection, isBackendBusy }: BottomBarProps) => {
+const BottomBar = memo(function BottomBar({ onOpenDrawer, onAddItem, onShareList, canShareList, backendConnection, isBackendBusy }: BottomBarProps) {
   const { t } = useI18n();
   const [showOfflineInfo, setShowOfflineInfo] = useState(false);
   const showOfflineBadge = backendConnection === "offline";
@@ -76,6 +76,6 @@ const BottomBar = ({ onOpenDrawer, onAddItem, onShareList, canShareList, backend
       </div>
     </footer>
   );
-};
+});
 
 export default BottomBar;

@@ -205,33 +205,33 @@ const App = () => {
     );
   }, [lists, items]);
 
-  const clearUndoTimeout = (toastId: string) => {
+  const clearUndoTimeout = useCallback((toastId: string) => {
     const timeout = undoTimeoutsRef.current.get(toastId);
     if (timeout !== undefined) {
       window.clearTimeout(timeout);
       undoTimeoutsRef.current.delete(toastId);
     }
-  };
+  }, []);
 
-  const clearAppToastTimeout = (toastId: string) => {
+  const clearAppToastTimeout = useCallback((toastId: string) => {
     const timeout = toastTimeoutsRef.current.get(toastId);
     if (timeout !== undefined) {
       window.clearTimeout(timeout);
       toastTimeoutsRef.current.delete(toastId);
     }
-  };
+  }, []);
 
-  const removeUndoToast = (toastId: string) => {
+  const removeUndoToast = useCallback((toastId: string) => {
     clearUndoTimeout(toastId);
     setUndoToasts((current) => current.filter((toast) => toast.id !== toastId));
-  };
+  }, [clearUndoTimeout]);
 
-  const removeAppToast = (toastId: string) => {
+  const removeAppToast = useCallback((toastId: string) => {
     clearAppToastTimeout(toastId);
     setAppToasts((current) => current.filter((toast) => toast.id !== toastId));
-  };
+  }, [clearAppToastTimeout]);
 
-  const enqueueUndoToast = (nextToast: UndoToast, options?: { replaceRenameForListId?: string }) => {
+  const enqueueUndoToast = useCallback((nextToast: UndoToast, options?: { replaceRenameForListId?: string }) => {
     setUndoToasts((current) => {
       const nextQueue = options?.replaceRenameForListId
         ? current.filter((toast) => {
@@ -253,27 +253,27 @@ const App = () => {
       removedToasts.forEach((toast) => clearUndoTimeout(toast.id));
       return queueWithNext.slice(overflow);
     });
-  };
+  }, [clearUndoTimeout]);
 
-  const pushAppToast = (message: string, tone: "success" | "error") => {
+  const pushAppToast = useCallback((message: string, tone: "success" | "error") => {
     const toastId = crypto.randomUUID();
     setAppToasts((current) => [...current, { id: toastId, message, tone }]);
     const timeout = window.setTimeout(() => {
       removeAppToast(toastId);
     }, 4500);
     toastTimeoutsRef.current.set(toastId, timeout);
-  };
+  }, [removeAppToast]);
 
-  const showUndoDelete = (item: Item) => {
+  const showUndoDelete = useCallback((item: Item) => {
     const toastId = crypto.randomUUID();
     enqueueUndoToast({ id: toastId, kind: "item-delete", item });
     const timeout = window.setTimeout(() => {
       removeUndoToast(toastId);
     }, 5000);
     undoTimeoutsRef.current.set(toastId, timeout);
-  };
+  }, [enqueueUndoToast, removeUndoToast]);
 
-  const showUndoRename = (listId: string, previousName: string, nextName: string) => {
+  const showUndoRename = useCallback((listId: string, previousName: string, nextName: string) => {
     const toastId = crypto.randomUUID();
     enqueueUndoToast(
       { id: toastId, kind: "list-rename", listId, previousName, nextName },
@@ -283,7 +283,7 @@ const App = () => {
       removeUndoToast(toastId);
     }, 5000);
     undoTimeoutsRef.current.set(toastId, timeout);
-  };
+  }, [enqueueUndoToast, removeUndoToast]);
 
   useEffect(
     () => () => {
@@ -295,9 +295,15 @@ const App = () => {
     [],
   );
 
-  const handleToggleItem = async (itemId: string) => {
-    if (exitingItemIds.has(itemId)) {return;}
-    const itemToDelete = items.find((item) => item.id === itemId);
+  const exitingItemIdsRef = useRef(exitingItemIds);
+  useEffect(() => { exitingItemIdsRef.current = exitingItemIds; });
+
+  const itemsRef = useRef(items);
+  useEffect(() => { itemsRef.current = items; });
+
+  const handleToggleItem = useCallback(async (itemId: string) => {
+    if (exitingItemIdsRef.current.has(itemId)) {return;}
+    const itemToDelete = itemsRef.current.find((item) => item.id === itemId);
     if (!itemToDelete) {return;}
 
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
@@ -306,11 +312,11 @@ const App = () => {
       return;
     }
     setExitingItemIds((current) => new Set(current).add(itemId));
-  };
+  }, [toggleItem, showUndoDelete]);
 
-  const handleExitComplete = async (itemId: string) => {
-    if (!exitingItemIds.has(itemId)) {return;}
-    const deletedItem = items.find((item) => item.id === itemId);
+  const handleExitComplete = useCallback(async (itemId: string) => {
+    if (!exitingItemIdsRef.current.has(itemId)) {return;}
+    const deletedItem = itemsRef.current.find((item) => item.id === itemId);
     await toggleItem(itemId);
     if (deletedItem) {
       showUndoDelete(deletedItem);
@@ -320,15 +326,18 @@ const App = () => {
       next.delete(itemId);
       return next;
     });
-  };
+  }, [toggleItem, showUndoDelete]);
 
-  const shareWithSystemSheet = async (shareLink: string): Promise<boolean> => {
+  const activeListRef = useRef(activeList);
+  useEffect(() => { activeListRef.current = activeList; });
+
+  const shareWithSystemSheet = useCallback(async (shareLink: string): Promise<boolean> => {
     if (typeof navigator.share !== "function") {
       return false;
     }
 
     const sharePayload: ShareData = {
-      title: activeList?.name ?? "GoList",
+      title: activeListRef.current?.name ?? "GoList",
       text: t("share.text"),
       url: shareLink,
     };
@@ -339,20 +348,20 @@ const App = () => {
 
     await navigator.share(sharePayload);
     return true;
-  };
+  }, [t]);
 
-  const handleUndoDelete = async (toastId: string, itemId: string) => {
+  const handleUndoDelete = useCallback(async (toastId: string, itemId: string) => {
     removeUndoToast(toastId);
     await toggleItem(itemId);
-  };
+  }, [removeUndoToast, toggleItem]);
 
-  const handleUndoRename = async (toastId: string, listId: string, previousName: string) => {
+  const handleUndoRename = useCallback(async (toastId: string, listId: string, previousName: string) => {
     removeUndoToast(toastId);
     await renameList(listId, previousName);
     if (activeListId === listId) {
       setNewListName(previousName);
     }
-  };
+  }, [removeUndoToast, renameList, activeListId, setNewListName]);
 
   const {
     handlePointerDown,
@@ -489,6 +498,121 @@ const App = () => {
     };
   }, [handlePointerCancel, isPopupOpen, isPullRefreshing, pullDistance, refreshRealtimeConnection]);
 
+  // --- Stable callback props for memoized children ---
+
+  const handleOpenStats = useCallback(() => setIsListStatsOpen(true), []);
+  const handleCloseStats = useCallback(() => setIsListStatsOpen(false), []);
+
+  const handleStartRename = useCallback(() => {
+    setNewListName(activeListRef.current?.name ?? "");
+    setEditingTitle(true);
+  }, [setNewListName, setEditingTitle]);
+
+  const handleSaveRename = useCallback(() => {
+    void (async () => {
+      const renameResult = await handleRenameList();
+      if (!renameResult) {
+        return;
+      }
+      showUndoRename(renameResult.listId, renameResult.previousName, renameResult.nextName);
+    })();
+  }, [handleRenameList, showUndoRename]);
+
+  const handleCancelRename = useCallback(() => {
+    setNewListName(activeListRef.current?.name ?? "");
+    setEditingTitle(false);
+  }, [setNewListName, setEditingTitle]);
+
+  const handleGridPointerDown = useCallback((itemId: string, name: string, quantityOrUnit?: string) => {
+    if (suppressItemPressRef.current) {
+      return;
+    }
+    handlePointerDown(itemId, name, quantityOrUnit);
+  }, [handlePointerDown]);
+
+  const handleGridPointerUp = useCallback((itemId: string) => {
+    if (suppressItemPressRef.current) {
+      suppressItemPressRef.current = false;
+      return;
+    }
+    handlePointerUp(itemId);
+  }, [handlePointerUp]);
+
+  const handleOpenDrawer = useCallback(() => setIsDrawerOpen(true), [setIsDrawerOpen]);
+  const handleCloseDrawer = useCallback(() => setIsDrawerOpen(false), [setIsDrawerOpen]);
+
+  const handleShareList = useCallback(() => {
+    void (async () => {
+      try {
+        const shareLink = await handleShareActiveList();
+        try {
+          const shared = await shareWithSystemSheet(shareLink);
+          if (shared) {
+            pushAppToast(t("toast.shareSuccess"), "success");
+            return;
+          }
+        } catch (error) {
+          if (isAbortError(error)) {
+            return;
+          }
+        }
+
+        await navigator.clipboard.writeText(shareLink);
+        pushAppToast(t("toast.shareCopied"), "success");
+      } catch {
+        pushAppToast(t("toast.shareUnavailable"), "error");
+      }
+    })();
+  }, [handleShareActiveList, shareWithSystemSheet, pushAppToast, t]);
+
+  const handleSelectList = useCallback((listId: string) => {
+    setActiveList(listId);
+    setIsDrawerOpen(false);
+  }, [setActiveList, setIsDrawerOpen]);
+
+  const handleOpenSettings = useCallback(() => {
+    setIsDrawerOpen(false);
+    setIsSettingsModalOpen(true);
+  }, [setIsDrawerOpen]);
+
+  const handleOpenImprint = useCallback(() => {
+    setIsDrawerOpen(false);
+    setActiveLegalModal("imprint");
+  }, [setIsDrawerOpen]);
+
+  const handleOpenPrivacy = useCallback(() => {
+    setIsDrawerOpen(false);
+    setActiveLegalModal("privacy");
+  }, [setIsDrawerOpen]);
+
+  const handleCloseAddDialog = useCallback(() => setIsAddDialogOpen(false), [setIsAddDialogOpen]);
+
+  const handleCancelCreateList = useCallback(() => {
+    setCreateListName("");
+    setIsCreateListModalOpen(false);
+  }, [setCreateListName, setIsCreateListModalOpen]);
+
+  const handleSaveCreateList = useCallback(() => {
+    void handleConfirmCreateList();
+  }, [handleConfirmCreateList]);
+
+  const handleCancelJoinList = useCallback(() => {
+    setJoinListValue("");
+    setIsJoinListModalOpen(false);
+  }, [setJoinListValue, setIsJoinListModalOpen]);
+
+  const handleConfirmJoinList = useCallback(() => {
+    void handleJoinList();
+  }, [handleJoinList]);
+
+  const handleCloseSettings = useCallback(() => setIsSettingsModalOpen(false), []);
+  const handleCloseLegal = useCallback(() => setActiveLegalModal(null), []);
+  const handleCancelEditItem = useCallback(() => setEditingItemId(null), [setEditingItemId]);
+
+  const handleAcceptLanguage = useCallback(() => {
+    void handleAcceptLanguageSuggestion();
+  }, [handleAcceptLanguageSuggestion]);
+
   return (
     <div className="app">
       <div
@@ -502,25 +626,11 @@ const App = () => {
         activeListName={activeList?.name ?? ""}
         renameValue={newListName}
         isEditingName={editingTitle}
-        onOpenStats={() => setIsListStatsOpen(true)}
+        onOpenStats={handleOpenStats}
         onRenameValueChange={setNewListName}
-        onStartRename={() => {
-          setNewListName(activeList?.name ?? "");
-          setEditingTitle(true);
-        }}
-        onSaveRename={() => {
-          void (async () => {
-            const renameResult = await handleRenameList();
-            if (!renameResult) {
-              return;
-            }
-            showUndoRename(renameResult.listId, renameResult.previousName, renameResult.nextName);
-          })();
-        }}
-        onCancelRename={() => {
-          setNewListName(activeList?.name ?? "");
-          setEditingTitle(false);
-        }}
+        onStartRename={handleStartRename}
+        onSaveRename={handleSaveRename}
+        onCancelRename={handleCancelRename}
       />
 
       <ListStatsModal
@@ -529,7 +639,7 @@ const App = () => {
         openItems={listStats.openItems}
         topItems={listStats.topItems}
         lastBoughtAt={listStats.lastBoughtAt}
-        onClose={() => setIsListStatsOpen(false)}
+        onClose={handleCloseStats}
       />
 
       <ItemGrid
@@ -539,51 +649,18 @@ const App = () => {
         longPressTriggeredRef={longPressTriggeredRef}
         suppressItemPressRef={suppressItemPressRef}
         pressedItemId={pressedItemId}
-        onPointerDown={(itemId, name, quantityOrUnit) => {
-          if (suppressItemPressRef.current) {
-            return;
-          }
-          handlePointerDown(itemId, name, quantityOrUnit);
-        }}
-        onPointerUp={(itemId) => {
-          if (suppressItemPressRef.current) {
-            suppressItemPressRef.current = false;
-            return;
-          }
-          handlePointerUp(itemId);
-        }}
+        onPointerDown={handleGridPointerDown}
+        onPointerUp={handleGridPointerUp}
         onPointerCancel={handlePointerCancel}
       />
 
       <BottomBar
-        onOpenDrawer={() => setIsDrawerOpen(true)}
+        onOpenDrawer={handleOpenDrawer}
         onAddItem={openAddDialog}
         backendConnection={backendConnection}
         isBackendBusy={backendBusyRequests > 0}
         canShareList={backendSharingEnabled}
-        onShareList={() => {
-          void (async () => {
-            try {
-              const shareLink = await handleShareActiveList();
-              try {
-                const shared = await shareWithSystemSheet(shareLink);
-                if (shared) {
-                  pushAppToast(t("toast.shareSuccess"), "success");
-                  return;
-                }
-              } catch (error) {
-                if (isAbortError(error)) {
-                  return;
-                }
-              }
-
-              await navigator.clipboard.writeText(shareLink);
-              pushAppToast(t("toast.shareCopied"), "success");
-            } catch {
-              pushAppToast(t("toast.shareUnavailable"), "error");
-            }
-          })();
-        }}
+        onShareList={handleShareList}
       />
 
       <div className="app-toast-stack" aria-live="polite" aria-atomic="false">
@@ -656,27 +733,15 @@ const App = () => {
         lists={lists}
         activeListId={activeListId}
         listMetaById={listMetaById}
-        onClose={() => setIsDrawerOpen(false)}
-        onOpen={() => setIsDrawerOpen(true)}
-        onSelectList={(listId) => {
-          setActiveList(listId);
-          setIsDrawerOpen(false);
-        }}
+        onClose={handleCloseDrawer}
+        onOpen={handleOpenDrawer}
+        onSelectList={handleSelectList}
         onDeleteList={handleDeleteList}
         onCreateList={handleCreateList}
         onJoinList={handleOpenJoinList}
-        onOpenSettings={() => {
-          setIsDrawerOpen(false);
-          setIsSettingsModalOpen(true);
-        }}
-        onOpenImprint={() => {
-          setIsDrawerOpen(false);
-          setActiveLegalModal("imprint");
-        }}
-        onOpenPrivacy={() => {
-          setIsDrawerOpen(false);
-          setActiveLegalModal("privacy");
-        }}
+        onOpenSettings={handleOpenSettings}
+        onOpenImprint={handleOpenImprint}
+        onOpenPrivacy={handleOpenPrivacy}
       />
 
       <AddItemDialog
@@ -685,7 +750,7 @@ const App = () => {
         suggestions={suggestions}
         duplicatePreview={duplicatePreview}
         onItemNameChange={setItemName}
-        onClose={() => setIsAddDialogOpen(false)}
+        onClose={handleCloseAddDialog}
         onAddItem={handleAddItem}
         onAddSuggestion={handleAddSuggestion}
       />
@@ -694,37 +759,27 @@ const App = () => {
         isOpen={isCreateListModalOpen}
         value={createListName}
         onChange={setCreateListName}
-        onCancel={() => {
-          setCreateListName("");
-          setIsCreateListModalOpen(false);
-        }}
-        onSave={() => {
-          void handleConfirmCreateList();
-        }}
+        onCancel={handleCancelCreateList}
+        onSave={handleSaveCreateList}
       />
 
       <JoinListModal
         isOpen={isJoinListModalOpen}
         value={joinListValue}
         onChange={setJoinListValue}
-        onCancel={() => {
-          setJoinListValue("");
-          setIsJoinListModalOpen(false);
-        }}
-        onJoin={() => {
-          void handleJoinList();
-        }}
+        onCancel={handleCancelJoinList}
+        onJoin={handleConfirmJoinList}
       />
 
       <SettingsModal
         isOpen={isSettingsModalOpen}
-        onClose={() => setIsSettingsModalOpen(false)}
+        onClose={handleCloseSettings}
       />
 
       <LegalModal
         isOpen={activeLegalModal !== null}
         type={activeLegalModal ?? "imprint"}
-        onClose={() => setActiveLegalModal(null)}
+        onClose={handleCloseLegal}
       />
 
       <EditItemModal
@@ -733,7 +788,7 @@ const App = () => {
         quantity={editItemQuantity}
         onNameChange={setEditItemName}
         onQuantityChange={setEditItemQuantity}
-        onCancel={() => setEditingItemId(null)}
+        onCancel={handleCancelEditItem}
         onSave={handleSaveItem}
       />
 
@@ -741,12 +796,8 @@ const App = () => {
         <LanguageSuggestionModal
           isOpen
           suggestedLocale={languageSuggestion.suggestedLocale}
-          onAccept={() => {
-            void handleAcceptLanguageSuggestion();
-          }}
-          onDismiss={() => {
-            handleDismissLanguageSuggestion();
-          }}
+          onAccept={handleAcceptLanguage}
+          onDismiss={handleDismissLanguageSuggestion}
         />
       ) : null}
     </div>

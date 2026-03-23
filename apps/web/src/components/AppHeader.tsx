@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { memo, useEffect, useRef } from "react";
 import { useI18n } from "../i18n";
 
 type AppHeaderProps = {
@@ -12,7 +12,7 @@ type AppHeaderProps = {
   onCancelRename: () => void;
 };
 
-const AppHeader = ({
+const AppHeader = memo(function AppHeader({
   activeListName,
   renameValue,
   isEditingName,
@@ -21,7 +21,7 @@ const AppHeader = ({
   onStartRename,
   onSaveRename,
   onCancelRename,
-}: AppHeaderProps) => {
+}: AppHeaderProps) {
   const renameInputRef = useRef<HTMLInputElement | null>(null);
   const skipBlurSaveRef = useRef(false);
   const { t } = useI18n();
@@ -95,6 +95,6 @@ const AppHeader = ({
       </div>
     </header>
   );
-};
+});
 
 export default AppHeader;

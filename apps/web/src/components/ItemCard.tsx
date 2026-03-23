@@ -1,4 +1,4 @@
-import type { MouseEvent } from "react";
+import { memo, type MouseEvent } from "react";
 import { getListItemIcon } from "../domain/categories";
 import type { Item } from "@golist/shared/domain/types";
 
@@ -14,7 +14,7 @@ type ItemCardProps = {
   onClick: (event: MouseEvent<HTMLButtonElement>) => void;
 };
 
-const ItemCard = ({
+const ItemCard = memo(function ItemCard({
   item,
   isExiting,
   onExitComplete,
@@ -24,7 +24,7 @@ const ItemCard = ({
   onPointerLeave,
   onPointerCancel,
   onClick,
-}: ItemCardProps) => {
+}: ItemCardProps) {
   return (
     <button
       type="button"
@@ -49,6 +49,6 @@ const ItemCard = ({
       </div>
     </button>
   );
-};
+});
 
 export default ItemCard;
