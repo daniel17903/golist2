@@ -17,31 +17,15 @@ appending on each sync request, `backendBusyRequests` toggling) triggered a
 full re-render of `App` and every child component. Now each selector only
 triggers a re-render when its specific slice changes.
 
----
-
-## Remaining Work
-
 ### P0: Memoize `ItemCard` component
 **File:** `apps/web/src/components/ItemCard.tsx`
-**Effort:** Low
 
-Wrap `ItemCard` with `React.memo`. Currently every item card re-renders when
-any grid-level state changes — even if only one item's `isExiting` flag
-changed or a toast appeared. With memoization, unchanged cards skip rendering.
+Wrapped `ItemCard` with `React.memo` using a named function for better DevTools
+display. Unchanged cards now skip rendering when grid-level state changes
+(e.g. toast appearance, other items' `isExiting` flags).
 
-```tsx
-const ItemCard = React.memo(({ item, isExiting, ... }: ItemCardProps) => {
-  return <button>...</button>;
-});
-ItemCard.displayName = "ItemCard";
-export default ItemCard;
-```
-
-**Note:** This must be combined with callback stabilization (P1 items below) to
-be effective — inline arrow functions in props defeat `React.memo`'s shallow
-comparison.
-
----
+**Note:** Full benefit requires callback stabilization (P1) to avoid inline
+arrow functions defeating the shallow comparison.
 
 ### P1: Add `React.memo` to major child components
 **Files:**
@@ -50,34 +34,30 @@ comparison.
 - `apps/web/src/components/ListsDrawer.tsx`
 - `apps/web/src/components/ItemGrid.tsx`
 
-**Effort:** Low
-
-Wrap each component's default export with `React.memo`. Since `App` holds
-~20+ pieces of local state, any state change re-renders all children. Memoizing
-them prevents re-renders when their props haven't changed.
-
----
+Wrapped each component with `React.memo` using named functions. Since `App`
+holds ~20+ pieces of local state, any state change previously re-rendered all
+children. Memoizing prevents re-renders when their props haven't changed.
 
 ### P1: Stabilize callback props with `useCallback`
-**File:** `apps/web/src/App.tsx` (lines 505-680)
-**Effort:** Medium
+**File:** `apps/web/src/App.tsx`
 
-Dozens of inline arrow functions are passed as props to child components:
-- `onOpenStats={() => setIsListStatsOpen(true)}`
-- `onStartRename={() => { ... }}`
-- `onOpenDrawer={() => setIsDrawerOpen(true)}`
-- 8+ closures for `ListsDrawer`
-- Closures for `CreateListModal`, `JoinListModal`
+Replaced ~25 inline arrow function props with stable `useCallback` references.
+This covers all callback props passed to memoized children: `AppHeader`,
+`BottomBar`, `ItemGrid`, `ListsDrawer`, `AddItemDialog`, `CreateListModal`,
+`JoinListModal`, `SettingsModal`, `LegalModal`, `EditItemModal`, and
+`LanguageSuggestionModal`.
 
-Each creates a new function identity on every render, defeating `React.memo`.
-Wrap them in `useCallback`:
-
-```tsx
-const handleOpenStats = useCallback(() => setIsListStatsOpen(true), []);
-const handleOpenDrawer = useCallback(() => setIsDrawerOpen(true), []);
-```
+Also stabilized internal helper functions (`clearUndoTimeout`,
+`clearAppToastTimeout`, `removeUndoToast`, `removeAppToast`,
+`enqueueUndoToast`, `pushAppToast`, `showUndoDelete`, `showUndoRename`,
+`shareWithSystemSheet`, `handleUndoDelete`, `handleUndoRename`,
+`handleToggleItem`, `handleExitComplete`) with `useCallback`, and moved
+frequently-changing values (`exitingItemIds`, `items`, `activeList`) to refs
+synced via `useEffect` to avoid unnecessary dependency churn.
 
 ---
+
+## Remaining Work
 
 ### P1: Fix pull-to-refresh effect re-registering every frame
 **File:** `apps/web/src/App.tsx` (lines 406-490)
@@ -243,9 +223,9 @@ Delete it.
 | Priority | Item | Impact | Effort |
 |----------|------|--------|--------|
 | ~~P0~~ | ~~Zustand fine-grained selectors~~ | ~~Critical~~ | ~~Done~~ |
-| P0 | Memoize `ItemCard` | High | Low |
-| P1 | `React.memo` on major children | High | Low |
-| P1 | Stabilize callbacks with `useCallback` | High | Medium |
+| ~~P0~~ | ~~Memoize `ItemCard`~~ | ~~High~~ | ~~Done~~ |
+| ~~P1~~ | ~~`React.memo` on major children~~ | ~~High~~ | ~~Done~~ |
+| ~~P1~~ | ~~Stabilize callbacks with `useCallback`~~ | ~~High~~ | ~~Done~~ |
 | P1 | Fix pull-to-refresh effect deps | Medium | Low |
 | P1 | Isolate `backendLogs` rendering | Medium | Medium |
 | P1 | Stabilize `useLongPressItem` handlers | Medium | Low |

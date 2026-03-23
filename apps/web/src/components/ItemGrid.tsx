@@ -1,4 +1,4 @@
-import type { MutableRefObject } from "react";
+import { memo, type MutableRefObject } from "react";
 import type { Item } from "@golist/shared/domain/types";
 import ItemCard from "./ItemCard";
 
@@ -14,7 +14,7 @@ type ItemGridProps = {
   onPointerCancel: () => void;
 };
 
-const ItemGrid = ({
+const ItemGrid = memo(function ItemGrid({
   items,
   exitingItemIds,
   onExitComplete,
@@ -24,7 +24,7 @@ const ItemGrid = ({
   onPointerDown,
   onPointerUp,
   onPointerCancel,
-}: ItemGridProps) => {
+}: ItemGridProps) {
   return (
     <main className="list-grid">
       {items.map((item) => (
@@ -47,6 +47,6 @@ const ItemGrid = ({
       ))}
     </main>
   );
-};
+});
 
 export default ItemGrid;

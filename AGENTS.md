@@ -70,6 +70,70 @@
   For E2E-related changes, do this setup and run the Playwright E2E command before committing.
   Do **not** treat a skipped run as sufficient validation: for E2E-related changes you must execute with `RUN_PLAYWRIGHT_E2E=1` so tests actually run.
 
+## React performance rules (web app)
+
+These rules exist to prevent regressions against the work tracked in
+`docs/frontend-performance-plan.md`. Follow them for every web-app change.
+
+### Component memoization
+- All components in `apps/web/src/components/` that receive props from `App`
+  are wrapped with `React.memo`. **New components** that receive props from a
+  parent must also be wrapped with `React.memo` using a named function:
+  ```tsx
+  const MyComponent = memo(function MyComponent(props: Props) { ... });
+  ```
+- Never remove an existing `React.memo` wrapper without an explicit reason.
+
+### Callback stability
+- **Never pass inline arrow functions** as props to memoized children. Every
+  callback prop must be a stable reference — either a `useCallback` result, a
+  state setter from `useState`, or a module-scope function.
+  ```tsx
+  // Bad — new identity every render, defeats React.memo
+  <AppHeader onOpenStats={() => setIsListStatsOpen(true)} />
+
+  // Good — stable reference
+  const handleOpenStats = useCallback(() => setIsListStatsOpen(true), []);
+  <AppHeader onOpenStats={handleOpenStats} />
+  ```
+- Inline arrows are acceptable **only** inside elements that are not memoized
+  components (e.g. plain `<button>`, `<div>`), or in `.map()` callbacks that
+  produce plain elements.
+- Helper functions declared inside a component that are passed as props or
+  appear in `useEffect`/`useCallback` dependency arrays must themselves be
+  wrapped with `useCallback`.
+
+### Zustand selectors
+- **Never subscribe to the whole store** with a bare `useStore()` call. Always
+  use a fine-grained selector: `useStore((s) => s.specificSlice)`.
+- Store actions are stable (created once in `create()`). Extract them at module
+  scope via `useStore.getState()` — do not select them inside components.
+- See `apps/web/src/hooks/useAppState.ts` for the established pattern.
+
+### Refs for frequently-changing values
+- When a `useCallback` or `useEffect` needs to read a value that changes often
+  (e.g. `items`, `exitingItemIds`, `activeList`), store it in a ref synced via
+  a no-deps `useEffect` instead of adding it to the dependency array:
+  ```tsx
+  const itemsRef = useRef(items);
+  useEffect(() => { itemsRef.current = items; });
+  ```
+- **Never assign to `.current` directly in the render body** — the
+  `react-hooks/refs` lint rule will reject it. Always use `useEffect`.
+
+### useEffect dependency hygiene
+- Avoid putting rapidly-changing values (e.g. animation frame positions, pull
+  distances) in `useEffect` dependency arrays. Use refs instead to prevent
+  effect teardown/re-registration on every frame.
+
+### General checklist for new UI code
+1. New component receives props from a parent? → wrap with `React.memo`.
+2. Passing a function as a prop? → ensure it is wrapped in `useCallback` (or
+   is a state setter / module-scope constant).
+3. Adding a new Zustand subscription? → use a selector, not the whole store.
+4. Adding a `useEffect`? → verify no high-frequency values in the dep array.
+5. Consult `docs/frontend-performance-plan.md` for remaining items and context.
+
 
 ## Documentation maintenance
 - Keep `docs/sharing-plan.md` up to date when backend sharing architecture, sequencing, or CI expectations change.

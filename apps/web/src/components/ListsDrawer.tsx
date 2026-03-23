@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type PointerEvent, type TouchEvent } from "react";
+import { memo, useMemo, useRef, useState, type PointerEvent, type TouchEvent } from "react";
 import type { List } from "@golist/shared/domain/types";
 import { useI18n } from "../i18n";
 
@@ -28,7 +28,7 @@ const EDGE_SWIPE_WIDTH = 28;
 
 const getCurrentTimestamp = () => Date.now();
 
-const ListsDrawer = ({
+const ListsDrawer = memo(function ListsDrawer({
   isOpen,
   lists,
   activeListId,
@@ -42,7 +42,7 @@ const ListsDrawer = ({
   onOpenSettings,
   onOpenImprint,
   onOpenPrivacy,
-}: ListsDrawerProps) => {
+}: ListsDrawerProps) {
   const { t, locale } = useI18n();
   const drawerRef = useRef<HTMLElement | null>(null);
   const dragStateRef = useRef<{ pointerId: number; startX: number; mode: DragMode } | null>(null);
@@ -374,6 +374,6 @@ const ListsDrawer = ({
       </div>
     </>
   );
-};
+});
 
 export default ListsDrawer;
