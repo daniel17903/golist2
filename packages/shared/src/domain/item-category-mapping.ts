@@ -685,9 +685,10 @@ const categoryEntriesDe: CategoryEntry[] = [
     "category": "fruitsVegetables",
   },
   {
-    "assetFileName": "lime",
+    "assetFileName": "lemon",
     "matchingNames": [
       "limette",
+      "limetten",
     ],
     "category": "fruitsVegetables",
   },
@@ -1541,9 +1542,10 @@ const categoryEntriesEn: CategoryEntry[] = [
     "category": "fruitsVegetables",
   },
   {
-    "assetFileName": "lime",
+    "assetFileName": "lemon",
     "matchingNames": [
       "lime",
+      "limes",
     ],
     "category": "fruitsVegetables",
   },
@@ -2443,10 +2445,11 @@ const categoryEntriesEs: CategoryEntry[] = [
     "category": "fruitsVegetables",
   },
   {
-    "assetFileName": "lime",
+    "assetFileName": "lemon",
     "matchingNames": [
       "cal",
       "lima",
+      "limas",
     ],
     "category": "fruitsVegetables",
   },
