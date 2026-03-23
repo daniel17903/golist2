@@ -2742,3 +2742,19 @@ export const getIconNameForItemName = (
   const key = name.trim().toLowerCase();
   return itemIconMapByLanguage[language].get(key);
 };
+
+export const getCategoryAndIconForItemName = (
+  name: string,
+  language: CategoryLanguage = defaultCategoryLanguage,
+): { category: string | undefined; iconName: string | undefined } => {
+  const resolvedEntry = resolveCategoryEntryForItemName(name, language);
+  if (resolvedEntry) {
+    return { category: resolvedEntry.category, iconName: resolvedEntry.assetFileName };
+  }
+
+  const key = name.trim().toLowerCase();
+  return {
+    category: itemCategoryMapByLanguage[language].get(key),
+    iconName: itemIconMapByLanguage[language].get(key),
+  };
+};

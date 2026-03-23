@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Item } from "@golist/shared/domain/types";
 import AppHeader from "./components/AppHeader";
 import BottomBar from "./components/BottomBar";
@@ -7,11 +7,13 @@ import EditItemModal from "./components/EditItemModal";
 import ItemGrid from "./components/ItemGrid";
 import ListsDrawer from "./components/ListsDrawer";
 import CreateListModal from "./components/CreateListModal";
-import JoinListModal from "./components/JoinListModal";
-import SettingsModal from "./components/SettingsModal";
-import LegalModal from "./components/LegalModal";
-import ListStatsModal from "./components/ListStatsModal";
+import BackendLogPanel from "./components/BackendLogPanel";
 import LanguageSuggestionModal from "./components/LanguageSuggestionModal";
+
+const JoinListModal = lazy(() => import("./components/JoinListModal"));
+const SettingsModal = lazy(() => import("./components/SettingsModal"));
+const LegalModal = lazy(() => import("./components/LegalModal"));
+const ListStatsModal = lazy(() => import("./components/ListStatsModal"));
 import { useAppState } from "./hooks/useAppState";
 import { useLongPressItem } from "./hooks/useLongPressItem";
 import { useKeyboardInset } from "./hooks/useKeyboardInset";
@@ -113,9 +115,6 @@ const App = () => {
     handleJoinList,
     handleShareActiveList,
     backendConnection,
-    syncNotice,
-    clearSyncNotice,
-    backendLogs,
     isLoaded,
     deviceId,
     recategorizeSuggestedItems,
@@ -328,6 +327,9 @@ const App = () => {
     });
   }, [toggleItem, showUndoDelete]);
 
+  const pullDistanceRef = useRef(pullDistance);
+  useEffect(() => { pullDistanceRef.current = pullDistance; });
+
   const activeListRef = useRef(activeList);
   useEffect(() => { activeListRef.current = activeList; });
 
@@ -399,20 +401,6 @@ const App = () => {
   }, []);
 
   useEffect(() => {
-    if (!showBackendLogs || !syncNotice) {
-      return;
-    }
-
-    const timeout = window.setTimeout(() => {
-      clearSyncNotice();
-    }, 6000);
-
-    return () => {
-      window.clearTimeout(timeout);
-    };
-  }, [showBackendLogs, syncNotice, clearSyncNotice]);
-
-  useEffect(() => {
     const pullThreshold = 72;
     const pullSuppressionThreshold = 10;
     const maxPull = 96;
@@ -440,7 +428,7 @@ const App = () => {
 
       const rawDistance = currentY - pullStartYRef.current;
       if (rawDistance <= 0) {
-        if (pullDistance !== 0) {
+        if (pullDistanceRef.current !== 0) {
           setPullDistance(0);
         }
         return;
@@ -459,7 +447,7 @@ const App = () => {
 
     const onTouchEnd = () => {
       pullStartYRef.current = null;
-      const shouldRefresh = pullDistance >= pullThreshold && !isPopupOpen && !isPullRefreshing;
+      const shouldRefresh = pullDistanceRef.current >= pullThreshold && !isPopupOpen && !isPullRefreshing;
 
       if (!shouldRefresh) {
         setPullDistance(0);
@@ -496,7 +484,7 @@ const App = () => {
       window.removeEventListener("touchend", onTouchEnd);
       window.removeEventListener("touchcancel", onTouchEnd);
     };
-  }, [handlePointerCancel, isPopupOpen, isPullRefreshing, pullDistance, refreshRealtimeConnection]);
+  }, [handlePointerCancel, isPopupOpen, isPullRefreshing, refreshRealtimeConnection]);
 
   // --- Stable callback props for memoized children ---
 
@@ -633,14 +621,18 @@ const App = () => {
         onCancelRename={handleCancelRename}
       />
 
-      <ListStatsModal
-        isOpen={isListStatsOpen}
-        totalItemsEver={listStats.totalItemsEver}
-        openItems={listStats.openItems}
-        topItems={listStats.topItems}
-        lastBoughtAt={listStats.lastBoughtAt}
-        onClose={handleCloseStats}
-      />
+      {isListStatsOpen && (
+        <Suspense fallback={null}>
+          <ListStatsModal
+            isOpen
+            totalItemsEver={listStats.totalItemsEver}
+            openItems={listStats.openItems}
+            topItems={listStats.topItems}
+            lastBoughtAt={listStats.lastBoughtAt}
+            onClose={handleCloseStats}
+          />
+        </Suspense>
+      )}
 
       <ItemGrid
         items={listItems}
@@ -674,36 +666,7 @@ const App = () => {
         ))}
       </div>
 
-      {showBackendLogs && syncNotice ? (
-        <div className="sync-toast" role="status" aria-live="polite">
-          <span>{syncNotice.message}</span>
-          <button type="button" className="sync-toast__close" onClick={clearSyncNotice}>
-            {t("common.close")}
-          </button>
-        </div>
-      ) : null}
-
-      {showBackendLogs ? (
-        <div className="backend-log-panel" aria-live="polite">
-          <p className="backend-log-panel__title">{t("debug.backendLogs")}</p>
-          <ul className="backend-log-panel__list">
-            {backendLogs.length === 0 ? (
-              <li className="backend-log-panel__entry backend-log-panel__entry--skipped">
-                {t("debug.noBackendLogs")}
-              </li>
-            ) : (
-              backendLogs.slice().reverse().map((entry) => (
-                <li
-                  key={entry.id}
-                  className={`backend-log-panel__entry backend-log-panel__entry--${entry.outcome}`}
-                >
-                  {entry.message}
-                </li>
-              ))
-            )}
-          </ul>
-        </div>
-      ) : null}
+      {showBackendLogs ? <BackendLogPanel /> : null}
 
       <div className="undo-toast-stack" aria-live="polite" aria-atomic="false">
         {undoToasts.map((toast) => (
@@ -763,24 +726,36 @@ const App = () => {
         onSave={handleSaveCreateList}
       />
 
-      <JoinListModal
-        isOpen={isJoinListModalOpen}
-        value={joinListValue}
-        onChange={setJoinListValue}
-        onCancel={handleCancelJoinList}
-        onJoin={handleConfirmJoinList}
-      />
+      {isJoinListModalOpen && (
+        <Suspense fallback={null}>
+          <JoinListModal
+            isOpen
+            value={joinListValue}
+            onChange={setJoinListValue}
+            onCancel={handleCancelJoinList}
+            onJoin={handleConfirmJoinList}
+          />
+        </Suspense>
+      )}
 
-      <SettingsModal
-        isOpen={isSettingsModalOpen}
-        onClose={handleCloseSettings}
-      />
+      {isSettingsModalOpen && (
+        <Suspense fallback={null}>
+          <SettingsModal
+            isOpen
+            onClose={handleCloseSettings}
+          />
+        </Suspense>
+      )}
 
-      <LegalModal
-        isOpen={activeLegalModal !== null}
-        type={activeLegalModal ?? "imprint"}
-        onClose={handleCloseLegal}
-      />
+      {activeLegalModal !== null && (
+        <Suspense fallback={null}>
+          <LegalModal
+            isOpen
+            type={activeLegalModal}
+            onClose={handleCloseLegal}
+          />
+        </Suspense>
+      )}
 
       <EditItemModal
         isOpen={Boolean(editingItemId)}

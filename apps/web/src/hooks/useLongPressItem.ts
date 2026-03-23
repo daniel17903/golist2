@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { MutableRefObject } from "react";
 
 type LongPressHandlers = {
@@ -24,38 +24,47 @@ export const useLongPressItem = ({
   const longPressTriggeredRef = useRef(false);
   const [pressedItemId, setPressedItemId] = useState<string | null>(null);
 
-  const clearLongPressTimer = () => {
+  const onLongPressRef = useRef(onLongPress);
+  useEffect(() => { onLongPressRef.current = onLongPress; });
+
+  const onShortPressRef = useRef(onShortPress);
+  useEffect(() => { onShortPressRef.current = onShortPress; });
+
+  const delayRef = useRef(delay);
+  useEffect(() => { delayRef.current = delay; });
+
+  const clearLongPressTimer = useCallback(() => {
     if (longPressTimerRef.current === null) {
       return;
     }
     window.clearTimeout(longPressTimerRef.current);
     longPressTimerRef.current = null;
-  };
+  }, []);
 
-  const handlePointerDown = (itemId: string, name: string, quantityOrUnit?: string) => {
+  const handlePointerDown = useCallback((itemId: string, name: string, quantityOrUnit?: string) => {
     clearLongPressTimer();
     longPressTriggeredRef.current = false;
     setPressedItemId(itemId);
     longPressTimerRef.current = window.setTimeout(() => {
       longPressTriggeredRef.current = true;
-      onLongPress(itemId, name, quantityOrUnit);
-    }, delay);
-  };
+      onLongPressRef.current(itemId, name, quantityOrUnit);
+    }, delayRef.current);
+  }, [clearLongPressTimer]);
 
-  const handlePointerUp = (itemId: string) => {
+  const handlePointerUp = useCallback((itemId: string) => {
     clearLongPressTimer();
     setPressedItemId((current) => (current === itemId ? null : current));
     if (!longPressTriggeredRef.current) {
-      void onShortPress(itemId);
+      void onShortPressRef.current(itemId);
     }
     longPressTriggeredRef.current = false;
-  };
+  }, [clearLongPressTimer]);
 
-  const handlePointerCancel = () => {
+  const handlePointerCancel = useCallback(() => {
     clearLongPressTimer();
     longPressTriggeredRef.current = false;
     setPressedItemId(null);
-  };
+  }, [clearLongPressTimer]);
 
   return {
     handlePointerDown,

@@ -1,6 +1,6 @@
 # Frontend Performance Improvement Plan
 
-Status: In progress
+Status: Complete
 Last updated: 2026-03-23
 
 ## Completed
@@ -55,183 +55,95 @@ Also stabilized internal helper functions (`clearUndoTimeout`,
 frequently-changing values (`exitingItemIds`, `items`, `activeList`) to refs
 synced via `useEffect` to avoid unnecessary dependency churn.
 
----
-
-## Remaining Work
-
 ### P1: Fix pull-to-refresh effect re-registering every frame
-**File:** `apps/web/src/App.tsx` (lines 406-490)
-**Effort:** Low
+**File:** `apps/web/src/App.tsx`
 
-`pullDistance` is in the `useEffect` dependency array. Since it changes on
-every `touchmove` event during a pull gesture, the effect tears down and
-re-registers event listeners on every frame.
-
-Fix: read `pullDistance` from a ref instead of including it in deps:
-
-```tsx
-const pullDistanceRef = useRef(pullDistance);
-pullDistanceRef.current = pullDistance;
-
-// Remove pullDistance from the dependency array
-useEffect(() => {
-  const onTouchEnd = () => {
-    const shouldRefresh = pullDistanceRef.current >= pullThreshold && ...;
-    // ...
-  };
-  // ...
-}, [handlePointerCancel, isPopupOpen, isPullRefreshing, refreshRealtimeConnection]);
-```
-
----
+Moved `pullDistance` reads to a ref (`pullDistanceRef`) synced via `useEffect`
+and removed `pullDistance` from the touch-event `useEffect` dependency array.
+Previously the effect tore down and re-registered `touchstart`/`touchmove`/
+`touchend` listeners on every `touchmove` frame during a pull gesture.
 
 ### P1: Isolate `backendLogs` from triggering app-wide re-renders
-**File:** `apps/web/src/state/useStore.ts` (lines 540-546)
-**Effort:** Medium
+**Files:**
+- `apps/web/src/components/BackendLogPanel.tsx` (new)
+- `apps/web/src/hooks/useAppState.ts`
+- `apps/web/src/App.tsx`
 
-Every `appendBackendLog` call creates a new array, which triggered the old
-whole-store subscription. With fine-grained selectors (now done), only
-components that select `backendLogs` re-render. However, `App.tsx` still
-subscribes via `useAppState` which returns `backendLogs`.
-
-Options:
-1. Have the debug panel (`showBackendLogs` block in `App.tsx`) subscribe to
-   `backendLogs` directly with its own `useStore` selector, rather than
-   receiving it through `useAppState`.
-2. Move `backendLogs` to a separate store or `useRef` since it's dev-only.
-
----
+Extracted the backend-log panel and sync-notice toast into a dedicated
+`BackendLogPanel` component that subscribes directly to `backendLogs` and
+`syncNotice` via fine-grained Zustand selectors. Removed both subscriptions
+from `useAppState`, so `backendLogs` appends no longer cause `App` or any of
+its children to re-render.
 
 ### P1: Stabilize `useLongPressItem` handlers
-**File:** `apps/web/src/hooks/useLongPressItem.ts` (lines 35-58)
-**Effort:** Low
+**File:** `apps/web/src/hooks/useLongPressItem.ts`
 
-`handlePointerDown`, `handlePointerUp`, and `handlePointerCancel` are plain
-function declarations recreated every render. Since `handlePointerCancel` is
-in the pull-to-refresh effect's dependency array, this causes the effect to
-re-register unnecessarily.
-
-Wrap them in `useCallback`.
-
----
+Wrapped `handlePointerDown`, `handlePointerUp`, and `handlePointerCancel` with
+`useCallback`. Stored `onLongPress`, `onShortPress`, and `delay` props in refs
+synced via `useEffect` so the callbacks have stable identities. This prevents
+the pull-to-refresh effect (which depends on `handlePointerCancel`) from
+re-registering on every render.
 
 ### P2: Lazy-load rarely-used modals
-**File:** `apps/web/src/App.tsx` (lines 1-14)
-**Effort:** Low
+**File:** `apps/web/src/App.tsx`
 
-Eagerly imported modals that most sessions never open:
-- `LegalModal` (197 lines with 3-language legal text)
-- `SettingsModal`
-- `ListStatsModal`
-- `JoinListModal`
-
-Use `React.lazy()` + `Suspense`:
-
-```tsx
-const LegalModal = lazy(() => import("./components/LegalModal"));
-const SettingsModal = lazy(() => import("./components/SettingsModal"));
-
-// In JSX — only render when open:
-{isSettingsModalOpen && (
-  <Suspense fallback={null}>
-    <SettingsModal isOpen onClose={() => setIsSettingsModalOpen(false)} />
-  </Suspense>
-)}
-```
-
-Also change modal rendering to conditional (`{isOpen && <Modal />}`) instead
-of always-mounted (`<Modal isOpen={isOpen} />`), avoiding hook evaluation for
-closed modals.
-
----
+Converted `LegalModal`, `SettingsModal`, `ListStatsModal`, and `JoinListModal`
+from eager imports to `React.lazy()` with `<Suspense fallback={null}>`.
+Changed rendering from always-mounted (`<Modal isOpen={isOpen} />`) to
+conditional (`{isOpen && <Suspense><Modal isOpen /></Suspense>}`), avoiding
+hook evaluation for closed modals and deferring code loading until first open.
 
 ### P2: Cache regex in `inputParser.getAmountPattern`
-**File:** `apps/web/src/domain/inputParser.ts` (lines 106-109)
-**Effort:** Low
+**File:** `apps/web/src/domain/inputParser.ts`
 
-`getAmountPattern` constructs a `RegExp` from ~30 unit strings on every call.
-It's called on every keystroke in the add-item dialog. Cache per locale:
-
-```tsx
-const amountPatternCache = new Map<Locale, RegExp>();
-
-const getAmountPattern = (locale: Locale) => {
-  const cached = amountPatternCache.get(locale);
-  if (cached) return cached;
-  const units = unitByLocale[locale].map(escapeRegExp).join("|");
-  const pattern = new RegExp(...);
-  amountPatternCache.set(locale, pattern);
-  return pattern;
-};
-```
-
----
+Added a `Map<Locale, RegExp>` cache so the ~30-unit regex is compiled once per
+locale instead of on every keystroke in the add-item dialog.
 
 ### P2: Merge category and icon lookup into single function
-**File:** `packages/shared/src/domain/item-category-mapping.ts` (lines 2684-2716)
-**Effort:** Low
+**Files:**
+- `packages/shared/src/domain/item-category-mapping.ts`
+- `apps/web/src/domain/categories.ts`
+- `apps/web/src/state/useStore.ts`
 
-`getItemIconName` and `getCategoryIdForItem` each do a full linear scan of
-300+ matchers. They're called together on every item add/update. Combine into
-one function that returns both `{ category, iconName }`.
-
----
+Added `getCategoryAndIconForItemName` that resolves both category and icon name
+in a single pass through the matcher list. Updated `addItem` and `updateItem`
+in the store to use the combined function, halving matcher scans on item
+create/update.
 
 ### P3: Vendor chunk splitting
 **File:** `apps/web/vite.config.ts`
-**Effort:** Low
 
-Add `manualChunks` for better caching of vendor dependencies:
-
-```tsx
-build: {
-  rollupOptions: {
-    output: {
-      manualChunks: {
-        vendor: ["react", "react-dom", "zustand", "dexie"],
-      },
-    },
-  },
-},
-```
-
----
+Added `manualChunks` to split `react`, `react-dom`, `zustand`, and `dexie`
+into a separate `vendor` chunk for better long-term caching.
 
 ### P3: Extend PWA precache glob patterns
-**File:** `apps/web/vite.config.ts` (line 62)
-**Effort:** Low
+**File:** `apps/web/vite.config.ts`
 
-Currently only images are matched. Add JS/CSS/HTML for reliable offline:
-
-```tsx
-globPatterns: ["**/*.{js,css,html,ico,png,svg,jpg,jpeg,webp,gif}"],
-```
-
----
+Extended workbox `globPatterns` to include `js`, `css`, and `html` files
+alongside images, ensuring reliable offline support for all static assets.
 
 ### P3: Delete unused `RenameListModal`
-**File:** `apps/web/src/components/RenameListModal.tsx`
-**Effort:** Trivial
+**File:** `apps/web/src/components/RenameListModal.tsx` (deleted)
 
-This component is not imported anywhere — leftover from before inline rename.
-Delete it.
+Removed the unused component, which was a leftover from before inline rename
+was implemented.
 
 ---
 
 ## Priority Summary
 
-| Priority | Item | Impact | Effort |
+| Priority | Item | Impact | Status |
 |----------|------|--------|--------|
 | ~~P0~~ | ~~Zustand fine-grained selectors~~ | ~~Critical~~ | ~~Done~~ |
 | ~~P0~~ | ~~Memoize `ItemCard`~~ | ~~High~~ | ~~Done~~ |
 | ~~P1~~ | ~~`React.memo` on major children~~ | ~~High~~ | ~~Done~~ |
 | ~~P1~~ | ~~Stabilize callbacks with `useCallback`~~ | ~~High~~ | ~~Done~~ |
-| P1 | Fix pull-to-refresh effect deps | Medium | Low |
-| P1 | Isolate `backendLogs` rendering | Medium | Medium |
-| P1 | Stabilize `useLongPressItem` handlers | Medium | Low |
-| P2 | Lazy-load modals | Medium | Low |
-| P2 | Cache regex in `inputParser` | Low-Medium | Low |
-| P2 | Merge category/icon lookup | Low-Medium | Low |
-| P3 | Vendor chunk splitting | Low | Low |
-| P3 | Extend PWA precache patterns | Low | Low |
-| P3 | Delete unused `RenameListModal` | Trivial | Trivial |
+| ~~P1~~ | ~~Fix pull-to-refresh effect deps~~ | ~~Medium~~ | ~~Done~~ |
+| ~~P1~~ | ~~Isolate `backendLogs` rendering~~ | ~~Medium~~ | ~~Done~~ |
+| ~~P1~~ | ~~Stabilize `useLongPressItem` handlers~~ | ~~Medium~~ | ~~Done~~ |
+| ~~P2~~ | ~~Lazy-load modals~~ | ~~Medium~~ | ~~Done~~ |
+| ~~P2~~ | ~~Cache regex in `inputParser`~~ | ~~Low-Medium~~ | ~~Done~~ |
+| ~~P2~~ | ~~Merge category/icon lookup~~ | ~~Low-Medium~~ | ~~Done~~ |
+| ~~P3~~ | ~~Vendor chunk splitting~~ | ~~Low~~ | ~~Done~~ |
+| ~~P3~~ | ~~Extend PWA precache patterns~~ | ~~Low~~ | ~~Done~~ |
+| ~~P3~~ | ~~Delete unused `RenameListModal`~~ | ~~Trivial~~ | ~~Done~~ |

@@ -9,6 +9,18 @@ console.info(`[web-build] Configured API_BASE_URL=${apiBaseUrl || "<offline-only
 export default defineConfig({
   build: {
     minify: "esbuild",
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes("node_modules/react/") ||
+              id.includes("node_modules/react-dom/") ||
+              id.includes("node_modules/zustand/") ||
+              id.includes("node_modules/dexie/")) {
+            return "vendor";
+          }
+        },
+      },
+    },
   },
   define: {
     __APP_VERSION__: JSON.stringify(process.env.npm_package_version ?? "dev"),
@@ -59,7 +71,7 @@ export default defineConfig({
         ],
       },
       workbox: {
-        globPatterns: ["**/*.{ico,png,svg,jpg,jpeg,webp,gif}"],
+        globPatterns: ["**/*.{js,css,html,ico,png,svg,jpg,jpeg,webp,gif}"],
         runtimeCaching: [
           {
             urlPattern: ({ request }) => request.destination === "image",
