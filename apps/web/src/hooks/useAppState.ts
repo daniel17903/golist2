@@ -40,8 +40,6 @@ export const useAppState = () => {
   const activeListId = useStore((s) => s.activeListId);
   const isLoaded = useStore((s) => s.isLoaded);
   const backendConnection = useStore((s) => s.backendConnection);
-  const syncNotice = useStore((s) => s.syncNotice);
-  const backendLogs = useStore((s) => s.backendLogs);
   const backendBusyRequests = useStore((s) => s.backendBusyRequests);
   const backendSharingEnabled = useStore((s) => s.backendSharingEnabled);
   const metadata = useStore((s) => s.metadata);
@@ -339,9 +337,7 @@ export const useAppState = () => {
     handleShareActiveList,
     joinSharedList,
     backendConnection,
-    syncNotice,
     clearSyncNotice,
-    backendLogs,
     backendBusyRequests,
     backendSharingEnabled,
     refreshRealtimeConnection,

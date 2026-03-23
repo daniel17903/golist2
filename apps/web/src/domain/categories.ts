@@ -1,5 +1,6 @@
 import {
   categoryOrderById,
+  getCategoryAndIconForItemName,
   getCategoryIdForItemName,
   getIconNameForItemName,
 } from "@golist/shared/domain/item-category-mapping";
@@ -17,6 +18,9 @@ export const getCategoryIdForItem = (name: string, locale: Locale = getLocale())
 
 export const getItemIconName = (name: string, locale: Locale = getLocale()): string | undefined =>
   getIconNameForItemName(name, locale);
+
+export const getCategoryAndIcon = (name: string, locale: Locale = getLocale()) =>
+  getCategoryAndIconForItemName(name, locale);
 
 export const getItemIcon = (name: string, locale: Locale = getLocale()): string => {
   const iconName = getItemIconName(name, locale) ?? defaultIconName;

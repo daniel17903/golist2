@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import type { AppMetadata, Item, List } from "@golist/shared/domain/types";
 import { buildItemHash } from "@golist/shared/domain/sync";
-import { getCategoryIdForItem, getItemIconName } from "../domain/categories";
+import { getCategoryAndIcon, getItemIconName } from "../domain/categories";
 import { db } from "../storage/db";
 import { t } from "../i18n";
 import type { Locale } from "../i18n/config";
@@ -328,13 +328,14 @@ export const useStore = create<StoreState>((set, get) => ({
   addItem: async (listId: string, name: string, quantityOrUnit?: string) => {
     const now = Date.now();
     const deviceId = get().metadata?.deviceId;
+    const { category: resolvedCategory, iconName: resolvedIcon } = getCategoryAndIcon(name);
     const item: Item = {
       id: createId(),
       listId,
       name,
       quantityOrUnit,
-      iconName: getItemIconName(name) ?? "default",
-      category: getCategoryIdForItem(name) ?? "other",
+      iconName: resolvedIcon ?? "default",
+      category: resolvedCategory ?? "other",
       deleted: false,
       createdByDeviceId: deviceId,
       createdAt: now,
@@ -397,12 +398,13 @@ export const useStore = create<StoreState>((set, get) => ({
     const { items } = get();
     const item = items.find((entry) => entry.id === itemId);
     if (!item) {return;}
+    const { category: resolvedCategory, iconName: resolvedIcon } = getCategoryAndIcon(name);
     const updated = {
       ...item,
       name,
       quantityOrUnit,
-      iconName: getItemIconName(name) ?? "default",
-      category: getCategoryIdForItem(name) ?? "other",
+      iconName: resolvedIcon ?? "default",
+      category: resolvedCategory ?? "other",
       updatedAt: Date.now(),
     };
     await db.items.put(updated);

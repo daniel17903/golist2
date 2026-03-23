@@ -103,9 +103,15 @@ export type ParsedItemInput = {
 
 const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
+const amountPatternCache = new Map<Locale, RegExp>();
+
 const getAmountPattern = (locale: Locale) => {
+  const cached = amountPatternCache.get(locale);
+  if (cached) {return cached;}
   const units = unitByLocale[locale].map(escapeRegExp).join("|");
-  return new RegExp(`(^| +)([0-9]+((.|,)[0-9])? ?(${units})?)( +|$)`, "i");
+  const pattern = new RegExp(`(^| +)([0-9]+((.|,)[0-9])? ?(${units})?)( +|$)`, "i");
+  amountPatternCache.set(locale, pattern);
+  return pattern;
 };
 
 export const parseAmount = (input: string, locale: Locale = getLocale()): string | undefined => {
