@@ -44,6 +44,30 @@ describe("categories helpers", () => {
     expect(getItemIcon("manzana", "es")).toBe("/icons/apple.svg");
   });
 
+
+  it("maps lime terms to the same icon and category as lemon across locales", () => {
+    expect(getCategoryIdForItem("zitrone", "de")).toBe("fruitsVegetables");
+    expect(getItemIconName("zitrone", "de")).toBe("lemon");
+    expect(getCategoryIdForItem("limette", "de")).toBe("fruitsVegetables");
+    expect(getItemIconName("limette", "de")).toBe("lemon");
+    expect(getCategoryIdForItem("limetten", "de")).toBe("fruitsVegetables");
+    expect(getItemIconName("limetten", "de")).toBe("lemon");
+
+    expect(getCategoryIdForItem("lemon", "en")).toBe("fruitsVegetables");
+    expect(getItemIconName("lemon", "en")).toBe("lemon");
+    expect(getCategoryIdForItem("lime", "en")).toBe("fruitsVegetables");
+    expect(getItemIconName("lime", "en")).toBe("lemon");
+    expect(getCategoryIdForItem("limes", "en")).toBe("fruitsVegetables");
+    expect(getItemIconName("limes", "en")).toBe("lemon");
+
+    expect(getCategoryIdForItem("limón", "es")).toBe("fruitsVegetables");
+    expect(getItemIconName("limón", "es")).toBe("lemon");
+    expect(getCategoryIdForItem("lima", "es")).toBe("fruitsVegetables");
+    expect(getItemIconName("lima", "es")).toBe("lemon");
+    expect(getCategoryIdForItem("limas", "es")).toBe("fruitsVegetables");
+    expect(getItemIconName("limas", "es")).toBe("lemon");
+  });
+
   it("maps rosemary to the same icon and category as herbs across locales", () => {
     expect(getCategoryIdForItem("kräuter", "de")).toBe("spicesCanned");
     expect(getItemIconName("kräuter", "de")).toBe("herbs");
