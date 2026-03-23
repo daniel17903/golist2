@@ -58,6 +58,7 @@ const isAbortError = (error: unknown): boolean => {
 
 const App = () => {
   const { t, locale, setLanguagePreference } = useI18n();
+  const [dismissedLanguageSuggestionLocale, setDismissedLanguageSuggestionLocale] = useState<string | null>(null);
 
   useKeyboardInset();
 
@@ -166,6 +167,7 @@ const App = () => {
       suggestedLocale: languageSuggestion.suggestedLocale,
       action: "accepted",
     });
+    setDismissedLanguageSuggestionLocale(languageSuggestion.suggestedLocale);
   }, [languageSuggestion, recategorizeSuggestedItems, setLanguagePreference]);
 
   const handleDismissLanguageSuggestion = useCallback(() => {
@@ -177,6 +179,7 @@ const App = () => {
       suggestedLocale: languageSuggestion.suggestedLocale,
       action: "dismissed",
     });
+    setDismissedLanguageSuggestionLocale(languageSuggestion.suggestedLocale);
   }, [languageSuggestion]);
 
   const listStats = useMemo(() => calculateListStats(items, activeListId), [items, activeListId]);
@@ -734,7 +737,7 @@ const App = () => {
         onSave={handleSaveItem}
       />
 
-      {languageSuggestion ? (
+      {languageSuggestion && dismissedLanguageSuggestionLocale !== languageSuggestion.suggestedLocale ? (
         <LanguageSuggestionModal
           isOpen
           suggestedLocale={languageSuggestion.suggestedLocale}
