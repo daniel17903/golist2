@@ -10,35 +10,41 @@ type RenameListResult = {
   nextName: string;
 };
 
+// Actions are stable references in Zustand — select them once outside renders
+// to avoid subscribing to the entire store.
+const storeActions = useStore.getState();
+const {
+  load,
+  addList,
+  renameList,
+  setActiveList,
+  addItem,
+  recategorizeSuggestedItems,
+  toggleItem,
+  updateItem,
+  deleteList,
+  ensureShareToken,
+  joinSharedList,
+  syncAllLists,
+  refreshRealtimeConnection,
+  clearSyncNotice,
+} = storeActions;
+
 export const useAppState = () => {
   const { t, locale } = useI18n();
 
-  const {
-    lists,
-    items,
-    activeListId,
-    isLoaded,
-    load,
-    addList,
-    renameList,
-    setActiveList,
-    addItem,
-    recategorizeSuggestedItems,
-    toggleItem,
-    updateItem,
-    deleteList,
-    ensureShareToken,
-    joinSharedList,
-    syncAllLists,
-    refreshRealtimeConnection,
-    backendConnection,
-    syncNotice,
-    clearSyncNotice,
-    backendLogs,
-    backendBusyRequests,
-    backendSharingEnabled,
-    metadata,
-  } = useStore();
+  // Fine-grained selectors: each subscription only triggers a re-render
+  // when that specific slice of state changes.
+  const lists = useStore((s) => s.lists);
+  const items = useStore((s) => s.items);
+  const activeListId = useStore((s) => s.activeListId);
+  const isLoaded = useStore((s) => s.isLoaded);
+  const backendConnection = useStore((s) => s.backendConnection);
+  const syncNotice = useStore((s) => s.syncNotice);
+  const backendLogs = useStore((s) => s.backendLogs);
+  const backendBusyRequests = useStore((s) => s.backendBusyRequests);
+  const backendSharingEnabled = useStore((s) => s.backendSharingEnabled);
+  const metadata = useStore((s) => s.metadata);
 
   const [newListName, setNewListName] = useState("");
   const [editingTitle, setEditingTitle] = useState(false);
@@ -55,13 +61,13 @@ export const useAppState = () => {
 
   useEffect(() => {
     void load();
-  }, [load]);
+  }, []);
 
   useEffect(() => {
     if (isLoaded && lists.length === 0) {
       void addList(t("app.defaultListName"));
     }
-  }, [isLoaded, lists.length, addList, t]);
+  }, [isLoaded, lists.length, t]);
 
   useEffect(() => {
     if (!isLoaded || !backendSharingEnabled) {
@@ -82,7 +88,7 @@ export const useAppState = () => {
         window.history.replaceState({}, "", cleanedUrl.toString());
       }
     })();
-  }, [isLoaded, backendSharingEnabled, joinSharedList]);
+  }, [isLoaded, backendSharingEnabled]);
 
   useEffect(() => {
     if (!isLoaded || !backendSharingEnabled) {
@@ -107,7 +113,7 @@ export const useAppState = () => {
       document.removeEventListener("visibilitychange", onVisibilityChange);
       window.removeEventListener("online", onVisibilityChange);
     };
-  }, [isLoaded, backendSharingEnabled, syncAllLists]);
+  }, [isLoaded, backendSharingEnabled]);
 
   const activeList = lists.find((list) => list.id === activeListId) ?? null;
   const listItems = useMemo(() => {
@@ -187,7 +193,7 @@ export const useAppState = () => {
     await addItem(activeListId, parsed.name, parsed.quantityOrUnit);
     setItemName("");
     setIsAddDialogOpen(false);
-  }, [activeListId, addItem, itemName, locale]);
+  }, [activeListId, itemName, locale]);
 
   const handleAddSuggestion = useCallback(async (name: string, quantityOrUnit?: string) => {
     if (!activeListId) {return;}
@@ -195,7 +201,7 @@ export const useAppState = () => {
     await addItem(activeListId, name, quantityOrUnit);
     setItemName("");
     setIsAddDialogOpen(false);
-  }, [activeListId, addItem]);
+  }, [activeListId]);
 
   const handleRenameList = async (): Promise<RenameListResult | null> => {
     if (!activeListId || !activeList) {return null;}
