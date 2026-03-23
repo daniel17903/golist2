@@ -16,9 +16,9 @@ describe("categories helpers", () => {
     expect(getItemIconName("apple bread", "en")).toBe("bread");
   });
 
-  it("allows any match when there are multiple matches and none at the end", () => {
-    expect(["fruitsVegetables", "bread"]).toContain(getCategoryIdForItem("apple bread now", "en"));
-    expect(["apple", "bread"]).toContain(getItemIconName("apple bread now", "en"));
+  it("prefers the longest non-ending match when there are multiple matches and none at the end", () => {
+    expect(getCategoryIdForItem("rosemary bread mix", "en")).toBe("spicesCanned");
+    expect(getItemIconName("rosemary bread mix", "en")).toBe("herbs");
   });
 
   it("prefers the longest ending match when multiple endings match", () => {
