@@ -2707,15 +2707,13 @@ const resolveCategoryEntryForItemName = (
     normalizedItemName.endsWith(normalizedName),
   );
 
-  if (endingMatches.length > 0) {
-    return endingMatches.reduce((bestMatch, currentMatch) =>
-      currentMatch.normalizedName.length > bestMatch.normalizedName.length
-        ? currentMatch
-        : bestMatch,
-    ).entry;
-  }
+  const highestPriorityMatches = endingMatches.length > 0 ? endingMatches : matches;
 
-  return matches[0]?.entry;
+  return highestPriorityMatches.reduce((bestMatch, currentMatch) =>
+    currentMatch.normalizedName.length > bestMatch.normalizedName.length
+      ? currentMatch
+      : bestMatch,
+  ).entry;
 };
 
 export const getCategoryIdForItemName = (
