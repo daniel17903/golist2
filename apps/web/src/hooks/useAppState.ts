@@ -149,7 +149,9 @@ export const useAppState = () => {
 
   const suggestions = useMemo(() => {
     const trimmed = itemName.trim();
-    const query = trimmed.toLowerCase();
+    const parsed = parseItemInput(itemName, locale);
+    const parsedName = parsed.name.trim().toLowerCase();
+    const query = parsedName || trimmed.toLowerCase();
     const sorted = suggestionPool
       .slice()
       .sort((a, b) => {
@@ -163,11 +165,11 @@ export const useAppState = () => {
     if (trimmed && !currentItemNames.has(query)) {
       const alreadySuggested = filtered.some((name) => name.toLowerCase() === query);
       if (!alreadySuggested) {
-        filtered.unshift(trimmed);
+        filtered.unshift(parsed.name.trim() || trimmed);
       }
     }
     return filtered.slice(0, 12);
-  }, [itemName, suggestionPool, currentItemNames]);
+  }, [itemName, locale, suggestionPool, currentItemNames]);
 
   const duplicatePreview = useMemo(() => {
     const parsed = parseItemInput(itemName, locale);
