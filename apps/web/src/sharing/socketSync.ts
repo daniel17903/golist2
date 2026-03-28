@@ -328,10 +328,11 @@ class SocketSyncManager {
       const remoteRawSummaries = Array.isArray(payload.summaries) ? payload.summaries : [];
       const remoteSummaryById = new Map(
         remoteRawSummaries
-          .filter((entry): entry is { itemId: string; itemHash: string } =>
+          .filter((entry): entry is { itemId: string; updatedAt: number; itemHash: string } =>
             typeof entry === 'object' &&
             entry !== null &&
             typeof Reflect.get(entry, 'itemId') === 'string' &&
+            typeof Reflect.get(entry, 'updatedAt') === 'number' &&
             typeof Reflect.get(entry, 'itemHash') === 'string',
           )
           .map((entry) => [entry.itemId, entry]),
@@ -342,7 +343,19 @@ class SocketSyncManager {
         if (!remoteEntry) {
           return true;
         }
-        return remoteEntry.itemHash !== buildItemHash(item);
+        const localHash = buildItemHash(item);
+        if (localHash === remoteEntry.itemHash) {
+          return false;
+        }
+        // Only send if client has newer data (mirrors applyIncomingItems logic)
+        if (item.updatedAt > remoteEntry.updatedAt) {
+          return true;
+        }
+        if (item.updatedAt < remoteEntry.updatedAt) {
+          return false;
+        }
+        // Tie-breaker: same updatedAt, send if client hash >= server hash
+        return localHash >= remoteEntry.itemHash;
       });
 
       if (localMissingOrStaleForRemote.length > 0) {
