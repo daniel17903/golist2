@@ -404,7 +404,7 @@ const App = () => {
     const pullThreshold = 72;
     const pullSuppressionThreshold = 10;
     const maxPull = 96;
-    const getScrollY = () => window.scrollY || document.scrollingElement?.scrollTop || 0;
+    const getScrollY = () => document.body.scrollTop || window.scrollY || document.scrollingElement?.scrollTop || 0;
 
     const onTouchStart = (event: TouchEvent) => {
       suppressItemPressRef.current = false;
