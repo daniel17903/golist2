@@ -140,6 +140,16 @@ These rules exist to prevent regressions against the work tracked in
 - Keep this `AGENTS.md` file up to date when repo layout, commands, workflows, or testing expectations change.
 - For backend-sharing related PRs, include doc updates as part of the definition of done when behavior or process changes.
 
+## Production API
+- **Base URL**: `https://go-list.app/api/` (not just `/v1/`)
+- **Health endpoint**: `https://go-list.app/api/health` returns `{"status":"ok"}`
+- **CORS requirement**: API calls from scripts/tools must include `Origin: https://go-list.app` header, otherwise the server returns 500 errors.
+- **Share token redemption flow**:
+  1. POST to `/api/v1/share-tokens/{shareToken}/redeem` with `x-device-id` (UUID) and `Origin: https://go-list.app` headers
+  2. Response: `{"listId": "..."}`
+  3. GET `/api/v1/lists/{listId}` with same headers to fetch list data
+- **Default category**: Items that don't match any known category mapping are assigned `"other"`. This is the fallback in `apps/web/src/state/useStore.ts`: `category: resolvedCategory ?? "other"`.
+
 ## Tooling note
 - Use the Context7 MCP server for quick library/API references when needed.
 - When introducing new tools or dependencies, always use the latest stable version.
