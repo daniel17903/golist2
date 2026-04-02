@@ -7,7 +7,7 @@
     "build": "redocly build-docs openapi.yaml --output dist/index.html"
   },
   "devDependencies": {
-    "@redocly/cli": "^2.24.0"
+    "@redocly/cli": "^2.25.4"
   },
   "dependencies": {
     "yaml": "^2.8.1"
