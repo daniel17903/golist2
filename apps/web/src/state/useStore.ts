@@ -76,6 +76,93 @@ type StoreState = {
   appendBackendLog: (entry: { message: string; outcome: "success" | "error" | "skipped" }) => void;
 };
 
+let backendSyncInitialized = false;
+
+export const resetBackendSyncInitializationForTests = () => {
+  backendSyncInitialized = false;
+};
+
+const initializeBackendSync = (deviceId: string, activeListId: string | undefined) => {
+  if (!isBackendSharingEnabled || backendSyncInitialized) {
+    return;
+  }
+
+  socketSyncManager.init(deviceId, {
+    getItemsForList: (listId) => useStore.getState().items.filter((item) => item.listId === listId),
+    applyIncomingItems: async (listId, incomingItems) => {
+      const currentState = useStore.getState();
+      const localById = new Map(
+        currentState.items.filter((item) => item.listId === listId).map((item) => [item.id, item]),
+      );
+
+      const acceptedItems = incomingItems.filter((incoming) => {
+        const localItem = localById.get(incoming.id);
+        if (!localItem) {
+          return true;
+        }
+        if (incoming.updatedAt > localItem.updatedAt) {
+          return true;
+        }
+        if (incoming.updatedAt < localItem.updatedAt) {
+          return false;
+        }
+        return buildItemHash(incoming) >= buildItemHash(localItem);
+      });
+
+      if (acceptedItems.length === 0) {
+        return;
+      }
+
+      await db.items.bulkPut(acceptedItems);
+      useStore.setState((state) => {
+        const mergedById = new Map(state.items.map((item) => [item.id, item]));
+        for (const accepted of acceptedItems) {
+          mergedById.set(accepted.id, accepted);
+        }
+        return { items: Array.from(mergedById.values()) };
+      });
+    },
+    applyIncomingListMetadata: async (listId, payload) => {
+      const currentList = useStore.getState().lists.find((entry) => entry.id === listId);
+      if (!currentList) {
+        return;
+      }
+
+      if (payload.updatedAt < currentList.updatedAt) {
+        return;
+      }
+
+      if (payload.updatedAt === currentList.updatedAt && payload.name === currentList.name) {
+        return;
+      }
+
+      const updatedList = {
+        ...currentList,
+        name: payload.name,
+        updatedAt: payload.updatedAt,
+      };
+
+      await db.lists.put(updatedList);
+      useStore.setState((state) => ({
+        lists: state.lists.map((entry) =>
+          entry.id === listId
+            ? updatedList
+            : entry,
+        ),
+      }));
+    },
+    onConnectionState: (connectionState) => {
+      useStore.setState({ backendConnection: connectionState });
+    },
+    onError: (message) => {
+      reportSyncError(`${message} ${t("sync.pending")}`);
+    },
+  });
+
+  backendSyncInitialized = true;
+  socketSyncManager.setActiveList(activeListId);
+};
+
 
 const syncListNameImmediately = async (listId: string, listName: string) => {
   const state = useStore.getState();
@@ -83,6 +170,8 @@ const syncListNameImmediately = async (listId: string, listName: string) => {
     logSkippedBackendCall("List name sync skipped: device metadata missing.");
     return;
   }
+
+  initializeBackendSync(state.metadata.deviceId, state.activeListId);
 
   await sharingApiClient.upsertList({
     deviceId: state.metadata.deviceId,
@@ -189,79 +278,8 @@ export const useStore = create<StoreState>((set, get) => ({
       isLoaded: true,
     });
 
-    if (isBackendSharingEnabled) {
-      socketSyncManager.init(metadata.deviceId, {
-        getItemsForList: (listId) => useStore.getState().items.filter((item) => item.listId === listId),
-        applyIncomingItems: async (listId, incomingItems) => {
-          const currentState = useStore.getState();
-          const localById = new Map(
-            currentState.items.filter((item) => item.listId === listId).map((item) => [item.id, item]),
-          );
-
-          const acceptedItems = incomingItems.filter((incoming) => {
-            const localItem = localById.get(incoming.id);
-            if (!localItem) {
-              return true;
-            }
-            if (incoming.updatedAt > localItem.updatedAt) {
-              return true;
-            }
-            if (incoming.updatedAt < localItem.updatedAt) {
-              return false;
-            }
-            return buildItemHash(incoming) >= buildItemHash(localItem);
-          });
-
-          if (acceptedItems.length === 0) {
-            return;
-          }
-
-          await db.items.bulkPut(acceptedItems);
-          useStore.setState((state) => {
-            const mergedById = new Map(state.items.map((item) => [item.id, item]));
-            for (const accepted of acceptedItems) {
-              mergedById.set(accepted.id, accepted);
-            }
-            return { items: Array.from(mergedById.values()) };
-          });
-        },
-        applyIncomingListMetadata: async (listId, payload) => {
-          const currentList = useStore.getState().lists.find((entry) => entry.id === listId);
-          if (!currentList) {
-            return;
-          }
-
-          if (payload.updatedAt < currentList.updatedAt) {
-            return;
-          }
-
-          if (payload.updatedAt === currentList.updatedAt && payload.name === currentList.name) {
-            return;
-          }
-
-          const updatedList = {
-            ...currentList,
-            name: payload.name,
-            updatedAt: payload.updatedAt,
-          };
-
-          await db.lists.put(updatedList);
-          useStore.setState((state) => ({
-            lists: state.lists.map((entry) =>
-              entry.id === listId
-                ? updatedList
-                : entry,
-            ),
-          }));
-        },
-        onConnectionState: (connectionState) => {
-          useStore.setState({ backendConnection: connectionState });
-        },
-        onError: (message) => {
-          reportSyncError(`${message} ${t("sync.pending")}`);
-        },
-      });
-      socketSyncManager.setActiveList(initialActiveListId);
+    if (isBackendSharingEnabled && items.length > 0) {
+      initializeBackendSync(metadata.deviceId, initialActiveListId);
     }
   },
   addList: async (name: string) => {
@@ -279,10 +297,12 @@ export const useStore = create<StoreState>((set, get) => ({
       activeListId: list.id,
     }));
 
-    runBackendSyncInBackground(
-      () => syncListNameImmediately(list.id, list.name),
-      t("sync.offline"),
-    );
+    if (get().items.length > 0) {
+      runBackendSyncInBackground(
+        () => syncListNameImmediately(list.id, list.name),
+        t("sync.offline"),
+      );
+    }
 
     socketSyncManager.setActiveList(list.id);
   },
@@ -326,6 +346,7 @@ export const useStore = create<StoreState>((set, get) => ({
     socketSyncManager.setActiveList(listId);
   },
   addItem: async (listId: string, name: string, quantityOrUnit?: string) => {
+    const shouldInitializeBackendSync = get().items.length === 0;
     const now = Date.now();
     const deviceId = get().metadata?.deviceId;
     const { category: resolvedCategory, iconName: resolvedIcon } = getCategoryAndIcon(name);
@@ -343,6 +364,17 @@ export const useStore = create<StoreState>((set, get) => ({
     };
     await db.items.add(item);
     set((state) => ({ items: [...state.items, item] }));
+
+    if (shouldInitializeBackendSync) {
+      const list = get().lists.find((entry) => entry.id === listId);
+      if (list) {
+        runBackendSyncInBackground(
+          () => syncListNameImmediately(list.id, list.name),
+          t("sync.offline"),
+        );
+      }
+    }
+
     socketSyncManager.queueLocalItemPatch(item);
   },
   recategorizeSuggestedItems: async (itemUpdates, locale) => {
@@ -448,6 +480,8 @@ export const useStore = create<StoreState>((set, get) => ({
     if (!state.metadata?.deviceId) {
       throw new Error("Device metadata missing");
     }
+
+    initializeBackendSync(state.metadata.deviceId, state.activeListId);
 
     const shareToken = extractShareToken(rawShareValue);
     if (!shareToken) {
