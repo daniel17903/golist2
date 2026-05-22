@@ -1,9 +1,13 @@
-import { memo, useEffect, useMemo, useRef } from "react";
+import { memo, useImperativeHandle, useMemo, useRef, type Ref } from "react";
 import { createPortal } from "react-dom";
 import { getItemIcon } from "../domain/categories";
 import { parseItemInput } from "../domain/inputParser";
 import { useI18n } from "../i18n";
 import type { Locale } from "../i18n/config";
+
+export type AddItemDialogHandle = {
+  focusInput: () => void;
+};
 
 type AddItemDialogProps = {
   isOpen: boolean;
@@ -17,6 +21,7 @@ type AddItemDialogProps = {
   onClose: () => void;
   onAddItem: () => void;
   onAddSuggestion: (name: string, quantityOrUnit?: string) => void;
+  ref?: Ref<AddItemDialogHandle>;
 };
 
 type DuplicatePreviewCardProps = {
@@ -99,6 +104,7 @@ const AddItemDialog = ({
   onClose,
   onAddItem,
   onAddSuggestion,
+  ref,
 }: AddItemDialogProps) => {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const { locale, t } = useI18n();
@@ -109,11 +115,15 @@ const AddItemDialog = ({
   );
   const trimmedItemName = itemName.trim();
 
-  useEffect(() => {
-    if (!isOpen) {return;}
-    const timer = window.setTimeout(() => inputRef.current?.focus(), 0);
-    return () => window.clearTimeout(timer);
-  }, [isOpen]);
+  useImperativeHandle(
+    ref,
+    () => ({
+      focusInput: () => {
+        inputRef.current?.focus();
+      },
+    }),
+    [],
+  );
 
   if (!isOpen) {return null;}
 
