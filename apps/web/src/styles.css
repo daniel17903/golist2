@@ -29,6 +29,9 @@
 html {
   width: 100%;
   overflow: hidden;
+  touch-action: pan-x pan-y;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 body {
@@ -38,6 +41,7 @@ body {
   width: 100%;
   overflow-y: scroll;
   -webkit-overflow-scrolling: touch;
+  touch-action: pan-x pan-y;
 }
 
 @media (hover: hover) and (pointer: fine) {
