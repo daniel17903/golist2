@@ -1,8 +1,9 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import type { Item } from "@golist/shared/domain/types";
 import AppHeader from "./components/AppHeader";
 import BottomBar from "./components/BottomBar";
-import AddItemDialog from "./components/AddItemDialog";
+import AddItemDialog, { type AddItemDialogHandle } from "./components/AddItemDialog";
 import EditItemModal from "./components/EditItemModal";
 import ItemGrid from "./components/ItemGrid";
 import ListsDrawer from "./components/ListsDrawer";
@@ -575,6 +576,15 @@ const App = () => {
 
   const handleCloseAddDialog = useCallback(() => setIsAddDialogOpen(false), [setIsAddDialogOpen]);
 
+  const addItemDialogRef = useRef<AddItemDialogHandle | null>(null);
+
+  const handleOpenAddDialog = useCallback(() => {
+    flushSync(() => {
+      openAddDialog();
+    });
+    addItemDialogRef.current?.focusInput();
+  }, [openAddDialog]);
+
   const handleCancelCreateList = useCallback(() => {
     setCreateListName("");
     setIsCreateListModalOpen(false);
@@ -648,7 +658,7 @@ const App = () => {
 
       <BottomBar
         onOpenDrawer={handleOpenDrawer}
-        onAddItem={openAddDialog}
+        onAddItem={handleOpenAddDialog}
         backendConnection={backendConnection}
         isBackendBusy={backendBusyRequests > 0}
         canShareList={backendSharingEnabled}
@@ -708,6 +718,7 @@ const App = () => {
       />
 
       <AddItemDialog
+        ref={addItemDialogRef}
         isOpen={isAddDialogOpen}
         itemName={itemName}
         suggestions={suggestions}

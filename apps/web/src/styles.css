@@ -29,6 +29,9 @@
 html {
   width: 100%;
   overflow: hidden;
+  touch-action: pan-x pan-y;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 body {
@@ -38,6 +41,7 @@ body {
   width: 100%;
   overflow-y: scroll;
   -webkit-overflow-scrolling: touch;
+  touch-action: pan-x pan-y;
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -856,7 +860,7 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.8);
   background: transparent;
   color: #ffffff;
-  font-size: 15px;
+  font-size: 16px;
 }
 
 .add-dialog .add-panel input::placeholder {
@@ -913,7 +917,7 @@ body {
 }
 
 .app {
-  padding: 16px 14px calc(104px + env(safe-area-inset-bottom));
+  padding: 16px 14px calc(112px + env(safe-area-inset-bottom));
 }
 
 .app__header {
@@ -1137,7 +1141,7 @@ body {
 .app-toast-stack {
   position: fixed;
   left: 50%;
-  bottom: calc(126px + env(safe-area-inset-bottom));
+  bottom: calc(134px + env(safe-area-inset-bottom));
   transform: translateX(-50%);
   width: min(460px, calc(100% - 24px));
   display: flex;
@@ -1171,12 +1175,12 @@ body {
 }
 
 .undo-toast-stack {
-  bottom: calc(68px + env(safe-area-inset-bottom));
+  bottom: calc(76px + env(safe-area-inset-bottom));
 }
 
 .bottom-bar {
-  padding-bottom: calc(10px + env(safe-area-inset-bottom));
-  height: calc(56px + env(safe-area-inset-bottom));
+  padding-bottom: calc(14px + env(safe-area-inset-bottom));
+  height: calc(64px + env(safe-area-inset-bottom));
 }
 
 .bottom-bar__actions-right {
