@@ -143,6 +143,9 @@ const App = () => {
     isListStatsOpen ||
     activeLegalModal !== null ||
     Boolean(editingItemId);
+  const isPopupOpenRef = useRef(isPopupOpen);
+  useEffect(() => { isPopupOpenRef.current = isPopupOpen; });
+  const closeTopPopupRef = useRef<() => void>(() => {});
 
   const languageSuggestion = useMemo(() => {
     if (!isLoaded || !deviceId || isLanguageSuggestionHandled()) {
@@ -385,13 +388,17 @@ const App = () => {
       return typeof state === "object" && state !== null ? state : {};
     };
 
-    const historyState = getHistoryState();
-    if (historyState.golistBackBlocked !== true) {
-      window.history.pushState({ ...historyState, golistBackBlocked: true }, "");
+    if (getHistoryState().golistBackBlocked !== true) {
+      window.history.pushState({ ...getHistoryState(), golistBackBlocked: true }, "");
     }
 
     const handlePopState = () => {
+      // Always restore the sentinel so the back gesture never exits the app.
       window.history.pushState({ ...getHistoryState(), golistBackBlocked: true }, "");
+
+      if (isPopupOpenRef.current) {
+        closeTopPopupRef.current();
+      }
     };
 
     window.addEventListener("popstate", handlePopState);
@@ -606,6 +613,29 @@ const App = () => {
   const handleCloseSettings = useCallback(() => setIsSettingsModalOpen(false), []);
   const handleCloseLegal = useCallback(() => setActiveLegalModal(null), []);
   const handleCancelEditItem = useCallback(() => setEditingItemId(null), [setEditingItemId]);
+
+  // Closes the topmost open popup. Layered so each back press peels off one level.
+  useEffect(() => {
+    closeTopPopupRef.current = () => {
+      if (editingItemId) {
+        handleCancelEditItem();
+      } else if (activeLegalModal !== null) {
+        handleCloseLegal();
+      } else if (isListStatsOpen) {
+        handleCloseStats();
+      } else if (isSettingsModalOpen) {
+        handleCloseSettings();
+      } else if (isJoinListModalOpen) {
+        handleCancelJoinList();
+      } else if (isCreateListModalOpen) {
+        handleCancelCreateList();
+      } else if (isAddDialogOpen) {
+        handleCloseAddDialog();
+      } else if (isDrawerOpen) {
+        handleCloseDrawer();
+      }
+    };
+  });
 
   const handleAcceptLanguage = useCallback(() => {
     void handleAcceptLanguageSuggestion();
