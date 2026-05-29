@@ -388,13 +388,44 @@ const App = () => {
       return typeof state === "object" && state !== null ? state : {};
     };
 
-    if (getHistoryState().golistBackBlocked !== true) {
+    const pushSentinel = () => {
       window.history.pushState({ ...getHistoryState(), golistBackBlocked: true }, "");
+    };
+
+    // Push immediately for engines that honour a pushState issued without a user
+    // gesture (Chromium-based browsers).
+    if (getHistoryState().golistBackBlocked !== true) {
+      pushSentinel();
     }
 
+    // Firefox and iOS WebKit ignore a pushState that isn't tied to a user
+    // gesture: the entry is treated as a "dummy" that never fires popstate, so
+    // the first back gesture escapes the trap and shows a black screen in an
+    // installed PWA. Create a gesture-backed trap entry on the first
+    // interaction to guarantee the back gesture stays inside the app.
+    let gestureSentinelArmed = false;
+    const gestureEvents: Array<keyof WindowEventMap> = ["pointerdown", "touchstart", "keydown"];
+    const removeGestureListeners = () => {
+      gestureEvents.forEach((eventName) =>
+        window.removeEventListener(eventName, armGestureSentinel, true),
+      );
+    };
+    const armGestureSentinel = () => {
+      if (gestureSentinelArmed) {
+        return;
+      }
+      gestureSentinelArmed = true;
+      pushSentinel();
+      removeGestureListeners();
+    };
+    gestureEvents.forEach((eventName) =>
+      window.addEventListener(eventName, armGestureSentinel, { capture: true, passive: true }),
+    );
+
     const handlePopState = () => {
-      // Always restore the sentinel so the back gesture never exits the app.
-      window.history.pushState({ ...getHistoryState(), golistBackBlocked: true }, "");
+      // A back gesture is itself user-initiated, so re-pushing here keeps the
+      // sentinel armed across browsers and the gesture never exits the app.
+      pushSentinel();
 
       if (isPopupOpenRef.current) {
         closeTopPopupRef.current();
@@ -405,6 +436,7 @@ const App = () => {
 
     return () => {
       window.removeEventListener("popstate", handlePopState);
+      removeGestureListeners();
     };
   }, []);
 
