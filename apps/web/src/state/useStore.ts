@@ -192,8 +192,34 @@ export const useStore = create<StoreState>((set, get) => ({
     if (isBackendSharingEnabled) {
       socketSyncManager.init(metadata.deviceId, {
         getItemsForList: (listId) => useStore.getState().items.filter((item) => item.listId === listId),
+        getAllListIds: () => useStore.getState().lists.map((list) => list.id),
+        getListMetadata: (listId) => {
+          const list = useStore.getState().lists.find((entry) => entry.id === listId);
+          return list ? { name: list.name, updatedAt: list.updatedAt } : null;
+        },
+        ensureListExists: async (listId) => {
+          const state = useStore.getState();
+          const list = state.lists.find((entry) => entry.id === listId);
+          if (!list || !state.metadata?.deviceId) {
+            return false;
+          }
+
+          try {
+            await sharingApiClient.upsertList({
+              deviceId: state.metadata.deviceId,
+              listId: list.id,
+              body: { name: list.name },
+            });
+            return true;
+          } catch {
+            return false;
+          }
+        },
         applyIncomingItems: async (listId, incomingItems) => {
           const currentState = useStore.getState();
+          if (!currentState.lists.some((list) => list.id === listId)) {
+            return;
+          }
           const localById = new Map(
             currentState.items.filter((item) => item.listId === listId).map((item) => [item.id, item]),
           );

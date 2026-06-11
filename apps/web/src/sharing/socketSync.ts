@@ -5,6 +5,9 @@ import { isBackendSharingEnabled } from './apiClient';
 
 type SocketSyncCallbacks = {
   getItemsForList: (listId: string) => Item[];
+  getAllListIds: () => string[];
+  getListMetadata: (listId: string) => { name: string; updatedAt: number } | null;
+  ensureListExists: (listId: string) => Promise<boolean>;
   applyIncomingItems: (listId: string, items: Item[]) => Promise<void>;
   applyIncomingListMetadata: (listId: string, payload: { name: string; updatedAt: number }) => Promise<void>;
   onConnectionState: (state: 'online' | 'offline') => void;
@@ -42,10 +45,15 @@ const isSyncItem = (value: unknown): value is Item =>
   typeof Reflect.get(value, 'createdAt') === 'number' &&
   typeof Reflect.get(value, 'updatedAt') === 'number';
 
+// Per-list reconciliation step during a full sync is abandoned after this
+// long so a single unresponsive list cannot stall the remaining lists.
+const FULL_SYNC_STEP_TIMEOUT_MS = 8000;
+
 class SocketSyncManager {
   private socket: WebSocket | null = null;
   private callbacks: SocketSyncCallbacks | null = null;
   private subscribedListId: string | null = null;
+  private desiredListId: string | null = null;
   private deviceId: string | null = null;
   private reconnectAttempts = 0;
   private isSubscribedReady = false;
@@ -53,6 +61,9 @@ class SocketSyncManager {
   private onlineListenerRegistered = false;
   private queue: OutboundPatch[] = [];
   private listMetadataQueue: OutboundListMetadataPatch[] = [];
+  private fullSyncPending = false;
+  private fullSyncQueue: string[] = [];
+  private fullSyncStepTimer: number | null = null;
   private forceReconnectPending = false;
   private forcedReconnectPromise: Promise<'success' | 'failed'> | null = null;
   private forcedReconnectResolver: ((result: 'success' | 'failed') => void) | null = null;
@@ -84,11 +95,26 @@ class SocketSyncManager {
 
   setActiveList(listId: string | undefined) {
     const nextListId = listId ?? null;
+    const previousDesiredListId = this.desiredListId;
+    this.desiredListId = nextListId;
+    this.fullSyncQueue = this.fullSyncQueue.filter((entry) => entry !== nextListId);
+
     if (this.subscribedListId === nextListId && this.isSubscribedReady) {
       return;
     }
 
     const previousListId = this.subscribedListId;
+    // An interrupted full-sync list still needs its reconciliation pass later.
+    if (
+      previousListId &&
+      previousListId !== nextListId &&
+      previousListId !== previousDesiredListId &&
+      !this.fullSyncQueue.includes(previousListId)
+    ) {
+      this.fullSyncQueue.unshift(previousListId);
+    }
+
+    this.clearFullSyncStepTimer();
     this.subscribedListId = nextListId;
     this.isSubscribedReady = false;
     this.consecutiveForbiddenCount = 0;
@@ -199,9 +225,12 @@ class SocketSyncManager {
       this.callbacks?.onConnectionState('online');
       this.isSubscribedReady = false;
       this.consecutiveForbiddenCount = 0;
+      this.fullSyncPending = true;
       this.send({ type: 'hello', deviceId: this.deviceId });
       if (this.subscribedListId) {
         this.send({ type: 'subscribe_list', listId: this.subscribedListId });
+      } else {
+        this.startFullSync();
       }
       this.flushQueue();
       this.finishForcedReconnect('success');
@@ -224,6 +253,7 @@ class SocketSyncManager {
       this.forceReconnectPending = false;
       this.socket = null;
       this.isSubscribedReady = false;
+      this.cancelFullSync();
       this.callbacks?.onConnectionState('offline');
 
       if (shouldReconnectImmediately) {
@@ -245,6 +275,7 @@ class SocketSyncManager {
 
       this.callbacks?.onConnectionState('offline');
       this.isSubscribedReady = false;
+      this.cancelFullSync();
 
       if (this.forcedReconnectPromise && !this.forceReconnectPending) {
         this.finishForcedReconnect('failed');
@@ -309,7 +340,17 @@ class SocketSyncManager {
             updatedAt: listUpdatedAt,
           });
         }
-        this.sendDigest(listId);
+        // A rename made while offline survives only in IndexedDB — push it
+        // back to the backend when the local copy is newer.
+        const localMetadata = this.callbacks?.getListMetadata(listId) ?? null;
+        if (localMetadata && listUpdatedAt !== null && localMetadata.updatedAt > listUpdatedAt) {
+          this.send({
+            type: 'list_metadata_patch',
+            listId,
+            name: localMetadata.name,
+            updatedAt: localMetadata.updatedAt,
+          });
+        }
         this.flushQueue();
       }
       return;
@@ -317,7 +358,7 @@ class SocketSyncManager {
 
     if (payload.type === 'hash_diff') {
       const listId = typeof payload.listId === 'string' ? payload.listId : null;
-      if (!listId || !this.callbacks) {
+      if (!listId || !this.callbacks || listId !== this.subscribedListId) {
         return;
       }
 
@@ -361,6 +402,8 @@ class SocketSyncManager {
       if (localMissingOrStaleForRemote.length > 0) {
         this.send({ type: 'item_patch', listId, items: localMissingOrStaleForRemote });
       }
+
+      this.onListExchangeComplete(listId);
       return;
     }
 
@@ -392,13 +435,41 @@ class SocketSyncManager {
         this.isSubscribedReady = false;
         this.consecutiveForbiddenCount += 1;
 
-        if (this.subscribedListId) {
-          this.send({ type: 'subscribe_list', listId: this.subscribedListId });
+        const listId = this.subscribedListId;
+        if (!listId) {
+          return;
+        }
+
+        // The backend rejects lists it has never seen — typically lists that
+        // were created while offline. Register the list via REST once, then
+        // retry the subscription.
+        if (this.consecutiveForbiddenCount === 1 && this.callbacks) {
+          const ensured = await this.callbacks.ensureListExists(listId);
+          if (this.subscribedListId !== listId) {
+            return;
+          }
+          if (!ensured && listId !== this.desiredListId) {
+            this.onListExchangeComplete(listId);
+            return;
+          }
+          this.send({ type: 'subscribe_list', listId });
+          return;
+        }
+
+        // During a full sync pass an inaccessible list is skipped so the
+        // remaining lists still get reconciled.
+        if (listId !== this.desiredListId) {
+          this.onListExchangeComplete(listId);
+          return;
         }
 
         if (this.consecutiveForbiddenCount >= 3) {
           this.callbacks?.onError(message);
+          this.onListExchangeComplete(listId);
+          return;
         }
+
+        this.send({ type: 'subscribe_list', listId });
         return;
       }
 
@@ -411,6 +482,106 @@ class SocketSyncManager {
       }
 
       this.callbacks?.onError(message);
+    }
+  }
+
+  // After (re)connecting, every known list gets one reconciliation pass so
+  // changes made offline — including on lists that are not currently open —
+  // reach the backend without relying on the in-memory patch queue.
+  private startFullSync() {
+    if (!this.callbacks) {
+      return;
+    }
+
+    this.fullSyncPending = false;
+    const currentListId = this.subscribedListId;
+    this.fullSyncQueue = this.callbacks.getAllListIds().filter((listId) => listId !== currentListId);
+    if (currentListId === null) {
+      this.advanceFullSync();
+    }
+  }
+
+  private onListExchangeComplete(listId: string) {
+    if (listId !== this.subscribedListId) {
+      return;
+    }
+
+    this.clearFullSyncStepTimer();
+
+    if (this.fullSyncPending) {
+      this.startFullSync();
+    }
+
+    if (this.fullSyncQueue.length > 0 || this.subscribedListId !== this.desiredListId) {
+      this.advanceFullSync();
+    }
+  }
+
+  private advanceFullSync() {
+    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
+      return;
+    }
+
+    // Lists can be deleted locally while the full sync is in flight.
+    const knownListIds = new Set(this.callbacks?.getAllListIds() ?? []);
+    let next: string | undefined;
+    while ((next = this.fullSyncQueue.shift()) !== undefined) {
+      if (knownListIds.has(next)) {
+        break;
+      }
+    }
+
+    const previousListId = this.subscribedListId;
+
+    if (next === undefined) {
+      if (this.subscribedListId === this.desiredListId) {
+        return;
+      }
+
+      if (!this.desiredListId) {
+        if (previousListId) {
+          this.send({ type: 'unsubscribe_list', listId: previousListId });
+        }
+        this.subscribedListId = null;
+        this.isSubscribedReady = false;
+        return;
+      }
+
+      next = this.desiredListId;
+    }
+
+    this.subscribedListId = next;
+    this.isSubscribedReady = false;
+    this.consecutiveForbiddenCount = 0;
+    if (previousListId && previousListId !== next) {
+      this.send({ type: 'unsubscribe_list', listId: previousListId });
+    }
+    this.send({ type: 'subscribe_list', listId: next });
+    this.armFullSyncStepTimer(next);
+  }
+
+  private armFullSyncStepTimer(listId: string) {
+    this.clearFullSyncStepTimer();
+    this.fullSyncStepTimer = window.setTimeout(() => {
+      this.fullSyncStepTimer = null;
+      this.onListExchangeComplete(listId);
+    }, FULL_SYNC_STEP_TIMEOUT_MS);
+  }
+
+  private clearFullSyncStepTimer() {
+    if (this.fullSyncStepTimer !== null) {
+      window.clearTimeout(this.fullSyncStepTimer);
+      this.fullSyncStepTimer = null;
+    }
+  }
+
+  private cancelFullSync() {
+    this.fullSyncPending = false;
+    this.fullSyncQueue = [];
+    this.clearFullSyncStepTimer();
+    if (this.subscribedListId !== this.desiredListId) {
+      this.subscribedListId = this.desiredListId;
+      this.isSubscribedReady = false;
     }
   }
 
