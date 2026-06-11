@@ -113,7 +113,10 @@ export const useAppState = () => {
     };
   }, [isLoaded, backendSharingEnabled]);
 
-  const activeList = lists.find((list) => list.id === activeListId) ?? null;
+  const activeList = useMemo(
+    () => lists.find((list) => list.id === activeListId) ?? null,
+    [lists, activeListId],
+  );
   const listItems = useMemo(() => {
     const filtered = items.filter((item) => item.listId === activeListId && !item.deleted);
     return sortItemsForList(filtered);
@@ -201,7 +204,7 @@ export const useAppState = () => {
     setIsAddDialogOpen(false);
   }, [activeListId]);
 
-  const handleRenameList = async (): Promise<RenameListResult | null> => {
+  const handleRenameList = useCallback(async (): Promise<RenameListResult | null> => {
     if (!activeListId || !activeList) {return null;}
     const trimmed = newListName.trim();
     if (!trimmed) {return null;}
@@ -221,15 +224,15 @@ export const useAppState = () => {
       previousName: activeList.name,
       nextName: trimmed,
     };
-  };
+  }, [activeListId, activeList, newListName]);
 
-  const openEditItem = (itemId: string, name: string, quantityOrUnit?: string) => {
+  const openEditItem = useCallback((itemId: string, name: string, quantityOrUnit?: string) => {
     setEditingItemId(itemId);
     setEditItemName(name);
     setEditItemQuantity(quantityOrUnit ?? "");
-  };
+  }, []);
 
-  const handleSaveItem = async () => {
+  const handleSaveItem = useCallback(async () => {
     if (!editingItemId) {return;}
     const trimmed = editItemName.trim();
     if (!trimmed) {return;}
@@ -239,19 +242,19 @@ export const useAppState = () => {
       editItemQuantity.trim() ? editItemQuantity.trim() : undefined,
     );
     setEditingItemId(null);
-  };
+  }, [editingItemId, editItemName, editItemQuantity]);
 
-  const openAddDialog = () => {
+  const openAddDialog = useCallback(() => {
     setIsAddDialogOpen(true);
-  };
+  }, []);
 
-  const handleCreateList = () => {
+  const handleCreateList = useCallback(() => {
     setCreateListName("");
     setIsDrawerOpen(false);
     setIsCreateListModalOpen(true);
-  };
+  }, []);
 
-  const handleConfirmCreateList = async () => {
+  const handleConfirmCreateList = useCallback(async () => {
     const trimmedName = createListName.trim();
     if (!trimmedName) {
       return;
@@ -261,32 +264,32 @@ export const useAppState = () => {
     setCreateListName("");
     setIsCreateListModalOpen(false);
     setIsDrawerOpen(false);
-  };
+  }, [createListName]);
 
-  const handleDeleteList = async (listId: string) => {
+  const handleDeleteList = useCallback(async (listId: string) => {
     await deleteList(listId);
     setIsDrawerOpen(false);
-  };
+  }, []);
 
-  const handleOpenJoinList = () => {
+  const handleOpenJoinList = useCallback(() => {
     setJoinListValue("");
     setIsDrawerOpen(false);
     setIsJoinListModalOpen(true);
-  };
+  }, []);
 
-  const handleJoinList = async () => {
+  const handleJoinList = useCallback(async () => {
     await joinSharedList(joinListValue);
     setJoinListValue("");
     setIsJoinListModalOpen(false);
-  };
+  }, [joinListValue]);
 
-  const handleShareActiveList = async () => {
+  const handleShareActiveList = useCallback(async () => {
     if (!activeListId) {
       throw new Error(t("sync.noActiveList"));
     }
     const token = await ensureShareToken(activeListId);
     return `${window.location.origin}/?shareToken=${token}`;
-  };
+  }, [activeListId, t]);
 
   return {
     lists,

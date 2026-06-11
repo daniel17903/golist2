@@ -28,6 +28,7 @@ const AppHeader = memo(function AppHeader({
 
   useEffect(() => {
     if (isEditingName) {
+      skipBlurSaveRef.current = false;
       renameInputRef.current?.focus();
       renameInputRef.current?.select();
     }
@@ -53,6 +54,9 @@ const AppHeader = memo(function AppHeader({
                 onKeyDown={(event) => {
                   if (event.key === "Enter") {
                     event.preventDefault();
+                    // Saving unmounts the input, which can still fire blur —
+                    // skip it so the rename isn't saved twice.
+                    skipBlurSaveRef.current = true;
                     onSaveRename();
                   }
                   if (event.key === "Escape") {

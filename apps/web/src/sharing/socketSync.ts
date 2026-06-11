@@ -289,7 +289,12 @@ class SocketSyncManager {
       return;
     }
 
-    const parsed = JSON.parse(rawData);
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(rawData);
+    } catch {
+      return;
+    }
     if (!isMessagePayload(parsed)) {
       return;
     }
