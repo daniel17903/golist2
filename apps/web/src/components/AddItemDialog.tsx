@@ -95,7 +95,7 @@ const SuggestionCard = memo(({ name, locale, onAddSuggestion }: SuggestionCardPr
 
 SuggestionCard.displayName = "SuggestionCard";
 
-const AddItemDialog = ({
+const AddItemDialog = memo(function AddItemDialog({
   isOpen,
   itemName,
   suggestions,
@@ -105,7 +105,7 @@ const AddItemDialog = ({
   onAddItem,
   onAddSuggestion,
   ref,
-}: AddItemDialogProps) => {
+}: AddItemDialogProps) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const { locale, t } = useI18n();
   const duplicateWarningLabel = t("addItem.duplicateWarning");
@@ -175,6 +175,6 @@ const AddItemDialog = ({
   );
 
   return createPortal(dialog, document.body);
-};
+});
 
 export default AddItemDialog;

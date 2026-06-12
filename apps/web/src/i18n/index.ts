@@ -1,4 +1,4 @@
-import { useSyncExternalStore } from "react";
+import { useMemo, useSyncExternalStore } from "react";
 import { defaultLocale, explicitLanguageStorageKey, storedLocaleStorageKey, type Locale } from "./config";
 import { readUrlLocale, resolveLocale } from "./resolveLocale";
 import { resources } from "./resources";
@@ -58,21 +58,25 @@ export const initI18n = () => {
   document.documentElement.lang = resolvedLocale;
 };
 
-export const useI18n = () => {
-  const locale = useSyncExternalStore(
-    (listener) => {
-      listeners.add(listener);
-      return () => listeners.delete(listener);
-    },
-    () => currentLocale,
-  );
+export const setLanguagePreference = (nextLocale: Locale) => {
+  setExplicitLanguagePreference(nextLocale);
+  setLocale(nextLocale);
+};
 
-  return {
-    locale,
-    t,
-    setLanguagePreference: (nextLocale: Locale) => {
-      setExplicitLanguagePreference(nextLocale);
-      setLocale(nextLocale);
-    },
-  };
+const subscribe = (listener: Listener) => {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+};
+
+export const useI18n = () => {
+  const locale = useSyncExternalStore(subscribe, () => currentLocale);
+
+  return useMemo(
+    () => ({
+      locale,
+      t,
+      setLanguagePreference,
+    }),
+    [locale],
+  );
 };

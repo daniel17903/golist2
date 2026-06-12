@@ -3,7 +3,7 @@ import { buildItemHash, buildItemSummaries, buildListDigest } from '@golist/shar
 
 import { isBackendSharingEnabled } from './apiClient';
 
-type SocketSyncCallbacks = {
+export type SocketSyncCallbacks = {
   getItemsForList: (listId: string) => Item[];
   getAllListIds: () => string[];
   getListMetadata: (listId: string) => { name: string; updatedAt: number } | null;
@@ -33,6 +33,24 @@ const createWebSocketUrl = (): string | null => {
 const isMessagePayload = (value: unknown): value is { type?: string; [key: string]: unknown } =>
   typeof value === 'object' && value !== null;
 
+type ItemSummary = { itemId: string; updatedAt: number; itemHash: string };
+
+// Incoming frames decoded into a discriminated union, so the handlers below
+// work with validated data instead of raw `unknown` payloads.
+type ServerMessage =
+  | { type: 'subscribed'; listId: string; listName: string | null; listUpdatedAt: number | null }
+  | { type: 'hash_diff'; listId: string; summaries: ItemSummary[] }
+  | { type: 'item_patch'; listId: string; items: Item[] }
+  | { type: 'list_metadata_patch'; listId: string; name: string; updatedAt: number }
+  | { type: 'error'; message: string };
+
+const isItemSummary = (value: unknown): value is ItemSummary =>
+  typeof value === 'object' &&
+  value !== null &&
+  typeof Reflect.get(value, 'itemId') === 'string' &&
+  typeof Reflect.get(value, 'updatedAt') === 'number' &&
+  typeof Reflect.get(value, 'itemHash') === 'string';
+
 const isSyncItem = (value: unknown): value is Item =>
   typeof value === 'object' &&
   value !== null &&
@@ -44,6 +62,62 @@ const isSyncItem = (value: unknown): value is Item =>
   typeof Reflect.get(value, 'deleted') === 'boolean' &&
   typeof Reflect.get(value, 'createdAt') === 'number' &&
   typeof Reflect.get(value, 'updatedAt') === 'number';
+
+const parseServerMessage = (value: unknown): ServerMessage | null => {
+  if (!isMessagePayload(value)) {
+    return null;
+  }
+
+  if (value.type === 'subscribed') {
+    const listId = typeof value.listId === 'string' ? value.listId : null;
+    if (!listId) {
+      return null;
+    }
+    return {
+      type: 'subscribed',
+      listId,
+      listName: typeof value.listName === 'string' ? value.listName : null,
+      listUpdatedAt: typeof value.listUpdatedAt === 'number' ? value.listUpdatedAt : null,
+    };
+  }
+
+  if (value.type === 'hash_diff') {
+    const listId = typeof value.listId === 'string' ? value.listId : null;
+    if (!listId) {
+      return null;
+    }
+    const summaries = Array.isArray(value.summaries) ? value.summaries.filter(isItemSummary) : [];
+    return { type: 'hash_diff', listId, summaries };
+  }
+
+  if (value.type === 'item_patch') {
+    const listId = typeof value.listId === 'string' ? value.listId : null;
+    if (!listId) {
+      return null;
+    }
+    const items = Array.isArray(value.items) ? value.items.filter((entry) => isSyncItem(entry)) : [];
+    return { type: 'item_patch', listId, items };
+  }
+
+  if (value.type === 'list_metadata_patch') {
+    const listId = typeof value.listId === 'string' ? value.listId : null;
+    const name = typeof value.name === 'string' ? value.name : null;
+    const updatedAt = typeof value.updatedAt === 'number' ? value.updatedAt : null;
+    if (!listId || !name || updatedAt === null) {
+      return null;
+    }
+    return { type: 'list_metadata_patch', listId, name, updatedAt };
+  }
+
+  if (value.type === 'error') {
+    return {
+      type: 'error',
+      message: typeof value.message === 'string' ? value.message : 'sync error',
+    };
+  }
+
+  return null;
+};
 
 // Per-list reconciliation step during a full sync is abandoned after this
 // long so a single unresponsive list cannot stall the remaining lists.
@@ -326,173 +400,174 @@ class SocketSyncManager {
     } catch {
       return;
     }
-    if (!isMessagePayload(parsed)) {
+
+    const message = parseServerMessage(parsed);
+    if (!message) {
       return;
     }
 
-    const payload = parsed;
+    switch (message.type) {
+      case 'subscribed':
+        await this.handleSubscribedMessage(message.listId, message.listName, message.listUpdatedAt);
+        return;
+      case 'hash_diff':
+        this.handleHashDiffMessage(message.listId, message.summaries);
+        return;
+      case 'item_patch':
+        await this.handleItemPatchMessage(message.listId, message.items);
+        return;
+      case 'list_metadata_patch':
+        await this.handleListMetadataPatchMessage(message.listId, message.name, message.updatedAt);
+        return;
+      case 'error':
+        await this.handleErrorMessage(message.message);
+    }
+  }
 
-    if (payload.type === 'subscribed') {
-      const listId = typeof payload.listId === 'string' ? payload.listId : null;
-      const listName = typeof payload.listName === 'string' ? payload.listName : null;
-      const listUpdatedAt = typeof payload.listUpdatedAt === 'number' ? payload.listUpdatedAt : null;
-      if (listId && listId === this.subscribedListId) {
-        this.isSubscribedReady = true;
-        this.consecutiveForbiddenCount = 0;
-        if (listName && listUpdatedAt !== null) {
-          await this.callbacks?.applyIncomingListMetadata(listId, {
-            name: listName,
-            updatedAt: listUpdatedAt,
-          });
-        }
-        // A rename made while offline survives only in IndexedDB — push it
-        // back to the backend when the local copy is newer.
-        const localMetadata = this.callbacks?.getListMetadata(listId) ?? null;
-        if (localMetadata && listUpdatedAt !== null && localMetadata.updatedAt > listUpdatedAt) {
-          this.send({
-            type: 'list_metadata_patch',
-            listId,
-            name: localMetadata.name,
-            updatedAt: localMetadata.updatedAt,
-          });
-        }
-        this.flushQueue();
+  private async handleSubscribedMessage(listId: string, listName: string | null, listUpdatedAt: number | null) {
+    if (listId !== this.subscribedListId) {
+      return;
+    }
+
+    this.isSubscribedReady = true;
+    this.consecutiveForbiddenCount = 0;
+    if (listName && listUpdatedAt !== null) {
+      await this.callbacks?.applyIncomingListMetadata(listId, {
+        name: listName,
+        updatedAt: listUpdatedAt,
+      });
+    }
+    // A rename made while offline survives only in IndexedDB — push it
+    // back to the backend when the local copy is newer.
+    const localMetadata = this.callbacks?.getListMetadata(listId) ?? null;
+    if (localMetadata && listUpdatedAt !== null && localMetadata.updatedAt > listUpdatedAt) {
+      this.send({
+        type: 'list_metadata_patch',
+        listId,
+        name: localMetadata.name,
+        updatedAt: localMetadata.updatedAt,
+      });
+    }
+    this.flushQueue();
+  }
+
+  private handleHashDiffMessage(listId: string, remoteSummaries: ItemSummary[]) {
+    if (!this.callbacks || listId !== this.subscribedListId) {
+      return;
+    }
+
+    const localItems = this.callbacks.getItemsForList(listId);
+    const localSummaries = buildItemSummaries(localItems);
+    this.send({ type: 'hash_diff', listId, summaries: localSummaries });
+
+    const remoteSummaryById = new Map(remoteSummaries.map((entry) => [entry.itemId, entry]));
+
+    const localMissingOrStaleForRemote = localItems.filter((item) => {
+      const remoteEntry = remoteSummaryById.get(item.id);
+      if (!remoteEntry) {
+        return true;
       }
-      return;
+      const localHash = buildItemHash(item);
+      if (localHash === remoteEntry.itemHash) {
+        return false;
+      }
+      // Only send if client has newer data (mirrors applyIncomingItems logic)
+      if (item.updatedAt > remoteEntry.updatedAt) {
+        return true;
+      }
+      if (item.updatedAt < remoteEntry.updatedAt) {
+        return false;
+      }
+      // Tie-breaker: same updatedAt, send if client hash >= server hash
+      return localHash >= remoteEntry.itemHash;
+    });
+
+    if (localMissingOrStaleForRemote.length > 0) {
+      this.send({ type: 'item_patch', listId, items: localMissingOrStaleForRemote });
     }
 
-    if (payload.type === 'hash_diff') {
-      const listId = typeof payload.listId === 'string' ? payload.listId : null;
-      if (!listId || !this.callbacks || listId !== this.subscribedListId) {
+    this.onListExchangeComplete(listId);
+  }
+
+  private async handleItemPatchMessage(listId: string, items: Item[]) {
+    if (items.length > 0) {
+      await this.callbacks?.applyIncomingItems(listId, items);
+    }
+  }
+
+  private async handleListMetadataPatchMessage(listId: string, name: string, updatedAt: number) {
+    await this.callbacks?.applyIncomingListMetadata(listId, { name, updatedAt });
+  }
+
+  private async handleErrorMessage(message: string) {
+    if (message === 'forbidden') {
+      this.isSubscribedReady = false;
+      this.consecutiveForbiddenCount += 1;
+
+      const listId = this.subscribedListId;
+      if (!listId) {
         return;
       }
 
-      const localItems = this.callbacks.getItemsForList(listId);
-      const localSummaries = buildItemSummaries(localItems);
-      this.send({ type: 'hash_diff', listId, summaries: localSummaries });
-
-      const remoteRawSummaries = Array.isArray(payload.summaries) ? payload.summaries : [];
-      const remoteSummaryById = new Map(
-        remoteRawSummaries
-          .filter((entry): entry is { itemId: string; updatedAt: number; itemHash: string } =>
-            typeof entry === 'object' &&
-            entry !== null &&
-            typeof Reflect.get(entry, 'itemId') === 'string' &&
-            typeof Reflect.get(entry, 'updatedAt') === 'number' &&
-            typeof Reflect.get(entry, 'itemHash') === 'string',
-          )
-          .map((entry) => [entry.itemId, entry]),
-      );
-
-      const localMissingOrStaleForRemote = localItems.filter((item) => {
-        const remoteEntry = remoteSummaryById.get(item.id);
-        if (!remoteEntry) {
-          return true;
-        }
-        const localHash = buildItemHash(item);
-        if (localHash === remoteEntry.itemHash) {
-          return false;
-        }
-        // Only send if client has newer data (mirrors applyIncomingItems logic)
-        if (item.updatedAt > remoteEntry.updatedAt) {
-          return true;
-        }
-        if (item.updatedAt < remoteEntry.updatedAt) {
-          return false;
-        }
-        // Tie-breaker: same updatedAt, send if client hash >= server hash
-        return localHash >= remoteEntry.itemHash;
-      });
-
-      if (localMissingOrStaleForRemote.length > 0) {
-        this.send({ type: 'item_patch', listId, items: localMissingOrStaleForRemote });
-      }
-
-      this.onListExchangeComplete(listId);
-      return;
-    }
-
-    if (payload.type === 'item_patch') {
-      const listId = typeof payload.listId === 'string' ? payload.listId : null;
-      const items = Array.isArray(payload.items) ? payload.items.filter((entry) => isSyncItem(entry)) : [];
-      if (listId && items.length > 0) {
-        await this.callbacks?.applyIncomingItems(listId, items);
-      }
-      return;
-    }
-
-    if (payload.type === 'list_metadata_patch') {
-      const listId = typeof payload.listId === 'string' ? payload.listId : null;
-      const listName = typeof payload.name === 'string' ? payload.name : null;
-      const listUpdatedAt = typeof payload.updatedAt === 'number' ? payload.updatedAt : null;
-      if (listId && listName && listUpdatedAt !== null) {
-        await this.callbacks?.applyIncomingListMetadata(listId, {
-          name: listName,
-          updatedAt: listUpdatedAt,
-        });
-      }
-      return;
-    }
-
-    if (payload.type === 'error') {
-      const message = typeof payload.message === 'string' ? payload.message : 'sync error';
-      if (message === 'forbidden') {
-        this.isSubscribedReady = false;
-        this.consecutiveForbiddenCount += 1;
-
-        const listId = this.subscribedListId;
-        if (!listId) {
+      // The backend rejects lists it has never seen — typically lists that
+      // were created while offline. Register the list via REST once, then
+      // retry the subscription.
+      if (this.consecutiveForbiddenCount === 1 && this.callbacks) {
+        const ensured = await this.callbacks.ensureListExists(listId);
+        if (this.subscribedListId !== listId) {
           return;
         }
-
-        // The backend rejects lists it has never seen — typically lists that
-        // were created while offline. Register the list via REST once, then
-        // retry the subscription.
-        if (this.consecutiveForbiddenCount === 1 && this.callbacks) {
-          const ensured = await this.callbacks.ensureListExists(listId);
-          if (this.subscribedListId !== listId) {
-            return;
-          }
-          if (!ensured && listId !== this.desiredListId) {
-            this.onListExchangeComplete(listId);
-            return;
-          }
-          this.send({ type: 'subscribe_list', listId });
-          return;
-        }
-
-        // During a full sync pass an inaccessible list is skipped so the
-        // remaining lists still get reconciled.
-        if (listId !== this.desiredListId) {
+        if (!ensured && listId !== this.desiredListId) {
           this.onListExchangeComplete(listId);
           return;
         }
-
-        if (this.consecutiveForbiddenCount >= 3) {
-          this.callbacks?.onError(message);
-          this.onListExchangeComplete(listId);
-          return;
-        }
-
         this.send({ type: 'subscribe_list', listId });
         return;
       }
 
-      if (message === 'not subscribed to list') {
-        this.isSubscribedReady = false;
-        if (this.subscribedListId) {
-          this.send({ type: 'subscribe_list', listId: this.subscribedListId });
-        }
+      // During a full sync pass an inaccessible list is skipped so the
+      // remaining lists still get reconciled.
+      if (listId !== this.desiredListId) {
+        this.onListExchangeComplete(listId);
         return;
       }
 
-      this.callbacks?.onError(message);
+      if (this.consecutiveForbiddenCount >= 3) {
+        this.callbacks?.onError(message);
+        this.onListExchangeComplete(listId);
+        return;
+      }
+
+      this.send({ type: 'subscribe_list', listId });
+      return;
     }
+
+    if (message === 'not subscribed to list') {
+      this.isSubscribedReady = false;
+      if (this.subscribedListId) {
+        this.send({ type: 'subscribe_list', listId: this.subscribedListId });
+      }
+      return;
+    }
+
+    this.callbacks?.onError(message);
   }
 
   // After (re)connecting, every known list gets one reconciliation pass so
   // changes made offline — including on lists that are not currently open —
   // reach the backend without relying on the in-memory patch queue.
+  //
+  // Full-sync state machine:
+  // - `desiredListId` is the list the UI wants subscribed; `subscribedListId`
+  //   is the list the socket is currently working through (during a full sync
+  //   they temporarily diverge while background lists are reconciled).
+  // - `fullSyncPending` is set on socket open and converts into a populated
+  //   `fullSyncQueue` once the first list exchange completes.
+  // - Each queue step subscribes one list and ends via
+  //   `onListExchangeComplete` — either a finished hash_diff exchange, a
+  //   skipped forbidden list, or the `fullSyncStepTimer` timeout.
+  // - When the queue drains, the subscription returns to `desiredListId`;
+  //   `cancelFullSync` (socket close) abandons the pass entirely.
   private startFullSync() {
     if (!this.callbacks) {
       return;

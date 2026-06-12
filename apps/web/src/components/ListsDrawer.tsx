@@ -1,5 +1,6 @@
 import { memo, useMemo, useRef, useState, type PointerEvent } from "react";
 import type { List } from "@golist/shared/domain/types";
+import { formatRelativeElapsedTime } from "../domain/relativeTime";
 import { useI18n } from "../i18n";
 
 type ListMeta = {
@@ -64,23 +65,7 @@ const ListsDrawer = memo(function ListsDrawer({
       return t("drawer.neverUpdated");
     }
 
-    const elapsedMs = getCurrentTimestamp() - timestamp;
-    const elapsedMinutes = Math.round(elapsedMs / 60000);
-
-    if (elapsedMinutes < 1) {
-      return relativeTimeFormatter.format(0, "minute");
-    }
-    if (elapsedMinutes < 60) {
-      return relativeTimeFormatter.format(-elapsedMinutes, "minute");
-    }
-
-    const elapsedHours = Math.round(elapsedMinutes / 60);
-    if (elapsedHours < 24) {
-      return relativeTimeFormatter.format(-elapsedHours, "hour");
-    }
-
-    const elapsedDays = Math.round(elapsedHours / 24);
-    return relativeTimeFormatter.format(-elapsedDays, "day");
+    return formatRelativeElapsedTime(getCurrentTimestamp() - timestamp, relativeTimeFormatter);
   };
 
   const getDrawerWidth = () => {

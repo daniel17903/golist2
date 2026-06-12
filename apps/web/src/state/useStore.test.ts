@@ -361,7 +361,7 @@ describe("useStore", () => {
     expect(state.items[0]?.deleted).toBe(false);
     expect(typeof state.items[0]?.createdAt).toBe("number");
     expect(typeof state.items[0]?.updatedAt).toBe("number");
-    expect(itemAdd).toHaveBeenCalledTimes(1);
+    expect(itemBulkPut).toHaveBeenCalledTimes(1);
 
     uuidSpy.mockRestore();
   });
@@ -402,12 +402,12 @@ describe("useStore", () => {
 
     const state = useStore.getState();
     expect(state.items[0]?.deleted).toBe(true);
-    expect(itemPut).toHaveBeenCalledWith(
+    expect(itemBulkPut).toHaveBeenCalledWith([
       expect.objectContaining({
         id: "item-1",
         deleted: true,
       }),
-    );
+    ]);
   });
 
   it("deletes a list with its items and updates active list", async () => {
@@ -456,13 +456,6 @@ describe("useStore", () => {
     expect(createShareTokenMock).not.toHaveBeenCalled();
     expect(upsertListMock).not.toHaveBeenCalled();
     expect(fetchListMock).not.toHaveBeenCalled();
-    expect(socketRequestResyncMock).toHaveBeenCalledTimes(1);
-  });
-
-  it("syncList switches active list and requests websocket resync", async () => {
-    await useStore.getState().syncList("list-1");
-
-    expect(socketSetActiveListMock).toHaveBeenCalledWith("list-1");
     expect(socketRequestResyncMock).toHaveBeenCalledTimes(1);
   });
 

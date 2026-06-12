@@ -1,3 +1,5 @@
+import { memo } from "react";
+import Modal from "./Modal";
 import type { Locale } from "../i18n/config";
 import { useI18n } from "../i18n";
 
@@ -8,12 +10,12 @@ type LanguageSuggestionModalProps = {
   onDismiss: () => void;
 };
 
-const LanguageSuggestionModal = ({
+const LanguageSuggestionModal = memo(function LanguageSuggestionModal({
   isOpen,
   suggestedLocale,
   onAccept,
   onDismiss,
-}: LanguageSuggestionModalProps) => {
+}: LanguageSuggestionModalProps) {
   const { t } = useI18n();
 
   if (!isOpen) {
@@ -21,30 +23,23 @@ const LanguageSuggestionModal = ({
   }
 
   return (
-    <div className="modal-backdrop" role="dialog" aria-modal="true" onClick={onDismiss}>
-      <div
-        className="modal"
-        onClick={(event) => {
-          event.stopPropagation();
-        }}
-      >
-        <div className="modal__header">
-          <h2>{t("languageSuggestion.title")}</h2>
-        </div>
-        <div className="modal__body">
-          <p>{t("languageSuggestion.body", { language: t(`language.${suggestedLocale}`) })}</p>
-        </div>
-        <div className="modal__actions">
+    <Modal
+      title={t("languageSuggestion.title")}
+      onClose={onDismiss}
+      actions={
+        <>
           <button type="button" className="text-button" onClick={onDismiss}>
             {t("languageSuggestion.dismiss")}
           </button>
           <button type="button" className="text-button" onClick={onAccept}>
             {t("languageSuggestion.switch")}
           </button>
-        </div>
-      </div>
-    </div>
+        </>
+      }
+    >
+      <p>{t("languageSuggestion.body", { language: t(`language.${suggestedLocale}`) })}</p>
+    </Modal>
   );
-};
+});
 
 export default LanguageSuggestionModal;

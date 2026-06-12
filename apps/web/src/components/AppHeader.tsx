@@ -1,29 +1,21 @@
-import { memo, useEffect, useRef } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { useI18n } from "../i18n";
 
 type AppHeaderProps = {
   activeListName: string;
-  renameValue: string;
-  isEditingName: boolean;
   onOpenStats: () => void;
-  onRenameValueChange: (value: string) => void;
-  onStartRename: () => void;
-  onSaveRename: () => void;
-  onCancelRename: () => void;
+  onSaveRename: (nextName: string) => void;
 };
 
 const AppHeader = memo(function AppHeader({
   activeListName,
-  renameValue,
-  isEditingName,
   onOpenStats,
-  onRenameValueChange,
-  onStartRename,
   onSaveRename,
-  onCancelRename,
 }: AppHeaderProps) {
   const renameInputRef = useRef<HTMLInputElement | null>(null);
   const skipBlurSaveRef = useRef(false);
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [renameValue, setRenameValue] = useState("");
   const { t } = useI18n();
 
   useEffect(() => {
@@ -34,6 +26,28 @@ const AppHeader = memo(function AppHeader({
     }
   }, [isEditingName]);
 
+  const handleStartRename = useCallback(() => {
+    setRenameValue(activeListName);
+    setIsEditingName(true);
+  }, [activeListName]);
+
+  const handleSaveRename = useCallback(() => {
+    const trimmed = renameValue.trim();
+    if (!trimmed) {
+      return;
+    }
+
+    setIsEditingName(false);
+
+    if (trimmed !== activeListName) {
+      onSaveRename(trimmed);
+    }
+  }, [renameValue, activeListName, onSaveRename]);
+
+  const handleCancelRename = useCallback(() => {
+    setIsEditingName(false);
+  }, []);
+
   return (
     <header className="app__header" aria-label={t("header.activeList")}>
       <div className="header-card">
@@ -43,13 +57,13 @@ const AppHeader = memo(function AppHeader({
               <input
                 ref={renameInputRef}
                 value={renameValue}
-                onChange={(event) => onRenameValueChange(event.target.value)}
+                onChange={(event) => setRenameValue(event.target.value)}
                 onBlur={() => {
                   if (skipBlurSaveRef.current) {
                     skipBlurSaveRef.current = false;
                     return;
                   }
-                  onSaveRename();
+                  handleSaveRename();
                 }}
                 onKeyDown={(event) => {
                   if (event.key === "Enter") {
@@ -57,12 +71,12 @@ const AppHeader = memo(function AppHeader({
                     // Saving unmounts the input, which can still fire blur —
                     // skip it so the rename isn't saved twice.
                     skipBlurSaveRef.current = true;
-                    onSaveRename();
+                    handleSaveRename();
                   }
                   if (event.key === "Escape") {
                     event.preventDefault();
                     skipBlurSaveRef.current = true;
-                    onCancelRename();
+                    handleCancelRename();
                   }
                 }}
                 aria-label={t("modal.listName")}
@@ -74,7 +88,7 @@ const AppHeader = memo(function AppHeader({
               <button
                 type="button"
                 className="title-button"
-                onClick={onStartRename}
+                onClick={handleStartRename}
                 aria-label={t("header.editListName")}
               >
                 {activeListName}
