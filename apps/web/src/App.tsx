@@ -392,17 +392,17 @@ const App = () => {
       window.history.pushState({ ...getHistoryState(), golistBackBlocked: true }, "");
     };
 
-    // Push immediately for engines that honour a pushState issued without a user
-    // gesture (Chromium-based browsers).
-    if (getHistoryState().golistBackBlocked !== true) {
-      pushSentinel();
-    }
-
-    // Firefox and iOS WebKit ignore a pushState that isn't tied to a user
-    // gesture: the entry is treated as a "dummy" that never fires popstate, so
-    // the first back gesture escapes the trap and shows a black screen in an
-    // installed PWA. Create a gesture-backed trap entry on the first
-    // interaction to guarantee the back gesture stays inside the app.
+    // Do NOT push a sentinel on mount. Firefox skips history entries the user
+    // never interacted with when navigating back (browser.navigation.
+    // requireUserInteraction; Fenix's back gesture uses goBack(userInteraction
+    // = true)). A pushState issued before the first interaction buries the
+    // initial app entry while it is still "uninteracted", so it can never
+    // receive the per-entry interaction flag. The back gesture then skips the
+    // entire app history and lands on the PWA session's initial blank entry —
+    // the dark grey manifest background_color screen. Pushing the first
+    // sentinel only from a user gesture lets that same gesture mark the
+    // underlying app entry as interacted, making it the landing target for
+    // every back gesture so popstate fires and the trap re-arms.
     let gestureSentinelArmed = false;
     const gestureEvents: Array<keyof WindowEventMap> = ["pointerdown", "touchstart", "keydown"];
     const removeGestureListeners = () => {
@@ -423,8 +423,10 @@ const App = () => {
     );
 
     const handlePopState = () => {
-      // A back gesture is itself user-initiated, so re-pushing here keeps the
-      // sentinel armed across browsers and the gesture never exits the app.
+      // Re-push so another trap entry sits above the app entry. Even where the
+      // re-pushed entry itself never counts as user-interacted (Firefox), the
+      // next back gesture falls through to the interacted app entry below,
+      // fires popstate again and re-arms the trap — it never exits the app.
       pushSentinel();
 
       if (isPopupOpenRef.current) {
