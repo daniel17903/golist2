@@ -29,18 +29,20 @@ export type ItemUpsertInput = {
 export type PutListResult =
   | { outcome: 'created' }
   | { outcome: 'updated' }
+  | { outcome: 'ignored' }
   | { outcome: 'forbidden' }
 
 export type UpsertListItemResult =
   | { outcome: 'created' }
   | { outcome: 'updated' }
+  | { outcome: 'ignored' }
   | { outcome: 'conflict' }
 
 export interface ListRepository {
   ping(): Promise<void>
   hasListAccess(listId: string, deviceId: string): Promise<boolean>
   findValidShareToken(shareToken: string): Promise<{ tokenId: string; listId: string } | null>
-  putList(listId: string, name: string, deviceId: string): Promise<PutListResult>
+  putList(listId: string, name: string, deviceId: string, updatedAt?: string): Promise<PutListResult>
   getList(listId: string): Promise<ListRecord | null>
   deleteList(listId: string, deviceId: string): Promise<boolean>
   listItems(listId: string): Promise<ListItemRecord[]>

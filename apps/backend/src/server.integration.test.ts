@@ -1,5 +1,6 @@
 import crypto from 'node:crypto'
 
+import { buildItemHash } from '@golist/shared/domain/sync'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { z } from 'zod'
 
@@ -10,6 +11,48 @@ const testDeviceId = '11111111-1111-4111-8111-111111111111'
 
 let baseUrl = ''
 let app: ReturnType<typeof buildServer>
+
+const openSyncSocket = async () => {
+  const socket = new WebSocket(`${baseUrl.replace('http', 'ws')}/v1/ws`)
+  const messages: Array<Record<string, unknown>> = []
+  let notify: (() => void) | null = null
+
+  const messageSchema = z.record(z.string(), z.unknown())
+
+  socket.addEventListener('message', (event) => {
+    messages.push(messageSchema.parse(JSON.parse(String(event.data))))
+    notify?.()
+  })
+
+  await new Promise<void>((resolve, reject) => {
+    socket.addEventListener('open', () => resolve(), { once: true })
+    socket.addEventListener('error', () => reject(new Error('websocket connection failed')), { once: true })
+  })
+
+  const send = (message: Record<string, unknown>) => socket.send(JSON.stringify(message))
+
+  const waitForMessage = async (
+    predicate: (message: Record<string, unknown>) => boolean,
+    timeoutMs = 2_000,
+  ): Promise<Record<string, unknown>> => {
+    const deadline = Date.now() + timeoutMs
+    for (;;) {
+      const found = messages.find(predicate)
+      if (found) {
+        return found
+      }
+      if (Date.now() > deadline) {
+        throw new Error('timed out waiting for websocket message')
+      }
+      await new Promise<void>((resolve) => {
+        notify = resolve
+        setTimeout(resolve, 25)
+      })
+    }
+  }
+
+  return { socket, messages, send, waitForMessage }
+}
 
 const createShareTokenForList = async (listId: string, deviceId: string) => {
   const response = await fetch(`${baseUrl}/v1/lists/${listId}/share-tokens`, {
@@ -174,39 +217,35 @@ describe('backend runtime integration', () => {
 
     const sameTimestamp = new Date(Date.parse(baselineItem.updatedAt) + 60_000).toISOString()
 
-    const [largerTieBreakUpdateResponse, smallerTieBreakUpdateResponse] = await Promise.all([
-      fetch(`${baseUrl}/v1/lists/${createPayload.listId}/items/${itemId}`, {
-        method: 'PUT',
-        headers: {
-          ...authHeaders,
-          'content-type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: 'Yogurt',
-          quantityOrUnit: '2',
-          category: 'dairy',
-          deleted: false,
-          updatedAt: sameTimestamp,
-        }),
-      }),
-      fetch(`${baseUrl}/v1/lists/${createPayload.listId}/items/${itemId}`, {
-        method: 'PUT',
-        headers: {
-          ...authHeaders,
-          'content-type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: 'Apple',
-          quantityOrUnit: '5',
-          category: 'produce',
-          deleted: false,
-          updatedAt: sameTimestamp,
-        }),
-      }),
-    ])
+    const candidateA = { name: 'Yogurt', iconName: 'default', quantityOrUnit: '2', category: 'dairy', deleted: false }
+    const candidateB = { name: 'Apple', iconName: 'default', quantityOrUnit: '5', category: 'produce', deleted: false }
 
-    expect(largerTieBreakUpdateResponse.status).toBe(204)
-    expect(smallerTieBreakUpdateResponse.status).toBe(204)
+    const [firstUpdateResponse, secondUpdateResponse] = await Promise.all(
+      [candidateA, candidateB].map((candidate) =>
+        fetch(`${baseUrl}/v1/lists/${createPayload.listId}/items/${itemId}`, {
+          method: 'PUT',
+          headers: {
+            ...authHeaders,
+            'content-type': 'application/json',
+          },
+          body: JSON.stringify({ ...candidate, updatedAt: sameTimestamp }),
+        }),
+      ),
+    )
+
+    expect(firstUpdateResponse.status).toBe(204)
+    expect(secondUpdateResponse.status).toBe(204)
+
+    // The winner of an equal-timestamp conflict is the candidate with the
+    // larger shared item hash — the same rule the web client applies.
+    const hashOfCandidate = (candidate: typeof candidateA) =>
+      buildItemHash({
+        id: itemId,
+        listId: createPayload.listId,
+        ...candidate,
+        updatedAt: Date.parse(sameTimestamp),
+      })
+    const expectedWinner = hashOfCandidate(candidateA) > hashOfCandidate(candidateB) ? candidateA : candidateB
 
     const itemResponse = await fetch(`${baseUrl}/v1/lists/${createPayload.listId}/items/${itemId}`, {
       headers: authHeaders,
@@ -216,13 +255,140 @@ describe('backend runtime integration', () => {
     expect(await itemResponse.json()).toEqual(
       expect.objectContaining({
         id: itemId,
-        name: 'Yogurt',
-        quantityOrUnit: '2',
-        category: 'dairy',
-        deleted: false,
+        ...expectedWinner,
         updatedAt: sameTimestamp,
       }),
     )
+  })
+
+  it('applies last-write-wins to websocket list metadata patches', async () => {
+    const listId = crypto.randomUUID()
+    const createResponse = await fetch(`${baseUrl}/v1/lists/${listId}`, {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json', 'x-device-id': testDeviceId },
+      body: JSON.stringify({ name: 'Original Name' }),
+    })
+
+    expect(createResponse.status).toBe(201)
+
+    const clientA = await openSyncSocket()
+    const clientB = await openSyncSocket()
+
+    try {
+      for (const client of [clientA, clientB]) {
+        client.send({ type: 'hello', deviceId: testDeviceId })
+        await client.waitForMessage((message) => message.type === 'hello_ack')
+        client.send({ type: 'subscribe_list', listId })
+        await client.waitForMessage((message) => message.type === 'subscribed')
+      }
+
+      const subscribed = await clientB.waitForMessage((message) => message.type === 'subscribed')
+      const listUpdatedAt = z.number().parse(subscribed.listUpdatedAt)
+
+      const freshUpdatedAt = listUpdatedAt + 60_000
+      clientB.send({ type: 'list_metadata_patch', listId, name: 'Stale Name', updatedAt: listUpdatedAt - 60_000 })
+      clientB.send({ type: 'list_metadata_patch', listId, name: 'Fresh Name', updatedAt: freshUpdatedAt })
+
+      const patch = await clientA.waitForMessage((message) => message.type === 'list_metadata_patch')
+
+      expect(patch).toEqual({ type: 'list_metadata_patch', listId, name: 'Fresh Name', updatedAt: freshUpdatedAt })
+      expect(clientA.messages.filter((message) => message.type === 'list_metadata_patch')).toHaveLength(1)
+
+      const listResponse = await fetch(`${baseUrl}/v1/lists/${listId}`, {
+        headers: { 'x-device-id': testDeviceId },
+      })
+
+      expect(listResponse.status).toBe(200)
+      expect(await listResponse.json()).toEqual(
+        expect.objectContaining({
+          name: 'Fresh Name',
+          updatedAt: new Date(freshUpdatedAt).toISOString(),
+        }),
+      )
+    } finally {
+      clientA.socket.close()
+      clientB.socket.close()
+    }
+  })
+
+  it('does not rebroadcast websocket item patches that lose conflict resolution', async () => {
+    const listId = crypto.randomUUID()
+    const createResponse = await fetch(`${baseUrl}/v1/lists/${listId}`, {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json', 'x-device-id': testDeviceId },
+      body: JSON.stringify({ name: 'Item Patch List' }),
+    })
+
+    expect(createResponse.status).toBe(201)
+
+    const itemId = crypto.randomUUID()
+    const baseTimestamp = Date.now()
+    const createItemResponse = await fetch(`${baseUrl}/v1/lists/${listId}/items/${itemId}`, {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json', 'x-device-id': testDeviceId },
+      body: JSON.stringify({
+        name: 'Milk',
+        iconName: 'default',
+        category: 'dairy',
+        deleted: false,
+        updatedAt: new Date(baseTimestamp).toISOString(),
+      }),
+    })
+
+    expect(createItemResponse.status).toBe(201)
+
+    const clientA = await openSyncSocket()
+    const clientB = await openSyncSocket()
+
+    try {
+      for (const client of [clientA, clientB]) {
+        client.send({ type: 'hello', deviceId: testDeviceId })
+        await client.waitForMessage((message) => message.type === 'hello_ack')
+        client.send({ type: 'subscribe_list', listId })
+        await client.waitForMessage((message) => message.type === 'subscribed')
+      }
+
+      const buildPatchItem = (name: string, updatedAt: number) => ({
+        id: itemId,
+        listId,
+        name,
+        iconName: 'default',
+        category: 'dairy',
+        deleted: false,
+        createdAt: baseTimestamp,
+        updatedAt,
+      })
+
+      const freshUpdatedAt = baseTimestamp + 60_000
+      clientB.send({ type: 'item_patch', listId, items: [buildPatchItem('Stale Milk', baseTimestamp - 60_000)] })
+      clientB.send({ type: 'item_patch', listId, items: [buildPatchItem('Fresh Milk', freshUpdatedAt)] })
+
+      const patch = await clientA.waitForMessage((message) => message.type === 'item_patch')
+
+      expect(patch).toEqual(
+        expect.objectContaining({
+          type: 'item_patch',
+          listId,
+          items: [expect.objectContaining({ id: itemId, name: 'Fresh Milk', updatedAt: freshUpdatedAt })],
+        }),
+      )
+      expect(clientA.messages.filter((message) => message.type === 'item_patch')).toHaveLength(1)
+
+      const itemResponse = await fetch(`${baseUrl}/v1/lists/${listId}/items/${itemId}`, {
+        headers: { 'x-device-id': testDeviceId },
+      })
+
+      expect(itemResponse.status).toBe(200)
+      expect(await itemResponse.json()).toEqual(
+        expect.objectContaining({
+          name: 'Fresh Milk',
+          updatedAt: new Date(freshUpdatedAt).toISOString(),
+        }),
+      )
+    } finally {
+      clientA.socket.close()
+      clientB.socket.close()
+    }
   })
 
   it('forbids putting an existing list without a valid access token', async () => {
