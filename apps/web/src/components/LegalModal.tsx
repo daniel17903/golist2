@@ -1,3 +1,5 @@
+import { memo } from "react";
+import Modal from "./Modal";
 import { useI18n } from "../i18n";
 
 type LegalModalType = "imprint" | "privacy";
@@ -151,47 +153,41 @@ const privacyHtmlEs = `<h1>Pol&iacute;tica de privacidad</h1>
 <p>Nuestras p&aacute;ginas web utilizan las llamadas “cookies”. Las cookies son peque&ntilde;os paquetes de datos y no causan da&ntilde;os en su dispositivo.</p>
 <p>Fuente: <a href="https://www.e-recht24.de">https://www.e-recht24.de</a></p>`;
 
-const LegalModal = ({ isOpen, type, onClose }: LegalModalProps) => {
+const imprintHtmlByLocale = {
+  de: imprintHtmlDe,
+  en: imprintHtmlEn,
+  es: imprintHtmlEs,
+};
+
+const privacyHtmlByLocale = {
+  de: privacyHtmlDe,
+  en: privacyHtmlEn,
+  es: privacyHtmlEs,
+};
+
+const LegalModal = memo(function LegalModal({ isOpen, type, onClose }: LegalModalProps) {
   const { t, locale } = useI18n();
 
   if (!isOpen) {return null;}
 
-  const imprintHtmlByLocale = {
-    de: imprintHtmlDe,
-    en: imprintHtmlEn,
-    es: imprintHtmlEs,
-  };
-
-  const privacyHtmlByLocale = {
-    de: privacyHtmlDe,
-    en: privacyHtmlEn,
-    es: privacyHtmlEs,
-  };
-
   return (
-    <div className="modal-backdrop" role="dialog" aria-modal="true" onClick={onClose}>
+    <Modal
+      onClose={onClose}
+      bodyClassName="legal-modal__body"
+      actions={
+        <button type="button" className="text-button" onClick={onClose}>
+          {t("common.close")}
+        </button>
+      }
+    >
       <div
-        className="modal"
-        onClick={(event) => {
-          event.stopPropagation();
+        className="legal-modal__content"
+        dangerouslySetInnerHTML={{
+          __html: type === "imprint" ? imprintHtmlByLocale[locale] : privacyHtmlByLocale[locale],
         }}
-      >
-        <div className="modal__body legal-modal__body">
-          <div
-            className="legal-modal__content"
-            dangerouslySetInnerHTML={{
-              __html: type === "imprint" ? imprintHtmlByLocale[locale] : privacyHtmlByLocale[locale],
-            }}
-          />
-        </div>
-        <div className="modal__actions">
-          <button type="button" className="text-button" onClick={onClose}>
-            {t("common.close")}
-          </button>
-        </div>
-      </div>
-    </div>
+      />
+    </Modal>
   );
-};
+});
 
 export default LegalModal;

@@ -1,6 +1,5 @@
 import { create } from "zustand";
 import type { AppMetadata, Item, List } from "@golist/shared/domain/types";
-import { buildItemHash } from "@golist/shared/domain/sync";
 import { getCategoryAndIcon, getItemIconName } from "../domain/categories";
 import { db } from "../storage/db";
 import { t } from "../i18n";
@@ -13,6 +12,7 @@ import {
   isBackendSharingEnabled,
 } from "../sharing/apiClient";
 import { socketSyncManager } from "../sharing/socketSync";
+import { createStoreSyncCallbacks } from "../sharing/storeSyncBridge";
 
 const createId = () => crypto.randomUUID();
 const appVersion = __APP_VERSION__;
@@ -69,7 +69,6 @@ type StoreState = {
   updateItem: (itemId: string, name: string, quantityOrUnit?: string) => Promise<void>;
   ensureShareToken: (listId: string) => Promise<string>;
   joinSharedList: (rawShareValue: string) => Promise<string>;
-  syncList: (listId: string) => Promise<void>;
   syncAllLists: () => Promise<void>;
   refreshRealtimeConnection: () => Promise<"success" | "failed">;
   clearSyncNotice: () => void;
@@ -152,6 +151,28 @@ const runBackendSyncInBackground = (action: () => Promise<void>, message: string
   });
 };
 
+// Replaces existing entries in place (preserving list order) and appends
+// entries that are new.
+const mergeItemsById = (currentItems: Item[], changedItems: Item[]): Item[] => {
+  const changedById = new Map(changedItems.map((item) => [item.id, item]));
+  const merged = currentItems.map((item) => changedById.get(item.id) ?? item);
+  const existingIds = new Set(currentItems.map((item) => item.id));
+  for (const item of changedItems) {
+    if (!existingIds.has(item.id)) {
+      merged.push(item);
+    }
+  }
+  return merged;
+};
+
+// Shared write path for locally-changed items: persist to Dexie, patch the
+// in-memory items and queue each change for websocket sync.
+const applyLocalItemChanges = async (changedItems: Item[]) => {
+  await db.items.bulkPut(changedItems);
+  useStore.setState((state) => ({ items: mergeItemsById(state.items, changedItems) }));
+  changedItems.forEach((item) => socketSyncManager.queueLocalItemPatch(item));
+};
+
 export const useStore = create<StoreState>((set, get) => ({
   lists: [],
   items: [],
@@ -190,94 +211,16 @@ export const useStore = create<StoreState>((set, get) => ({
     });
 
     if (isBackendSharingEnabled) {
-      socketSyncManager.init(metadata.deviceId, {
-        getItemsForList: (listId) => useStore.getState().items.filter((item) => item.listId === listId),
-        getAllListIds: () => useStore.getState().lists.map((list) => list.id),
-        getListMetadata: (listId) => {
-          const list = useStore.getState().lists.find((entry) => entry.id === listId);
-          return list ? { name: list.name, updatedAt: list.updatedAt } : null;
+      socketSyncManager.init(metadata.deviceId, createStoreSyncCallbacks({
+        getLists: () => useStore.getState().lists,
+        getItems: () => useStore.getState().items,
+        getDeviceId: () => useStore.getState().metadata?.deviceId,
+        applyAcceptedItems: (acceptedItems) => {
+          useStore.setState((state) => ({ items: mergeItemsById(state.items, acceptedItems) }));
         },
-        ensureListExists: async (listId) => {
-          const state = useStore.getState();
-          const list = state.lists.find((entry) => entry.id === listId);
-          if (!list || !state.metadata?.deviceId) {
-            return false;
-          }
-
-          try {
-            await sharingApiClient.upsertList({
-              deviceId: state.metadata.deviceId,
-              listId: list.id,
-              body: { name: list.name },
-            });
-            return true;
-          } catch {
-            return false;
-          }
-        },
-        applyIncomingItems: async (listId, incomingItems) => {
-          const currentState = useStore.getState();
-          if (!currentState.lists.some((list) => list.id === listId)) {
-            return;
-          }
-          const localById = new Map(
-            currentState.items.filter((item) => item.listId === listId).map((item) => [item.id, item]),
-          );
-
-          const acceptedItems = incomingItems.filter((incoming) => {
-            const localItem = localById.get(incoming.id);
-            if (!localItem) {
-              return true;
-            }
-            if (incoming.updatedAt > localItem.updatedAt) {
-              return true;
-            }
-            if (incoming.updatedAt < localItem.updatedAt) {
-              return false;
-            }
-            return buildItemHash(incoming) >= buildItemHash(localItem);
-          });
-
-          if (acceptedItems.length === 0) {
-            return;
-          }
-
-          await db.items.bulkPut(acceptedItems);
-          useStore.setState((state) => {
-            const mergedById = new Map(state.items.map((item) => [item.id, item]));
-            for (const accepted of acceptedItems) {
-              mergedById.set(accepted.id, accepted);
-            }
-            return { items: Array.from(mergedById.values()) };
-          });
-        },
-        applyIncomingListMetadata: async (listId, payload) => {
-          const currentList = useStore.getState().lists.find((entry) => entry.id === listId);
-          if (!currentList) {
-            return;
-          }
-
-          if (payload.updatedAt < currentList.updatedAt) {
-            return;
-          }
-
-          if (payload.updatedAt === currentList.updatedAt && payload.name === currentList.name) {
-            return;
-          }
-
-          const updatedList = {
-            ...currentList,
-            name: payload.name,
-            updatedAt: payload.updatedAt,
-          };
-
-          await db.lists.put(updatedList);
+        applyListMetadata: (updatedList) => {
           useStore.setState((state) => ({
-            lists: state.lists.map((entry) =>
-              entry.id === listId
-                ? updatedList
-                : entry,
-            ),
+            lists: state.lists.map((entry) => (entry.id === updatedList.id ? updatedList : entry)),
           }));
         },
         onConnectionState: (connectionState) => {
@@ -286,7 +229,7 @@ export const useStore = create<StoreState>((set, get) => ({
         onError: (message) => {
           reportSyncError(`${message} ${t("sync.pending")}`);
         },
-      });
+      }));
       socketSyncManager.setActiveList(initialActiveListId);
     }
   },
@@ -367,9 +310,7 @@ export const useStore = create<StoreState>((set, get) => ({
       createdAt: now,
       updatedAt: now,
     };
-    await db.items.add(item);
-    set((state) => ({ items: [...state.items, item] }));
-    socketSyncManager.queueLocalItemPatch(item);
+    await applyLocalItemChanges([item]);
   },
   recategorizeSuggestedItems: async (itemUpdates, locale) => {
     if (itemUpdates.length === 0) {
@@ -378,31 +319,23 @@ export const useStore = create<StoreState>((set, get) => ({
 
     const updatesByItemId = new Map(itemUpdates.map((update) => [update.itemId, update.category]));
     const updatedAt = Date.now();
-    const nextItems = get().items.map((item) => {
-      const nextCategory = updatesByItemId.get(item.id);
-      if (!nextCategory) {
-        return item;
-      }
+    const changedItems = get().items
+      .filter((item) => updatesByItemId.has(item.id))
+      .map((item) => {
+        const nextCategory = updatesByItemId.get(item.id);
+        return {
+          ...item,
+          category: nextCategory ?? item.category,
+          iconName: getItemIconName(item.name, locale) ?? item.iconName,
+          updatedAt,
+        };
+      });
 
-      return {
-        ...item,
-        category: nextCategory,
-        iconName: getItemIconName(item.name, locale) ?? item.iconName,
-        updatedAt,
-      };
-    });
-
-    const changedItems = nextItems.filter((item) => updatesByItemId.has(item.id));
     if (changedItems.length === 0) {
       return;
     }
 
-    await db.items.bulkPut(changedItems);
-    set({ items: nextItems });
-
-    changedItems.forEach((item) => {
-      socketSyncManager.queueLocalItemPatch(item);
-    });
+    await applyLocalItemChanges(changedItems);
   },
   toggleItem: async (itemId: string) => {
     const { items } = get();
@@ -413,12 +346,7 @@ export const useStore = create<StoreState>((set, get) => ({
       deleted: !item.deleted,
       updatedAt: Date.now(),
     };
-    await db.items.put(updated);
-    set((state) => ({
-      items: state.items.map((entry) => (entry.id === itemId ? updated : entry)),
-    }));
-
-    socketSyncManager.queueLocalItemPatch(updated);
+    await applyLocalItemChanges([updated]);
   },
   updateItem: async (itemId: string, name: string, quantityOrUnit?: string) => {
     const { items } = get();
@@ -433,12 +361,7 @@ export const useStore = create<StoreState>((set, get) => ({
       category: resolvedCategory ?? "other",
       updatedAt: Date.now(),
     };
-    await db.items.put(updated);
-    set((state) => ({
-      items: state.items.map((entry) => (entry.id === itemId ? updated : entry)),
-    }));
-
-    socketSyncManager.queueLocalItemPatch(updated);
+    await applyLocalItemChanges([updated]);
   },
   ensureShareToken: async (listId: string) => {
     const state = get();
@@ -536,19 +459,11 @@ export const useStore = create<StoreState>((set, get) => ({
       const details = describeSyncError(error);
       reportSyncError(
         details
-          ? `Geteilte Liste konnte nicht geladen werden (${details}). Bitte Backend-Verbindung prüfen.`
-          : "Geteilte Liste konnte nicht geladen werden. Bitte Backend-Verbindung prüfen.",
+          ? t("sync.joinFailedWithDetails", { details })
+          : t("sync.joinFailed"),
       );
       throw error;
     }
-  },
-  syncList: async (listId: string) => {
-    if (!isBackendSharingEnabled) {
-      return;
-    }
-
-    socketSyncManager.setActiveList(listId);
-    socketSyncManager.requestResync();
   },
   syncAllLists: async () => {
     if (!isBackendSharingEnabled) {

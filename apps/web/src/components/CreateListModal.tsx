@@ -1,4 +1,5 @@
-import type { FormEvent } from "react";
+import { memo, type FormEvent } from "react";
+import Modal from "./Modal";
 import { useI18n } from "../i18n";
 
 type CreateListModalProps = {
@@ -9,13 +10,13 @@ type CreateListModalProps = {
   onSave: () => void;
 };
 
-const CreateListModal = ({
+const CreateListModal = memo(function CreateListModal({
   isOpen,
   value,
   onChange,
   onCancel,
   onSave,
-}: CreateListModalProps) => {
+}: CreateListModalProps) {
   const { t } = useI18n();
 
   if (!isOpen) {return null;}
@@ -31,40 +32,33 @@ const CreateListModal = ({
   };
 
   return (
-    <div className="modal-backdrop" role="dialog" aria-modal="true" onClick={onCancel}>
-      <form
-        className="modal"
-        onSubmit={handleSubmit}
-        onClick={(event) => {
-          event.stopPropagation();
-        }}
-      >
-        <div className="modal__header">
-          <h2>{t("modal.createList")}</h2>
-        </div>
-        <div className="modal__body">
-          <div className="modal__field">
-            <label htmlFor="new-list-name">{t("common.name")}</label>
-            <input
-              id="new-list-name"
-              value={value}
-              onChange={(event) => onChange(event.target.value)}
-              placeholder={t("modal.listName")}
-              autoFocus
-            />
-          </div>
-        </div>
-        <div className="modal__actions">
+    <Modal
+      title={t("modal.createList")}
+      onClose={onCancel}
+      onSubmit={handleSubmit}
+      actions={
+        <>
           <button type="button" className="text-button" onClick={onCancel}>
             {t("common.cancel")}
           </button>
           <button type="submit" className="text-button" disabled={isSaveDisabled}>
             {t("modal.create")}
           </button>
-        </div>
-      </form>
-    </div>
+        </>
+      }
+    >
+      <div className="modal__field">
+        <label htmlFor="new-list-name">{t("common.name")}</label>
+        <input
+          id="new-list-name"
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          placeholder={t("modal.listName")}
+          autoFocus
+        />
+      </div>
+    </Modal>
   );
-};
+});
 
 export default CreateListModal;

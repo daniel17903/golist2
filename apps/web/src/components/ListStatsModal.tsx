@@ -1,4 +1,5 @@
-import { useMemo } from "react";
+import { memo, useMemo } from "react";
+import Modal from "./Modal";
 import { useI18n } from "../i18n";
 
 type TopItem = {
@@ -16,14 +17,14 @@ type ListStatsModalProps = {
   onClose: () => void;
 };
 
-const ListStatsModal = ({
+const ListStatsModal = memo(function ListStatsModal({
   isOpen,
   totalItemsEver,
   openItems,
   topItems,
   lastBoughtAt,
   onClose,
-}: ListStatsModalProps) => {
+}: ListStatsModalProps) {
   const { locale, t } = useI18n();
 
   const formattedLastBought = useMemo(() => {
@@ -80,63 +81,55 @@ const ListStatsModal = ({
   }
 
   return (
-    <div className="modal-backdrop" role="dialog" aria-modal="true" onClick={onClose}>
-      <div
-        className="modal"
-        onClick={(event) => {
-          event.stopPropagation();
-        }}
-      >
-        <div className="modal__header">
-          <h2>{t("stats.title")}</h2>
-        </div>
-        <div className="modal__body list-stats-modal__body">
-          <ul className="list-stats-modal__grid" aria-label={t("stats.summary")}>
-            <li>
-              <span>{t("stats.totalItemsEver")}</span>
-              <strong>{totalItemsEver}</strong>
-            </li>
-            <li>
-              <span>{t("stats.openItems")}</span>
-              <strong>{openItems}</strong>
-            </li>
-          </ul>
+    <Modal
+      title={t("stats.title")}
+      onClose={onClose}
+      bodyClassName="list-stats-modal__body"
+      actions={
+        <button type="button" className="text-button" onClick={onClose}>
+          {t("common.close")}
+        </button>
+      }
+    >
+      <ul className="list-stats-modal__grid" aria-label={t("stats.summary")}>
+        <li>
+          <span>{t("stats.totalItemsEver")}</span>
+          <strong>{totalItemsEver}</strong>
+        </li>
+        <li>
+          <span>{t("stats.openItems")}</span>
+          <strong>{openItems}</strong>
+        </li>
+      </ul>
 
-          <section>
-            <h3>{t("stats.topItems")}</h3>
-            {topItems.length === 0 ? (
-              <p>{t("stats.noneYet")}</p>
-            ) : (
-              <ol className="list-stats-modal__top-items">
-                {topItems.map((entry) => (
-                  <li key={entry.name}>
-                    <span>
-                      {entry.name}
-                      {entry.averageFrequencyMs ? (
-                        <small className="list-stats-modal__avg-frequency">
-                          {formatAverageFrequency(entry.averageFrequencyMs)}
-                        </small>
-                      ) : null}
-                    </span>
-                    <strong>{t("stats.timesAdded", { count: entry.count })}</strong>
-                  </li>
-                ))}
-              </ol>
-            )}
-          </section>
+      <section>
+        <h3>{t("stats.topItems")}</h3>
+        {topItems.length === 0 ? (
+          <p>{t("stats.noneYet")}</p>
+        ) : (
+          <ol className="list-stats-modal__top-items">
+            {topItems.map((entry) => (
+              <li key={entry.name}>
+                <span>
+                  {entry.name}
+                  {entry.averageFrequencyMs ? (
+                    <small className="list-stats-modal__avg-frequency">
+                      {formatAverageFrequency(entry.averageFrequencyMs)}
+                    </small>
+                  ) : null}
+                </span>
+                <strong>{t("stats.timesAdded", { count: entry.count })}</strong>
+              </li>
+            ))}
+          </ol>
+        )}
+      </section>
 
-          <p className="list-stats-modal__last-bought">
-            <strong>{t("stats.lastBought")}</strong> {formattedLastBought}
-          </p>
-        </div>
-        <div className="modal__actions">
-          <button type="button" className="text-button" onClick={onClose}>
-            {t("common.close")}
-          </button>
-        </div>
-      </div>
-    </div>
+      <p className="list-stats-modal__last-bought">
+        <strong>{t("stats.lastBought")}</strong> {formattedLastBought}
+      </p>
+    </Modal>
   );
-};
+});
 
 export default ListStatsModal;

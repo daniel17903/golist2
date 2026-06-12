@@ -8,22 +8,33 @@
 
 ## Project snapshot (web app)
 - **Stack**: React + TypeScript + Vite, Dexie (IndexedDB), Zustand, Vite PWA plugin.
-- **Entry points**: `apps/web/index.html`, `apps/web/src/main.tsx`, `apps/web/src/App.tsx`.
+- **Entry points**: `apps/web/index.html`, `apps/web/src/main.tsx`, `apps/web/src/App.tsx` (a thin composition layer — behavior lives in hooks).
 - **State + storage**: `apps/web/src/state/useStore.ts` (Zustand) + `apps/web/src/storage/db.ts` (Dexie).
-- **Domain logic**: `apps/web/src/domain/` (categories, sorting) plus shared types in `packages/shared/src/domain/types.ts`.
-- **UI composition**: `apps/web/src/components/` (shared UI building blocks) + `apps/web/src/hooks/` (UI state/behavior).
+- **Backend sharing/sync**: `apps/web/src/sharing/` — `apiClient.ts` (REST client), `socketSync.ts` (WebSocket realtime sync manager), `storeSyncBridge.ts` (wires incoming sync data into the store). Protocol details in `docs/websocket-sync-protocol.md` and `docs/frontend-sharing-sync.md`.
+- **i18n**: `apps/web/src/i18n/` — locale resolution (`resolveLocale.ts`), translations (`resources.ts`), `useI18n()`/module-level `t()`. Language auto-suggestion logic lives in `apps/web/src/domain/languageSuggestion.ts`.
+- **Domain logic**: `apps/web/src/domain/` (categories, sorting, input parsing, list stats) plus shared types in `packages/shared/src/domain/types.ts`.
+- **UI composition**: `apps/web/src/components/` (shared UI building blocks, including the `Modal.tsx` scaffold all dialogs build on) + `apps/web/src/hooks/` (one hook per feature: popup stack, toasts, dialogs, pull-to-refresh, back-gesture trap, item exit animation, share flow, app bootstrap).
 - **Styling**: `apps/web/src/styles.css`.
+- **localStorage keys**: `golist.deviceId`, `golist.selectedListId`, plus the i18n keys defined in `apps/web/src/i18n/config.ts`.
 
 ## Quickstart
+- Requires Node `>= 24` (see `engines` in the root `package.json`).
 - `npm install`
 - `npm run dev:web` (runs web app dev server from root, default http://localhost:5173)
 - Direct web command equivalent: `npm run dev -w apps/web`
+- Root aliases exist for all common web/backend scripts: `lint:web`, `typecheck:web`, `test:web`, `test:e2e:web`, `build:web` and the `:backend` equivalents.
 
 ## Key behaviors
 - Backend sharing auth: protected sharing endpoints require an `X-Device-Id` header and a prior token redemption record for that device/token pair.
 - **Multi-list** support with a list selector and inline rename.
 - **Item sorting** by grocery category order, fallback to created order.
 - **Item suggestions** are **list-specific**, ranked by frequency then recency.
+- **Realtime sync**: lists sync over a WebSocket (`/v1/ws`) using hash-diff reconciliation; offline changes are reconciled per list after reconnect. See `docs/websocket-sync-protocol.md` before touching `apps/web/src/sharing/socketSync.ts`.
+- **i18n**: en/de/es with locale auto-detection and a one-time language-switch suggestion based on recently added item names.
+- **Undo toasts** for item deletion and list rename (max 3 stacked, 5s timeout).
+- **Pull-to-refresh** forces a WebSocket reconnect; the pull distance is written straight to the DOM to avoid per-frame re-renders.
+- **Back-gesture trap**: a history sentinel keeps the Android/Firefox back gesture inside the PWA and closes the topmost popup instead. Do not touch `apps/web/src/hooks/useBackGestureTrap.ts` without reading its comments — the behavior encodes hard-won Firefox/Fenix quirks.
+- **Popup layering**: all overlays register in `apps/web/src/hooks/usePopupStack.ts`; the stack order is the open order and drives both "is any popup open" checks and back-gesture close order. New modals must open/close through the popup stack.
 
 ## UX rules (high-level)
 - Keep list rename inline with minimal friction (no full-screen modals).
@@ -66,19 +77,22 @@
 
 - Playwright E2E in fresh containers may require both browser binaries and OS deps.
   Run `npx playwright install chromium` and `npx playwright install-deps chromium`
-  before running `RUN_PLAYWRIGHT_E2E=1 npm run test -w apps/web -- src/e2e.backend-frontend.playwright.test.ts`.
+  before running `npm run test:e2e -w apps/web` (or root alias `npm run test:e2e:web`),
+  which already sets `RUN_PLAYWRIGHT_E2E=1`.
   For E2E-related changes, do this setup and run the Playwright E2E command before committing.
-  Do **not** treat a skipped run as sufficient validation: for E2E-related changes you must execute with `RUN_PLAYWRIGHT_E2E=1` so tests actually run.
+  Do **not** treat a skipped run as sufficient validation: for E2E-related changes the
+  tests must actually execute (the default `npm run test` skips them).
 
 ## React performance rules (web app)
 
-These rules exist to prevent regressions against the work tracked in
-`docs/frontend-performance-plan.md`. Follow them for every web-app change.
+These rules exist to prevent regressions against the (completed) work tracked
+in `docs/frontend-performance-plan.md`. Follow them for every web-app change.
 
 ### Component memoization
 - All components in `apps/web/src/components/` that receive props from `App`
-  are wrapped with `React.memo`. **New components** that receive props from a
-  parent must also be wrapped with `React.memo` using a named function:
+  are wrapped with `React.memo` — including modals, even though they return
+  `null` while closed. **New components** that receive props from a parent
+  must also be wrapped with `React.memo` using a named function:
   ```tsx
   const MyComponent = memo(function MyComponent(props: Props) { ... });
   ```
@@ -108,7 +122,9 @@ These rules exist to prevent regressions against the work tracked in
   use a fine-grained selector: `useStore((s) => s.specificSlice)`.
 - Store actions are stable (created once in `create()`). Extract them at module
   scope via `useStore.getState()` — do not select them inside components.
-- See `apps/web/src/hooks/useAppState.ts` for the established pattern.
+- See `apps/web/src/hooks/useAppState.ts` (selectors) and
+  `apps/web/src/hooks/useAddItemDialog.ts` (module-scope action extraction)
+  for the established pattern.
 
 ### Refs for frequently-changing values
 - When a `useCallback` or `useEffect` needs to read a value that changes often
@@ -132,12 +148,16 @@ These rules exist to prevent regressions against the work tracked in
    is a state setter / module-scope constant).
 3. Adding a new Zustand subscription? → use a selector, not the whole store.
 4. Adding a `useEffect`? → verify no high-frequency values in the dep array.
-5. Consult `docs/frontend-performance-plan.md` for remaining items and context.
+5. Adding a modal/overlay? → open and close it through `usePopupStack` so the
+   back gesture and "popup open" checks keep working.
+6. `docs/frontend-performance-plan.md` (status: complete) documents why these
+   rules exist and what was measured.
 
 
 ## Documentation maintenance
 - Keep `docs/sharing-plan.md` up to date when backend sharing architecture, sequencing, or CI expectations change.
-- Keep this `AGENTS.md` file up to date when repo layout, commands, workflows, or testing expectations change.
+- Keep `docs/websocket-sync-protocol.md` and `docs/frontend-sharing-sync.md` up to date when the realtime sync protocol or the frontend sync flow changes.
+- Keep this `AGENTS.md` file up to date when repo layout, commands, workflows, or testing expectations change. `CLAUDE.md` is just a pointer to this file — keep all content here.
 - For backend-sharing related PRs, include doc updates as part of the definition of done when behavior or process changes.
 
 ## Production API

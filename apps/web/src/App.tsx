@@ -1,6 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
-import type { Item } from "@golist/shared/domain/types";
 import AppHeader from "./components/AppHeader";
 import BottomBar from "./components/BottomBar";
 import AddItemDialog, { type AddItemDialogHandle } from "./components/AddItemDialog";
@@ -10,63 +9,44 @@ import ListsDrawer from "./components/ListsDrawer";
 import CreateListModal from "./components/CreateListModal";
 import BackendLogPanel from "./components/BackendLogPanel";
 import LanguageSuggestionModal from "./components/LanguageSuggestionModal";
+import ToastStacks from "./components/ToastStacks";
 
 const JoinListModal = lazy(() => import("./components/JoinListModal"));
 const SettingsModal = lazy(() => import("./components/SettingsModal"));
 const LegalModal = lazy(() => import("./components/LegalModal"));
 const ListStatsModal = lazy(() => import("./components/ListStatsModal"));
+import { useAppBootstrap } from "./hooks/useAppBootstrap";
 import { useAppState } from "./hooks/useAppState";
-import { useLongPressItem } from "./hooks/useLongPressItem";
+import { useAddItemDialog } from "./hooks/useAddItemDialog";
+import { useBackGestureTrap } from "./hooks/useBackGestureTrap";
+import { useCreateListDialog } from "./hooks/useCreateListDialog";
+import { useEditItemDialog } from "./hooks/useEditItemDialog";
+import { useItemExitAnimation } from "./hooks/useItemExitAnimation";
+import { useJoinListDialog } from "./hooks/useJoinListDialog";
 import { useKeyboardInset } from "./hooks/useKeyboardInset";
-import { useI18n } from "./i18n";
+import { useLanguageSuggestion } from "./hooks/useLanguageSuggestion";
+import { useLongPressItem } from "./hooks/useLongPressItem";
+import { usePopupStack } from "./hooks/usePopupStack";
+import { usePullToRefresh } from "./hooks/usePullToRefresh";
+import { useShareList } from "./hooks/useShareList";
+import { useToasts } from "./hooks/useToasts";
 import { calculateListStats } from "./domain/listStats";
-import {
-  findLanguageSuggestion,
-  isLanguageSuggestionHandled,
-  markLanguageSuggestionHandled,
-} from "./domain/languageSuggestion";
-
-type UndoDeleteToast = {
-  id: string;
-  kind: "item-delete";
-  item: Item;
-};
-
-type UndoRenameToast = {
-  id: string;
-  kind: "list-rename";
-  listId: string;
-  previousName: string;
-  nextName: string;
-};
-
-type UndoToast = UndoDeleteToast | UndoRenameToast;
-
-type AppToast = {
-  id: string;
-  message: string;
-  tone: "success" | "error";
-};
+import { useStore } from "./state/useStore";
 
 type LegalModalType = "imprint" | "privacy";
-const MAX_UNDO_TOASTS = 3;
-// Exit animation runs 220ms; the fallback covers animationend never firing
-// (hidden tab, interrupted animation, card removed from the DOM).
-const EXIT_ANIMATION_FALLBACK_MS = 400;
 
-const isAbortError = (error: unknown): boolean => {
-  if (error instanceof DOMException) {
-    return error.name === "AbortError";
-  }
-
-  return typeof error === "object" && error !== null && "name" in error && error.name === "AbortError";
-};
+// Store actions are stable references — select them once at module scope.
+const {
+  toggleItem,
+  renameList,
+  deleteList,
+  setActiveList,
+  refreshRealtimeConnection,
+} = useStore.getState();
 
 const App = () => {
-  const { t, locale, setLanguagePreference } = useI18n();
-  const [dismissedLanguageSuggestionLocale, setDismissedLanguageSuggestionLocale] = useState<string | null>(null);
-
   useKeyboardInset();
+  useAppBootstrap();
 
   const {
     lists,
@@ -74,123 +54,99 @@ const App = () => {
     activeListId,
     activeList,
     listItems,
-    suggestions,
-    duplicatePreview,
-    newListName,
-    editingTitle,
-    itemName,
-    editingItemId,
-    editItemName,
-    editItemQuantity,
-    isDrawerOpen,
-    isAddDialogOpen,
-    isCreateListModalOpen,
-    isJoinListModalOpen,
-    createListName,
-    joinListValue,
+    backendConnection,
     backendBusyRequests,
     backendSharingEnabled,
-    refreshRealtimeConnection,
-    setNewListName,
-    setEditingTitle,
-    setItemName,
-    setEditingItemId,
-    setEditItemName,
-    setEditItemQuantity,
-    setIsDrawerOpen,
-    setIsAddDialogOpen,
-    setIsCreateListModalOpen,
-    setIsJoinListModalOpen,
-    setCreateListName,
-    setJoinListValue,
-    setActiveList,
-    renameList,
-    toggleItem,
-    openEditItem,
-    handleAddItem,
-    handleAddSuggestion,
-    handleRenameList,
-    handleSaveItem,
-    openAddDialog,
-    handleCreateList,
-    handleConfirmCreateList,
-    handleDeleteList,
-    handleOpenJoinList,
-    handleJoinList,
-    handleShareActiveList,
-    backendConnection,
     isLoaded,
     deviceId,
-    recategorizeSuggestedItems,
   } = useAppState();
 
-  const undoTimeoutsRef = useRef<Map<string, number>>(new Map());
-  const toastTimeoutsRef = useRef<Map<string, number>>(new Map());
-  const [exitingItemIds, setExitingItemIds] = useState<Set<string>>(new Set());
-  const [undoToasts, setUndoToasts] = useState<UndoToast[]>([]);
-  const [appToasts, setAppToasts] = useState<AppToast[]>([]);
-  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
-  const [isListStatsOpen, setIsListStatsOpen] = useState(false);
-  const [activeLegalModal, setActiveLegalModal] = useState<LegalModalType | null>(null);
-  const pullStartYRef = useRef<number | null>(null);
-  const suppressItemPressRef = useRef(false);
-  // The pull distance is written straight to the indicator element so the
-  // whole app doesn't re-render on every touchmove frame while pulling.
-  const pullIndicatorRef = useRef<HTMLDivElement | null>(null);
-  const pullDistanceRef = useRef(0);
-  const [isPullRefreshing, setIsPullRefreshing] = useState(false);
-  const isPullRefreshingRef = useRef(false);
-  const pullRefreshStartedAtRef = useRef<number | null>(null);
-  const isPopupOpen =
-    isDrawerOpen ||
-    isAddDialogOpen ||
-    isCreateListModalOpen ||
-    isJoinListModalOpen ||
-    isSettingsModalOpen ||
-    isListStatsOpen ||
-    activeLegalModal !== null ||
-    Boolean(editingItemId);
-  const isPopupOpenRef = useRef(isPopupOpen);
-  useEffect(() => { isPopupOpenRef.current = isPopupOpen; });
-  const closeTopPopupRef = useRef<() => void>(() => {});
+  const { stack, isPopupOpenRef, openPopup, closePopup, closeTopPopup } = usePopupStack();
+  const isDrawerOpen = stack.includes("drawer");
+  const isAddDialogOpen = stack.includes("add-item");
+  const isCreateListModalOpen = stack.includes("create-list");
+  const isJoinListModalOpen = stack.includes("join-list");
+  const isSettingsModalOpen = stack.includes("settings");
+  const isListStatsOpen = stack.includes("list-stats");
+  const isLegalModalOpen = stack.includes("legal");
+  const isEditItemOpen = stack.includes("edit-item");
 
-  const languageSuggestion = useMemo(() => {
-    if (!isLoaded || !deviceId || isLanguageSuggestionHandled()) {
-      return null;
-    }
+  const {
+    undoToasts,
+    appToasts,
+    pushAppToast,
+    showUndoDelete,
+    showUndoRename,
+    removeUndoToast,
+    removeAppToast,
+  } = useToasts();
 
-    return findLanguageSuggestion({
-      currentLocale: locale,
-      currentDeviceId: deviceId,
-      items,
-    });
-  }, [deviceId, isLoaded, items, locale]);
+  const {
+    itemName,
+    setItemName,
+    suggestions,
+    duplicatePreview,
+    openAddDialog,
+    closeAddDialog,
+    handleAddItem,
+    handleAddSuggestion,
+  } = useAddItemDialog({ openPopup, closePopup });
 
-  const handleAcceptLanguageSuggestion = useCallback(async () => {
-    if (!languageSuggestion) {
-      return;
-    }
+  const {
+    editItemName,
+    editItemQuantity,
+    setEditItemName,
+    setEditItemQuantity,
+    openEditItem,
+    cancelEditItem,
+    handleSaveItem,
+  } = useEditItemDialog({ openPopup, closePopup });
 
-    setLanguagePreference(languageSuggestion.suggestedLocale);
-    await recategorizeSuggestedItems(languageSuggestion.itemUpdates, languageSuggestion.suggestedLocale);
-    markLanguageSuggestionHandled({
-      suggestedLocale: languageSuggestion.suggestedLocale,
-      action: "accepted",
-    });
-    setDismissedLanguageSuggestionLocale(languageSuggestion.suggestedLocale);
-  }, [languageSuggestion, recategorizeSuggestedItems, setLanguagePreference]);
+  const {
+    createListName,
+    setCreateListName,
+    openCreateList,
+    cancelCreateList,
+    handleConfirmCreateList,
+  } = useCreateListDialog({ openPopup, closePopup });
 
-  const handleDismissLanguageSuggestion = useCallback(() => {
-    if (!languageSuggestion) {
-      return;
-    }
+  const {
+    joinListValue,
+    setJoinListValue,
+    openJoinList,
+    cancelJoinList,
+    handleJoinList,
+  } = useJoinListDialog({ openPopup, closePopup });
 
-    markLanguageSuggestionHandled({
-      suggestedLocale: languageSuggestion.suggestedLocale,
-      action: "dismissed",
-    });
-    setDismissedLanguageSuggestionLocale(languageSuggestion.suggestedLocale);
-  }, [languageSuggestion]);
+  const { exitingItemIds, handleExitComplete, handleToggleItem } = useItemExitAnimation({
+    items,
+    toggleItem,
+    onItemDeleted: showUndoDelete,
+  });
+
+  const { handleShareList } = useShareList({ activeList, pushAppToast });
+
+  const { languageSuggestion, acceptLanguageSuggestion, dismissLanguageSuggestion } =
+    useLanguageSuggestion({ items, deviceId, isLoaded });
+
+  const {
+    handlePointerDown,
+    handlePointerUp,
+    handlePointerCancel,
+    longPressTriggeredRef,
+    pressedItemId,
+  } = useLongPressItem({
+    onLongPress: openEditItem,
+    onShortPress: handleToggleItem,
+  });
+
+  const { pullIndicatorRef, isPullRefreshing, suppressItemPressRef } = usePullToRefresh({
+    isPopupOpenRef,
+    onPullDetected: handlePointerCancel,
+    refresh: refreshRealtimeConnection,
+  });
+
+  useBackGestureTrap({ isPopupOpenRef, closeTopPopup });
 
   const listStats = useMemo(() => calculateListStats(items, activeListId), [items, activeListId]);
 
@@ -215,379 +171,37 @@ const App = () => {
     );
   }, [lists, items]);
 
-  const clearUndoTimeout = useCallback((toastId: string) => {
-    const timeout = undoTimeoutsRef.current.get(toastId);
-    if (timeout !== undefined) {
-      window.clearTimeout(timeout);
-      undoTimeoutsRef.current.delete(toastId);
-    }
-  }, []);
-
-  const clearAppToastTimeout = useCallback((toastId: string) => {
-    const timeout = toastTimeoutsRef.current.get(toastId);
-    if (timeout !== undefined) {
-      window.clearTimeout(timeout);
-      toastTimeoutsRef.current.delete(toastId);
-    }
-  }, []);
-
-  const removeUndoToast = useCallback((toastId: string) => {
-    clearUndoTimeout(toastId);
-    setUndoToasts((current) => current.filter((toast) => toast.id !== toastId));
-  }, [clearUndoTimeout]);
-
-  const removeAppToast = useCallback((toastId: string) => {
-    clearAppToastTimeout(toastId);
-    setAppToasts((current) => current.filter((toast) => toast.id !== toastId));
-  }, [clearAppToastTimeout]);
-
-  const enqueueUndoToast = useCallback((nextToast: UndoToast, options?: { replaceRenameForListId?: string }) => {
-    setUndoToasts((current) => {
-      const nextQueue = options?.replaceRenameForListId
-        ? current.filter((toast) => {
-            const shouldRemove = toast.kind === "list-rename" && toast.listId === options.replaceRenameForListId;
-            if (shouldRemove) {
-              clearUndoTimeout(toast.id);
-            }
-            return !shouldRemove;
-          })
-        : current;
-      const queueWithNext = [...nextQueue, nextToast];
-
-      if (queueWithNext.length <= MAX_UNDO_TOASTS) {
-        return queueWithNext;
-      }
-
-      const overflow = queueWithNext.length - MAX_UNDO_TOASTS;
-      const removedToasts = queueWithNext.slice(0, overflow);
-      removedToasts.forEach((toast) => clearUndoTimeout(toast.id));
-      return queueWithNext.slice(overflow);
-    });
-  }, [clearUndoTimeout]);
-
-  const pushAppToast = useCallback((message: string, tone: "success" | "error") => {
-    const toastId = crypto.randomUUID();
-    setAppToasts((current) => [...current, { id: toastId, message, tone }]);
-    const timeout = window.setTimeout(() => {
-      removeAppToast(toastId);
-    }, 4500);
-    toastTimeoutsRef.current.set(toastId, timeout);
-  }, [removeAppToast]);
-
-  const showUndoDelete = useCallback((item: Item) => {
-    const toastId = crypto.randomUUID();
-    enqueueUndoToast({ id: toastId, kind: "item-delete", item });
-    const timeout = window.setTimeout(() => {
-      removeUndoToast(toastId);
-    }, 5000);
-    undoTimeoutsRef.current.set(toastId, timeout);
-  }, [enqueueUndoToast, removeUndoToast]);
-
-  const showUndoRename = useCallback((listId: string, previousName: string, nextName: string) => {
-    const toastId = crypto.randomUUID();
-    enqueueUndoToast(
-      { id: toastId, kind: "list-rename", listId, previousName, nextName },
-      { replaceRenameForListId: listId },
-    );
-    const timeout = window.setTimeout(() => {
-      removeUndoToast(toastId);
-    }, 5000);
-    undoTimeoutsRef.current.set(toastId, timeout);
-  }, [enqueueUndoToast, removeUndoToast]);
-
-  useEffect(
-    () => () => {
-      undoTimeoutsRef.current.forEach((timeout) => window.clearTimeout(timeout));
-      undoTimeoutsRef.current.clear();
-      toastTimeoutsRef.current.forEach((timeout) => window.clearTimeout(timeout));
-      toastTimeoutsRef.current.clear();
-      exitTimeoutsRef.current.forEach((timeout) => window.clearTimeout(timeout));
-      exitTimeoutsRef.current.clear();
-    },
-    [],
-  );
-
-  const itemsRef = useRef(items);
-  useEffect(() => { itemsRef.current = items; });
-
-  // Pending exit fallbacks, keyed by item id. An entry also marks the item as
-  // "exit in progress", so completion runs exactly once even when both
-  // animationend and the fallback timer fire.
-  const exitTimeoutsRef = useRef<Map<string, number>>(new Map());
-
-  const handleExitComplete = useCallback(async (itemId: string) => {
-    const fallbackTimeout = exitTimeoutsRef.current.get(itemId);
-    if (fallbackTimeout === undefined) {return;}
-    window.clearTimeout(fallbackTimeout);
-    exitTimeoutsRef.current.delete(itemId);
-    const deletedItem = itemsRef.current.find((item) => item.id === itemId);
-    await toggleItem(itemId);
-    if (deletedItem) {
-      showUndoDelete(deletedItem);
-    }
-    setExitingItemIds((current) => {
-      const next = new Set(current);
-      next.delete(itemId);
-      return next;
-    });
-  }, [toggleItem, showUndoDelete]);
-
-  const handleToggleItem = useCallback(async (itemId: string) => {
-    if (exitTimeoutsRef.current.has(itemId)) {return;}
-    const itemToDelete = itemsRef.current.find((item) => item.id === itemId);
-    if (!itemToDelete) {return;}
-
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      await toggleItem(itemId);
-      showUndoDelete(itemToDelete);
-      return;
-    }
-    const fallbackTimeout = window.setTimeout(() => {
-      void handleExitComplete(itemId);
-    }, EXIT_ANIMATION_FALLBACK_MS);
-    exitTimeoutsRef.current.set(itemId, fallbackTimeout);
-    setExitingItemIds((current) => new Set(current).add(itemId));
-  }, [toggleItem, showUndoDelete, handleExitComplete]);
-
   const activeListRef = useRef(activeList);
   useEffect(() => { activeListRef.current = activeList; });
 
-  const shareWithSystemSheet = useCallback(async (shareLink: string): Promise<boolean> => {
-    if (typeof navigator.share !== "function") {
-      return false;
-    }
-
-    const sharePayload: ShareData = {
-      title: activeListRef.current?.name ?? "GoList",
-      text: t("share.text"),
-      url: shareLink,
-    };
-
-    if (typeof navigator.canShare === "function" && !navigator.canShare(sharePayload)) {
-      return false;
-    }
-
-    await navigator.share(sharePayload);
-    return true;
-  }, [t]);
-
-  const handleUndoDelete = useCallback(async (toastId: string, itemId: string) => {
-    removeUndoToast(toastId);
-    await toggleItem(itemId);
-  }, [removeUndoToast, toggleItem]);
-
-  const handleUndoRename = useCallback(async (toastId: string, listId: string, previousName: string) => {
-    removeUndoToast(toastId);
-    await renameList(listId, previousName);
-    if (activeListId === listId) {
-      setNewListName(previousName);
-    }
-  }, [removeUndoToast, renameList, activeListId, setNewListName]);
-
-  const {
-    handlePointerDown,
-    handlePointerUp,
-    handlePointerCancel,
-    longPressTriggeredRef,
-    pressedItemId,
-  } = useLongPressItem({
-    onLongPress: openEditItem,
-    onShortPress: handleToggleItem,
-  });
-
-  const showBackendLogs = __ENVIRONMENT__ !== "production";
-
-  useEffect(() => {
-    const getHistoryState = (): Record<string, unknown> => {
-      const { state } = window.history;
-      return typeof state === "object" && state !== null ? state : {};
-    };
-
-    const pushSentinel = () => {
-      window.history.pushState({ ...getHistoryState(), golistBackBlocked: true }, "");
-    };
-
-    // Do NOT push a sentinel on mount. Firefox skips history entries the user
-    // never interacted with when navigating back (browser.navigation.
-    // requireUserInteraction; Fenix's back gesture uses goBack(userInteraction
-    // = true)). A pushState issued before the first interaction buries the
-    // initial app entry while it is still "uninteracted", so it can never
-    // receive the per-entry interaction flag. The back gesture then skips the
-    // entire app history and lands on the PWA session's initial blank entry —
-    // the dark grey manifest background_color screen. Pushing the first
-    // sentinel only from a user gesture lets that same gesture mark the
-    // underlying app entry as interacted, making it the landing target for
-    // every back gesture so popstate fires and the trap re-arms.
-    let gestureSentinelArmed = false;
-    const gestureEvents: Array<keyof WindowEventMap> = ["pointerdown", "touchstart", "keydown"];
-    const removeGestureListeners = () => {
-      gestureEvents.forEach((eventName) =>
-        window.removeEventListener(eventName, armGestureSentinel, true),
-      );
-    };
-    const armGestureSentinel = () => {
-      if (gestureSentinelArmed) {
-        return;
-      }
-      gestureSentinelArmed = true;
-      pushSentinel();
-      removeGestureListeners();
-    };
-    gestureEvents.forEach((eventName) =>
-      window.addEventListener(eventName, armGestureSentinel, { capture: true, passive: true }),
-    );
-
-    const handlePopState = () => {
-      // Re-push so another trap entry sits above the app entry. Even where the
-      // re-pushed entry itself never counts as user-interacted (Firefox), the
-      // next back gesture falls through to the interacted app entry below,
-      // fires popstate again and re-arms the trap — it never exits the app.
-      pushSentinel();
-
-      if (isPopupOpenRef.current) {
-        closeTopPopupRef.current();
-      }
-    };
-
-    window.addEventListener("popstate", handlePopState);
-
-    return () => {
-      window.removeEventListener("popstate", handlePopState);
-      removeGestureListeners();
-    };
-  }, []);
-
-  useEffect(() => {
-    const pullThreshold = 72;
-    const pullSuppressionThreshold = 10;
-    const maxPull = 96;
-    const getScrollY = () => document.body.scrollTop || window.scrollY || document.scrollingElement?.scrollTop || 0;
-
-    const setPullDistance = (distance: number) => {
-      pullDistanceRef.current = distance;
-      const indicator = pullIndicatorRef.current;
-      if (indicator) {
-        indicator.style.transform = `translate(-50%, ${-56 + distance}px)`;
-      }
-    };
-
-    const setPullRefreshing = (value: boolean) => {
-      isPullRefreshingRef.current = value;
-      setIsPullRefreshing(value);
-    };
-
-    const onTouchStart = (event: TouchEvent) => {
-      suppressItemPressRef.current = false;
-      if (isPopupOpenRef.current || isPullRefreshingRef.current || event.touches.length !== 1 || getScrollY() > 0) {
-        pullStartYRef.current = null;
-        return;
-      }
-
-      pullStartYRef.current = event.touches[0]?.clientY ?? null;
-    };
-
-    const onTouchMove = (event: TouchEvent) => {
-      if (pullStartYRef.current === null || isPopupOpenRef.current || isPullRefreshingRef.current) {
-        return;
-      }
-
-      const currentY = event.touches[0]?.clientY;
-      if (typeof currentY !== "number") {
-        return;
-      }
-
-      const rawDistance = currentY - pullStartYRef.current;
-      if (rawDistance <= 0) {
-        if (pullDistanceRef.current !== 0) {
-          setPullDistance(0);
-        }
-        return;
-      }
-
-      const pullDistanceAfterThreshold = rawDistance - pullSuppressionThreshold;
-      if (pullDistanceAfterThreshold <= 0) {
-        return;
-      }
-
-      suppressItemPressRef.current = true;
-      handlePointerCancel();
-      event.preventDefault();
-      setPullDistance(Math.min(maxPull, pullDistanceAfterThreshold * 0.45));
-    };
-
-    const onTouchEnd = () => {
-      pullStartYRef.current = null;
-      const shouldRefresh =
-        pullDistanceRef.current >= pullThreshold && !isPopupOpenRef.current && !isPullRefreshingRef.current;
-
-      if (!shouldRefresh) {
-        setPullDistance(0);
-        return;
-      }
-
-      setPullDistance(pullThreshold);
-      setPullRefreshing(true);
-      pullRefreshStartedAtRef.current = Date.now();
-
-      void refreshRealtimeConnection()
-        .catch(() => "failed")
-        .finally(() => {
-          const startedAt = pullRefreshStartedAtRef.current ?? Date.now();
-          const elapsed = Date.now() - startedAt;
-          const remainingMs = Math.max(0, 1000 - elapsed);
-
-          window.setTimeout(() => {
-            setPullRefreshing(false);
-            setPullDistance(0);
-            pullRefreshStartedAtRef.current = null;
-          }, remainingMs);
-        });
-    };
-
-    window.addEventListener("touchstart", onTouchStart, { passive: true });
-    window.addEventListener("touchmove", onTouchMove, { passive: false });
-    window.addEventListener("touchend", onTouchEnd);
-    window.addEventListener("touchcancel", onTouchEnd);
-
-    return () => {
-      window.removeEventListener("touchstart", onTouchStart);
-      window.removeEventListener("touchmove", onTouchMove);
-      window.removeEventListener("touchend", onTouchEnd);
-      window.removeEventListener("touchcancel", onTouchEnd);
-    };
-  }, [handlePointerCancel, refreshRealtimeConnection]);
-
-  // --- Stable callback props for memoized children ---
-
-  const handleOpenStats = useCallback(() => setIsListStatsOpen(true), []);
-  const handleCloseStats = useCallback(() => setIsListStatsOpen(false), []);
-
-  const handleStartRename = useCallback(() => {
-    setNewListName(activeListRef.current?.name ?? "");
-    setEditingTitle(true);
-  }, [setNewListName, setEditingTitle]);
-
-  const handleSaveRename = useCallback(() => {
+  const handleSaveRename = useCallback((nextName: string) => {
     void (async () => {
-      const renameResult = await handleRenameList();
-      if (!renameResult) {
+      const list = activeListRef.current;
+      if (!list) {
         return;
       }
-      showUndoRename(renameResult.listId, renameResult.previousName, renameResult.nextName);
+      const previousName = list.name;
+      await renameList(list.id, nextName);
+      showUndoRename(list.id, previousName, nextName);
     })();
-  }, [handleRenameList, showUndoRename]);
+  }, [showUndoRename]);
 
-  const handleCancelRename = useCallback(() => {
-    setNewListName(activeListRef.current?.name ?? "");
-    setEditingTitle(false);
-  }, [setNewListName, setEditingTitle]);
+  const handleUndoDelete = useCallback((toastId: string, itemId: string) => {
+    removeUndoToast(toastId);
+    void toggleItem(itemId);
+  }, [removeUndoToast]);
+
+  const handleUndoRename = useCallback((toastId: string, listId: string, previousName: string) => {
+    removeUndoToast(toastId);
+    void renameList(listId, previousName);
+  }, [removeUndoToast]);
 
   const handleGridPointerDown = useCallback((itemId: string, name: string, quantityOrUnit?: string) => {
     if (suppressItemPressRef.current) {
       return;
     }
     handlePointerDown(itemId, name, quantityOrUnit);
-  }, [handlePointerDown]);
+  }, [handlePointerDown, suppressItemPressRef]);
 
   const handleGridPointerUp = useCallback((itemId: string) => {
     if (suppressItemPressRef.current) {
@@ -595,56 +209,45 @@ const App = () => {
       return;
     }
     handlePointerUp(itemId);
-  }, [handlePointerUp]);
+  }, [handlePointerUp, suppressItemPressRef]);
 
-  const handleOpenDrawer = useCallback(() => setIsDrawerOpen(true), [setIsDrawerOpen]);
-  const handleCloseDrawer = useCallback(() => setIsDrawerOpen(false), [setIsDrawerOpen]);
+  const handleOpenDrawer = useCallback(() => openPopup("drawer"), [openPopup]);
+  const handleCloseDrawer = useCallback(() => closePopup("drawer"), [closePopup]);
+  const handleOpenStats = useCallback(() => openPopup("list-stats"), [openPopup]);
+  const handleCloseStats = useCallback(() => closePopup("list-stats"), [closePopup]);
+  const handleCloseSettings = useCallback(() => closePopup("settings"), [closePopup]);
+  const handleCloseLegal = useCallback(() => closePopup("legal"), [closePopup]);
 
-  const handleShareList = useCallback(() => {
-    void (async () => {
-      try {
-        const shareLink = await handleShareActiveList();
-        try {
-          const shared = await shareWithSystemSheet(shareLink);
-          if (shared) {
-            pushAppToast(t("toast.shareSuccess"), "success");
-            return;
-          }
-        } catch (error) {
-          if (isAbortError(error)) {
-            return;
-          }
-        }
+  const handleOpenSettings = useCallback(() => {
+    closePopup("drawer");
+    openPopup("settings");
+  }, [openPopup, closePopup]);
 
-        await navigator.clipboard.writeText(shareLink);
-        pushAppToast(t("toast.shareCopied"), "success");
-      } catch {
-        pushAppToast(t("toast.shareUnavailable"), "error");
-      }
-    })();
-  }, [handleShareActiveList, shareWithSystemSheet, pushAppToast, t]);
+  const [activeLegalModal, setActiveLegalModal] = useState<LegalModalType | null>(null);
+
+  const handleOpenImprint = useCallback(() => {
+    setActiveLegalModal("imprint");
+    closePopup("drawer");
+    openPopup("legal");
+  }, [openPopup, closePopup]);
+
+  const handleOpenPrivacy = useCallback(() => {
+    setActiveLegalModal("privacy");
+    closePopup("drawer");
+    openPopup("legal");
+  }, [openPopup, closePopup]);
 
   const handleSelectList = useCallback((listId: string) => {
     setActiveList(listId);
-    setIsDrawerOpen(false);
-  }, [setActiveList, setIsDrawerOpen]);
+    closePopup("drawer");
+  }, [closePopup]);
 
-  const handleOpenSettings = useCallback(() => {
-    setIsDrawerOpen(false);
-    setIsSettingsModalOpen(true);
-  }, [setIsDrawerOpen]);
-
-  const handleOpenImprint = useCallback(() => {
-    setIsDrawerOpen(false);
-    setActiveLegalModal("imprint");
-  }, [setIsDrawerOpen]);
-
-  const handleOpenPrivacy = useCallback(() => {
-    setIsDrawerOpen(false);
-    setActiveLegalModal("privacy");
-  }, [setIsDrawerOpen]);
-
-  const handleCloseAddDialog = useCallback(() => setIsAddDialogOpen(false), [setIsAddDialogOpen]);
+  const handleDeleteList = useCallback((listId: string) => {
+    void (async () => {
+      await deleteList(listId);
+      closePopup("drawer");
+    })();
+  }, [closePopup]);
 
   const addItemDialogRef = useRef<AddItemDialogHandle | null>(null);
 
@@ -655,54 +258,19 @@ const App = () => {
     addItemDialogRef.current?.focusInput();
   }, [openAddDialog]);
 
-  const handleCancelCreateList = useCallback(() => {
-    setCreateListName("");
-    setIsCreateListModalOpen(false);
-  }, [setCreateListName, setIsCreateListModalOpen]);
-
   const handleSaveCreateList = useCallback(() => {
     void handleConfirmCreateList();
   }, [handleConfirmCreateList]);
-
-  const handleCancelJoinList = useCallback(() => {
-    setJoinListValue("");
-    setIsJoinListModalOpen(false);
-  }, [setJoinListValue, setIsJoinListModalOpen]);
 
   const handleConfirmJoinList = useCallback(() => {
     void handleJoinList();
   }, [handleJoinList]);
 
-  const handleCloseSettings = useCallback(() => setIsSettingsModalOpen(false), []);
-  const handleCloseLegal = useCallback(() => setActiveLegalModal(null), []);
-  const handleCancelEditItem = useCallback(() => setEditingItemId(null), [setEditingItemId]);
+  const handleSaveEditItem = useCallback(() => {
+    void handleSaveItem();
+  }, [handleSaveItem]);
 
-  // Closes the topmost open popup. Layered so each back press peels off one level.
-  useEffect(() => {
-    closeTopPopupRef.current = () => {
-      if (editingItemId) {
-        handleCancelEditItem();
-      } else if (activeLegalModal !== null) {
-        handleCloseLegal();
-      } else if (isListStatsOpen) {
-        handleCloseStats();
-      } else if (isSettingsModalOpen) {
-        handleCloseSettings();
-      } else if (isJoinListModalOpen) {
-        handleCancelJoinList();
-      } else if (isCreateListModalOpen) {
-        handleCancelCreateList();
-      } else if (isAddDialogOpen) {
-        handleCloseAddDialog();
-      } else if (isDrawerOpen) {
-        handleCloseDrawer();
-      }
-    };
-  });
-
-  const handleAcceptLanguage = useCallback(() => {
-    void handleAcceptLanguageSuggestion();
-  }, [handleAcceptLanguageSuggestion]);
+  const showBackendLogs = __ENVIRONMENT__ !== "production";
 
   return (
     <div className="app">
@@ -716,13 +284,8 @@ const App = () => {
       </div>
       <AppHeader
         activeListName={activeList?.name ?? ""}
-        renameValue={newListName}
-        isEditingName={editingTitle}
         onOpenStats={handleOpenStats}
-        onRenameValueChange={setNewListName}
-        onStartRename={handleStartRename}
         onSaveRename={handleSaveRename}
-        onCancelRename={handleCancelRename}
       />
 
       {isListStatsOpen && (
@@ -759,41 +322,15 @@ const App = () => {
         onShareList={handleShareList}
       />
 
-      <div className="app-toast-stack" aria-live="polite" aria-atomic="false">
-        {appToasts.map((toast) => (
-          <div key={toast.id} className={`app-toast app-toast--${toast.tone}`} role="status">
-            <span className="app-toast__text">{toast.message}</span>
-            <button type="button" className="app-toast__close" onClick={() => removeAppToast(toast.id)}>
-              {t("common.close")}
-            </button>
-          </div>
-        ))}
-      </div>
+      <ToastStacks
+        appToasts={appToasts}
+        undoToasts={undoToasts}
+        onCloseAppToast={removeAppToast}
+        onUndoDelete={handleUndoDelete}
+        onUndoRename={handleUndoRename}
+      />
 
       {showBackendLogs ? <BackendLogPanel /> : null}
-
-      <div className="undo-toast-stack" aria-live="polite" aria-atomic="false">
-        {undoToasts.map((toast) => (
-          <div key={toast.id} className="undo-toast" role="status">
-            <span className="undo-toast__text">
-              {toast.kind === "item-delete"
-                ? t("toast.undoDeleted", { name: toast.item.name })
-                : t("toast.undoRenamed", { name: toast.nextName })}
-            </span>
-            <button
-              type="button"
-              className="undo-toast__action"
-              onClick={() => void (
-                toast.kind === "item-delete"
-                  ? handleUndoDelete(toast.id, toast.item.id)
-                  : handleUndoRename(toast.id, toast.listId, toast.previousName)
-              )}
-            >
-              {t("toast.undo")}
-            </button>
-          </div>
-        ))}
-      </div>
 
       <ListsDrawer
         isOpen={isDrawerOpen}
@@ -804,8 +341,8 @@ const App = () => {
         onOpen={handleOpenDrawer}
         onSelectList={handleSelectList}
         onDeleteList={handleDeleteList}
-        onCreateList={handleCreateList}
-        onJoinList={handleOpenJoinList}
+        onCreateList={openCreateList}
+        onJoinList={openJoinList}
         onOpenSettings={handleOpenSettings}
         onOpenImprint={handleOpenImprint}
         onOpenPrivacy={handleOpenPrivacy}
@@ -818,7 +355,7 @@ const App = () => {
         suggestions={suggestions}
         duplicatePreview={duplicatePreview}
         onItemNameChange={setItemName}
-        onClose={handleCloseAddDialog}
+        onClose={closeAddDialog}
         onAddItem={handleAddItem}
         onAddSuggestion={handleAddSuggestion}
       />
@@ -827,7 +364,7 @@ const App = () => {
         isOpen={isCreateListModalOpen}
         value={createListName}
         onChange={setCreateListName}
-        onCancel={handleCancelCreateList}
+        onCancel={cancelCreateList}
         onSave={handleSaveCreateList}
       />
 
@@ -837,7 +374,7 @@ const App = () => {
             isOpen
             value={joinListValue}
             onChange={setJoinListValue}
-            onCancel={handleCancelJoinList}
+            onCancel={cancelJoinList}
             onJoin={handleConfirmJoinList}
           />
         </Suspense>
@@ -852,7 +389,7 @@ const App = () => {
         </Suspense>
       )}
 
-      {activeLegalModal !== null && (
+      {isLegalModalOpen && activeLegalModal !== null && (
         <Suspense fallback={null}>
           <LegalModal
             isOpen
@@ -863,21 +400,21 @@ const App = () => {
       )}
 
       <EditItemModal
-        isOpen={Boolean(editingItemId)}
+        isOpen={isEditItemOpen}
         name={editItemName}
         quantity={editItemQuantity}
         onNameChange={setEditItemName}
         onQuantityChange={setEditItemQuantity}
-        onCancel={handleCancelEditItem}
-        onSave={handleSaveItem}
+        onCancel={cancelEditItem}
+        onSave={handleSaveEditItem}
       />
 
-      {languageSuggestion && dismissedLanguageSuggestionLocale !== languageSuggestion.suggestedLocale ? (
+      {languageSuggestion ? (
         <LanguageSuggestionModal
           isOpen
           suggestedLocale={languageSuggestion.suggestedLocale}
-          onAccept={handleAcceptLanguage}
-          onDismiss={handleDismissLanguageSuggestion}
+          onAccept={acceptLanguageSuggestion}
+          onDismiss={dismissLanguageSuggestion}
         />
       ) : null}
     </div>
