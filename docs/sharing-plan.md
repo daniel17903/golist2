@@ -97,7 +97,7 @@ The API contract is maintained in `apps/api-spec/openapi.yaml` (and related file
    - active-list scoped subscribe/unsubscribe (only one list synced at a time)
    - digest/hash reconciliation (`list_digest` + `hash_diff`) before targeted `item_patch` exchange
    - optimistic local updates queued and flushed through websocket `item_patch` messages
-4. Frontend keeps bounded reconnect logic (exponential backoff + jitter, max retries) and re-runs digest/hash reconciliation after reconnect.
+4. Frontend keeps bounded reconnect logic (exponential backoff + jitter, max retries) and re-runs digest/hash reconciliation after reconnect; each (re)connect runs one reconciliation pass over all locally known lists (not just the active one) so offline changes sync even after app restarts, and lists created offline are registered via `PUT /v1/lists/{listId}` when their subscription is rejected (see `docs/frontend-sharing-sync.md`).
 5. Frontend does not persist share tokens to local storage/IndexedDB; share tokens are kept in-memory only for the active session.
 6. Local-first behavior is preserved when offline by keeping local mutations authoritative and treating sync errors as non-fatal.
    - Frontend sync flow details are documented in `docs/frontend-sharing-sync.md`.

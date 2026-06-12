@@ -33,15 +33,32 @@ For list/item mutations, the app writes to IndexedDB and updates Zustand state f
 
 ### 3. Active-list subscription
 
-- Only the active list is subscribed.
+- Only one list is subscribed at a time; outside the full sync pass that is the active list.
 - On list switch the client sends `unsubscribe_list` (old) then `subscribe_list` (new).
 - Outbound item and list-metadata patches are queued and flushed only after the subscription is acknowledged.
 
-### 4. Reconciliation protocol
+### 4. Full sync pass after (re)connecting
+
+Because the outbound patch queue lives in memory, changes made offline must not depend on it — they may
+target lists other than the active one, or the app may have been restarted before reconnecting. To cover
+this, every (re)connect triggers one reconciliation pass over **all** locally known lists:
+
+1. The active list is subscribed and reconciled first.
+2. Each remaining local list is subscribed in turn, reconciled via the digest/hash-diff exchange below,
+   then the client advances (an 8s per-list timeout prevents stalls).
+3. The client re-subscribes the active list when the pass completes.
+4. Lists the backend does not know yet (created while offline) are registered once via
+   `PUT /v1/lists/{listId}` when the subscription is rejected with `forbidden`, then retried; lists that
+   remain inaccessible are skipped so the rest of the pass still runs.
+5. On `subscribed`, the client compares the server's list name/`updatedAt` with the local copy and pushes
+   a `list_metadata_patch` when the local rename is newer (so offline renames survive app restarts).
+
+### 5. Reconciliation protocol
 
 On subscription and manual resync:
 
-1. Client and server exchange `list_digest` values.
+1. Client and server exchange `list_digest` values (the server also pushes its `hash_diff` summaries
+   unsolicited right after acknowledging a subscription).
 2. On mismatch, both sides exchange per-item `hash_diff` summaries (`itemId`, `itemHash`, `updatedAt`).
 3. Each side computes missing/stale items and exchanges targeted `item_patch` payloads.
 4. Incoming items are applied only when their `updatedAt` wins; equal timestamps use deterministic hash tie-break.
