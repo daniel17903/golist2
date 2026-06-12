@@ -1,5 +1,7 @@
 import crypto from 'node:crypto'
 
+import { buildItemHash } from '@golist/shared/domain/sync'
+
 import {
   type ItemUpsertInput,
   type ListItemRecord,
@@ -16,12 +18,6 @@ type ShareToken = {
   createdAt: string
   revokedAt?: string
   expiresAt?: string
-}
-
-const itemUpdateTieBreakDelimiter = '\u0001'
-
-function computeItemTieBreakValue(item: ItemUpsertInput | ListItemRecord): string {
-  return `${item.name}${itemUpdateTieBreakDelimiter}${item.iconName}${itemUpdateTieBreakDelimiter}${item.quantityOrUnit ?? ''}${itemUpdateTieBreakDelimiter}${item.category}${itemUpdateTieBreakDelimiter}${item.deleted}`
 }
 
 export class InMemoryListRepository implements ListRepository {
@@ -81,14 +77,14 @@ export class InMemoryListRepository implements ListRepository {
     return { tokenId: token.id, listId: token.listId }
   }
 
-  async putList(listId: string, name: string, deviceId: string): Promise<PutListResult> {
+  async putList(listId: string, name: string, deviceId: string, updatedAt?: string): Promise<PutListResult> {
     const existing = this.lists.get(listId)
     const now = new Date().toISOString()
 
     if (!existing) {
       this.lists.set(listId, {
         createdByDeviceId: deviceId,
-        data: { id: listId, name, createdAt: now, updatedAt: now },
+        data: { id: listId, name, createdAt: now, updatedAt: updatedAt ?? now },
       })
       return { outcome: 'created' }
     }
@@ -97,8 +93,23 @@ export class InMemoryListRepository implements ListRepository {
       return { outcome: 'forbidden' }
     }
 
+    if (updatedAt === undefined) {
+      existing.data.name = name
+      existing.data.updatedAt = now
+      return { outcome: 'updated' }
+    }
+
+    const incomingUpdatedAt = Date.parse(updatedAt)
+    const existingUpdatedAt = Date.parse(existing.data.updatedAt)
+    if (
+      incomingUpdatedAt < existingUpdatedAt ||
+      (incomingUpdatedAt === existingUpdatedAt && existing.data.name === name)
+    ) {
+      return { outcome: 'ignored' }
+    }
+
     existing.data.name = name
-    existing.data.updatedAt = now
+    existing.data.updatedAt = updatedAt
     return { outcome: 'updated' }
   }
 
@@ -173,24 +184,49 @@ export class InMemoryListRepository implements ListRepository {
       return { outcome: 'conflict' }
     }
 
-    const shouldUpdate =
-      existing.updatedAt < input.updatedAt ||
-      (existing.updatedAt === input.updatedAt && computeItemTieBreakValue(existing) < computeItemTieBreakValue(input))
+    void deviceId
 
-    if (shouldUpdate) {
-      this.items.set(itemId, {
-        ...existing,
-        name: input.name,
-        iconName: input.iconName,
-        quantityOrUnit: input.quantityOrUnit,
-        category: input.category,
-        deleted: input.deleted,
-        updatedAt: input.updatedAt,
-      })
-      list.data.updatedAt = input.updatedAt > list.data.updatedAt ? input.updatedAt : list.data.updatedAt
+    // Same LWW rule the clients apply (shared sync hashes).
+    const incomingUpdatedAt = Date.parse(input.updatedAt)
+    const existingUpdatedAt = Date.parse(existing.updatedAt)
+    const shouldUpdate =
+      incomingUpdatedAt > existingUpdatedAt ||
+      (incomingUpdatedAt === existingUpdatedAt &&
+        buildItemHash({
+          id: itemId,
+          listId,
+          name: input.name,
+          iconName: input.iconName,
+          quantityOrUnit: input.quantityOrUnit,
+          category: input.category,
+          deleted: input.deleted,
+          updatedAt: incomingUpdatedAt,
+        }) >
+          buildItemHash({
+            id: existing.id,
+            listId: existing.listId,
+            name: existing.name,
+            iconName: existing.iconName,
+            quantityOrUnit: existing.quantityOrUnit,
+            category: existing.category,
+            deleted: existing.deleted,
+            updatedAt: existingUpdatedAt,
+          }))
+
+    if (!shouldUpdate) {
+      return { outcome: 'ignored' }
     }
 
-    void deviceId
+    this.items.set(itemId, {
+      ...existing,
+      name: input.name,
+      iconName: input.iconName,
+      quantityOrUnit: input.quantityOrUnit,
+      category: input.category,
+      deleted: input.deleted,
+      updatedAt: input.updatedAt,
+    })
+    list.data.updatedAt = input.updatedAt > list.data.updatedAt ? input.updatedAt : list.data.updatedAt
 
     return { outcome: 'updated' }
   }

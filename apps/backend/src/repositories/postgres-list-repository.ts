@@ -1,5 +1,6 @@
 import crypto from 'node:crypto'
 
+import { buildItemHash } from '@golist/shared/domain/sync'
 import { z } from 'zod'
 
 import { query, withTransaction } from '../db/client.js'
@@ -33,8 +34,16 @@ const listAccessQuery = `SELECT EXISTS(
       AND (tokens.expires_at IS NULL OR tokens.expires_at > NOW())
  ) AS has_access`
 
-const itemUpdateTieBreakDelimiter = '\u0001'
 const accessRowSchema = z.object({ has_access: z.boolean() })
+
+// node-postgres returns timestamptz columns as Date objects at runtime.
+// Normalize to ISO strings here so millisecond precision survives later
+// Date.parse calls (a Date coerced via toString() loses milliseconds).
+type TimestampColumn = string | Date
+
+function toIsoTimestamp(value: TimestampColumn): string {
+  return (value instanceof Date ? value : new Date(value)).toISOString()
+}
 
 function toItemRecord(item: {
   id: string
@@ -44,8 +53,8 @@ function toItemRecord(item: {
   quantity_or_unit: string | null
   category: string
   deleted: boolean
-  created_at: string
-  updated_at: string
+  created_at: TimestampColumn
+  updated_at: TimestampColumn
 }): ListItemRecord {
   return {
     id: item.id,
@@ -55,17 +64,13 @@ function toItemRecord(item: {
     quantityOrUnit: item.quantity_or_unit ?? undefined,
     category: item.category,
     deleted: item.deleted,
-    createdAt: item.created_at,
-    updatedAt: item.updated_at,
+    createdAt: toIsoTimestamp(item.created_at),
+    updatedAt: toIsoTimestamp(item.updated_at),
   }
 }
 
 async function touchListUpdatedAt(client: Queryable, listId: string, updatedAt: string) {
   await client.query('UPDATE shared_lists SET updated_at = GREATEST(updated_at, $2::timestamptz) WHERE id = $1', [listId, updatedAt])
-}
-
-function computeItemTieBreakValue(item: ItemUpsertInput): string {
-  return `${item.name}${itemUpdateTieBreakDelimiter}${item.iconName}${itemUpdateTieBreakDelimiter}${item.quantityOrUnit ?? ''}${itemUpdateTieBreakDelimiter}${item.category}${itemUpdateTieBreakDelimiter}${item.deleted}`
 }
 
 async function hasListAccessWithClient(client: Queryable, listId: string, deviceId: string): Promise<boolean> {
@@ -105,14 +110,14 @@ export class PostgresListRepository implements ListRepository {
     }
   }
 
-  async putList(listId: string, name: string, deviceId: string): Promise<PutListResult> {
+  async putList(listId: string, name: string, deviceId: string, updatedAt?: string): Promise<PutListResult> {
     return withTransaction(async (client) => {
       const existingListResult = await client.query<{ id: string }>('SELECT id FROM shared_lists WHERE id = $1 FOR UPDATE', [listId])
 
       if (!existingListResult.rowCount) {
         await client.query(
-          'INSERT INTO shared_lists(id, name, created_by_device_id, created_at, updated_at) VALUES ($1, $2, $3, NOW(), NOW())',
-          [listId, name, deviceId],
+          'INSERT INTO shared_lists(id, name, created_by_device_id, created_at, updated_at) VALUES ($1, $2, $3, NOW(), COALESCE($4::timestamptz, NOW()))',
+          [listId, name, deviceId, updatedAt ?? null],
         )
         return { outcome: 'created' }
       }
@@ -121,14 +126,30 @@ export class PostgresListRepository implements ListRepository {
         return { outcome: 'forbidden' }
       }
 
-      await client.query('UPDATE shared_lists SET name = $1, updated_at = NOW() WHERE id = $2', [name, listId])
+      if (updatedAt === undefined) {
+        await client.query('UPDATE shared_lists SET name = $1, updated_at = NOW() WHERE id = $2', [name, listId])
+        return { outcome: 'updated' }
+      }
 
-      return { outcome: 'updated' }
+      // Mirrors the client's metadata LWW rule: apply only when the incoming
+      // change is newer, or carries a different name at the same millisecond.
+      const updateResult = await client.query(
+        `UPDATE shared_lists
+            SET name = $1, updated_at = $3
+          WHERE id = $2
+            AND (
+              date_trunc('milliseconds', updated_at) < $3::timestamptz
+              OR (date_trunc('milliseconds', updated_at) = $3::timestamptz AND name <> $1)
+            )`,
+        [name, listId, updatedAt],
+      )
+
+      return { outcome: updateResult.rowCount ? 'updated' : 'ignored' }
     })
   }
 
   async getList(listId: string): Promise<ListRecord | null> {
-    const listResult = await query<{ id: string; name: string; created_at: string; updated_at: string }>(
+    const listResult = await query<{ id: string; name: string; created_at: TimestampColumn; updated_at: TimestampColumn }>(
       'SELECT id, name, created_at, updated_at FROM shared_lists WHERE id = $1 LIMIT 1',
       [listId],
     )
@@ -140,8 +161,8 @@ export class PostgresListRepository implements ListRepository {
     return {
       id: listResult.rows[0].id,
       name: listResult.rows[0].name,
-      createdAt: listResult.rows[0].created_at,
-      updatedAt: listResult.rows[0].updated_at,
+      createdAt: toIsoTimestamp(listResult.rows[0].created_at),
+      updatedAt: toIsoTimestamp(listResult.rows[0].updated_at),
     }
   }
 
@@ -163,8 +184,8 @@ export class PostgresListRepository implements ListRepository {
       quantity_or_unit: string | null
       category: string
       deleted: boolean
-      created_at: string
-      updated_at: string
+      created_at: TimestampColumn
+      updated_at: TimestampColumn
     }>(
       `SELECT id, list_id, name, icon_name, quantity_or_unit, category, deleted, created_at, updated_at
          FROM list_items
@@ -185,8 +206,8 @@ export class PostgresListRepository implements ListRepository {
       quantity_or_unit: string | null
       category: string
       deleted: boolean
-      created_at: string
-      updated_at: string
+      created_at: TimestampColumn
+      updated_at: TimestampColumn
     }>(
       `SELECT id, list_id, name, icon_name, quantity_or_unit, category, deleted, created_at, updated_at
          FROM list_items
@@ -207,8 +228,8 @@ export class PostgresListRepository implements ListRepository {
       quantity_or_unit: string | null
       category: string
       deleted: boolean
-      created_at: string
-      updated_at: string
+      created_at: TimestampColumn
+      updated_at: TimestampColumn
     }>(
       `SELECT id, list_id, name, icon_name, quantity_or_unit, category, deleted, created_at, updated_at
          FROM list_items
@@ -230,12 +251,21 @@ export class PostgresListRepository implements ListRepository {
     deviceId: string,
     input: ItemUpsertInput,
   ): Promise<UpsertListItemResult> {
-    const tieBreakValue = computeItemTieBreakValue(input)
-
     return withTransaction(async (client) => {
       await client.query('SELECT id FROM shared_lists WHERE id = $1 FOR UPDATE', [listId])
 
-      const existingItemResult = await client.query<{ id: string; list_id: string }>('SELECT id, list_id FROM list_items WHERE id = $1 FOR UPDATE', [itemId])
+      const existingItemResult = await client.query<{
+        list_id: string
+        name: string
+        icon_name: string
+        quantity_or_unit: string | null
+        category: string
+        deleted: boolean
+        updated_at: TimestampColumn
+      }>(
+        'SELECT list_id, name, icon_name, quantity_or_unit, category, deleted, updated_at FROM list_items WHERE id = $1 FOR UPDATE',
+        [itemId],
+      )
 
       if (!existingItemResult.rowCount) {
         await client.query(
@@ -249,11 +279,46 @@ export class PostgresListRepository implements ListRepository {
         return { outcome: 'created' }
       }
 
-      if (existingItemResult.rows[0].list_id !== listId) {
+      const existing = existingItemResult.rows[0]
+
+      if (existing.list_id !== listId) {
         return { outcome: 'conflict' }
       }
 
-      const updateResult = await client.query(
+      // Same LWW rule the clients apply (shared sync hashes), so the persisted
+      // winner always matches what connected devices resolve locally. The row
+      // is locked above, so deciding here is race-free.
+      const incomingUpdatedAt = Date.parse(input.updatedAt)
+      const existingUpdatedAt = Date.parse(toIsoTimestamp(existing.updated_at))
+      const shouldUpdate =
+        incomingUpdatedAt > existingUpdatedAt ||
+        (incomingUpdatedAt === existingUpdatedAt &&
+          buildItemHash({
+            id: itemId,
+            listId,
+            name: input.name,
+            iconName: input.iconName,
+            quantityOrUnit: input.quantityOrUnit,
+            category: input.category,
+            deleted: input.deleted,
+            updatedAt: incomingUpdatedAt,
+          }) >
+            buildItemHash({
+              id: itemId,
+              listId,
+              name: existing.name,
+              iconName: existing.icon_name,
+              quantityOrUnit: existing.quantity_or_unit ?? undefined,
+              category: existing.category,
+              deleted: existing.deleted,
+              updatedAt: existingUpdatedAt,
+            }))
+
+      if (!shouldUpdate) {
+        return { outcome: 'ignored' }
+      }
+
+      await client.query(
         `UPDATE list_items
             SET name = $1,
                 icon_name = $2,
@@ -263,20 +328,11 @@ export class PostgresListRepository implements ListRepository {
                 updated_at = $6,
                 deleted_at = CASE WHEN $5 THEN NOW() ELSE NULL END
           WHERE id = $7
-            AND list_id = $8
-            AND (
-              updated_at < $6
-              OR (
-                updated_at = $6
-                AND CONCAT_WS($10, name, icon_name, COALESCE(quantity_or_unit, ''), category, deleted::text) < $9
-              )
-            )`,
-        [input.name, input.iconName, input.quantityOrUnit ?? null, input.category, input.deleted, input.updatedAt, itemId, listId, tieBreakValue, itemUpdateTieBreakDelimiter],
+            AND list_id = $8`,
+        [input.name, input.iconName, input.quantityOrUnit ?? null, input.category, input.deleted, input.updatedAt, itemId, listId],
       )
 
-      if (updateResult.rowCount) {
-        await touchListUpdatedAt(client, listId, input.updatedAt)
-      }
+      await touchListUpdatedAt(client, listId, input.updatedAt)
 
       return { outcome: 'updated' }
     })
@@ -284,7 +340,7 @@ export class PostgresListRepository implements ListRepository {
 
   async createShareToken(listId: string, deviceId: string): Promise<{ tokenId: string; createdAt: string }> {
     const tokenId = crypto.randomUUID()
-    const result = await query<{ created_at: string }>(
+    const result = await query<{ created_at: TimestampColumn }>(
       `INSERT INTO share_tokens(id, list_id, created_by_device_id, created_at)
        VALUES ($1, $2, $3, NOW())
        RETURNING created_at`,
@@ -293,7 +349,7 @@ export class PostgresListRepository implements ListRepository {
 
     return {
       tokenId,
-      createdAt: result.rows[0].created_at,
+      createdAt: toIsoTimestamp(result.rows[0].created_at),
     }
   }
 

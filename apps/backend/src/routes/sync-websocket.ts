@@ -142,22 +142,6 @@ const toSyncItem = (item: ListItemRecord): Item => ({
   updatedAt: Date.parse(item.updatedAt),
 })
 
-const shouldAcceptIncomingItem = (existing: Item | null, incoming: Item) => {
-  if (!existing) {
-    return true
-  }
-
-  if (incoming.updatedAt > existing.updatedAt) {
-    return true
-  }
-
-  if (incoming.updatedAt < existing.updatedAt) {
-    return false
-  }
-
-  return buildItemHash(incoming) >= buildItemHash(existing)
-}
-
 export function registerSyncWebsocketRoute(app: FastifyInstance, listRepository: ListRepository) {
   const subscribers = new Map<string, Set<ServerSocket>>()
 
@@ -319,14 +303,7 @@ export function registerSyncWebsocketRoute(app: FastifyInstance, listRepository:
           if (parsedPayload.type === 'item_patch') {
             const accepted: Item[] = []
             for (const item of parsedPayload.items) {
-              const existingRecord = await listRepository.getListItem(parsedPayload.listId, item.id)
-              const existing = existingRecord ? toSyncItem(existingRecord) : null
-
-              if (!shouldAcceptIncomingItem(existing, item)) {
-                continue
-              }
-
-              await listRepository.upsertListItem(parsedPayload.listId, item.id, state.deviceId, {
+              const result = await listRepository.upsertListItem(parsedPayload.listId, item.id, state.deviceId, {
                 name: item.name,
                 iconName: item.iconName,
                 quantityOrUnit: item.quantityOrUnit,
@@ -334,7 +311,12 @@ export function registerSyncWebsocketRoute(app: FastifyInstance, listRepository:
                 deleted: item.deleted,
                 updatedAt: new Date(item.updatedAt).toISOString(),
               })
-              accepted.push(item)
+
+              // Only rebroadcast what was actually persisted, so connected
+              // clients never diverge from the database.
+              if (result.outcome === 'created' || result.outcome === 'updated') {
+                accepted.push(item)
+              }
             }
 
             if (accepted.length > 0) {
@@ -345,9 +327,19 @@ export function registerSyncWebsocketRoute(app: FastifyInstance, listRepository:
           }
 
           if (parsedPayload.type === 'list_metadata_patch') {
-            const listResult = await listRepository.putList(parsedPayload.listId, parsedPayload.name, state.deviceId)
+            const listResult = await listRepository.putList(
+              parsedPayload.listId,
+              parsedPayload.name,
+              state.deviceId,
+              new Date(parsedPayload.updatedAt).toISOString(),
+            )
             if (listResult.outcome === 'forbidden') {
               send(socket, { type: 'error', message: 'forbidden' })
+              return
+            }
+
+            // Stale patch lost the LWW comparison against the stored list.
+            if (listResult.outcome === 'ignored') {
               return
             }
 
