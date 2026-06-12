@@ -50,6 +50,9 @@ type AppToast = {
 
 type LegalModalType = "imprint" | "privacy";
 const MAX_UNDO_TOASTS = 3;
+// Exit animation runs 220ms; the fallback covers animationend never firing
+// (hidden tab, interrupted animation, card removed from the DOM).
+const EXIT_ANIMATION_FALLBACK_MS = 400;
 
 const isAbortError = (error: unknown): boolean => {
   if (error instanceof DOMException) {
@@ -131,8 +134,12 @@ const App = () => {
   const [activeLegalModal, setActiveLegalModal] = useState<LegalModalType | null>(null);
   const pullStartYRef = useRef<number | null>(null);
   const suppressItemPressRef = useRef(false);
-  const [pullDistance, setPullDistance] = useState(0);
+  // The pull distance is written straight to the indicator element so the
+  // whole app doesn't re-render on every touchmove frame while pulling.
+  const pullIndicatorRef = useRef<HTMLDivElement | null>(null);
+  const pullDistanceRef = useRef(0);
   const [isPullRefreshing, setIsPullRefreshing] = useState(false);
+  const isPullRefreshingRef = useRef(false);
   const pullRefreshStartedAtRef = useRef<number | null>(null);
   const isPopupOpen =
     isDrawerOpen ||
@@ -294,31 +301,25 @@ const App = () => {
       undoTimeoutsRef.current.clear();
       toastTimeoutsRef.current.forEach((timeout) => window.clearTimeout(timeout));
       toastTimeoutsRef.current.clear();
+      exitTimeoutsRef.current.forEach((timeout) => window.clearTimeout(timeout));
+      exitTimeoutsRef.current.clear();
     },
     [],
   );
 
-  const exitingItemIdsRef = useRef(exitingItemIds);
-  useEffect(() => { exitingItemIdsRef.current = exitingItemIds; });
-
   const itemsRef = useRef(items);
   useEffect(() => { itemsRef.current = items; });
 
-  const handleToggleItem = useCallback(async (itemId: string) => {
-    if (exitingItemIdsRef.current.has(itemId)) {return;}
-    const itemToDelete = itemsRef.current.find((item) => item.id === itemId);
-    if (!itemToDelete) {return;}
-
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      await toggleItem(itemId);
-      showUndoDelete(itemToDelete);
-      return;
-    }
-    setExitingItemIds((current) => new Set(current).add(itemId));
-  }, [toggleItem, showUndoDelete]);
+  // Pending exit fallbacks, keyed by item id. An entry also marks the item as
+  // "exit in progress", so completion runs exactly once even when both
+  // animationend and the fallback timer fire.
+  const exitTimeoutsRef = useRef<Map<string, number>>(new Map());
 
   const handleExitComplete = useCallback(async (itemId: string) => {
-    if (!exitingItemIdsRef.current.has(itemId)) {return;}
+    const fallbackTimeout = exitTimeoutsRef.current.get(itemId);
+    if (fallbackTimeout === undefined) {return;}
+    window.clearTimeout(fallbackTimeout);
+    exitTimeoutsRef.current.delete(itemId);
     const deletedItem = itemsRef.current.find((item) => item.id === itemId);
     await toggleItem(itemId);
     if (deletedItem) {
@@ -331,8 +332,22 @@ const App = () => {
     });
   }, [toggleItem, showUndoDelete]);
 
-  const pullDistanceRef = useRef(pullDistance);
-  useEffect(() => { pullDistanceRef.current = pullDistance; });
+  const handleToggleItem = useCallback(async (itemId: string) => {
+    if (exitTimeoutsRef.current.has(itemId)) {return;}
+    const itemToDelete = itemsRef.current.find((item) => item.id === itemId);
+    if (!itemToDelete) {return;}
+
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      await toggleItem(itemId);
+      showUndoDelete(itemToDelete);
+      return;
+    }
+    const fallbackTimeout = window.setTimeout(() => {
+      void handleExitComplete(itemId);
+    }, EXIT_ANIMATION_FALLBACK_MS);
+    exitTimeoutsRef.current.set(itemId, fallbackTimeout);
+    setExitingItemIds((current) => new Set(current).add(itemId));
+  }, [toggleItem, showUndoDelete, handleExitComplete]);
 
   const activeListRef = useRef(activeList);
   useEffect(() => { activeListRef.current = activeList; });
@@ -448,9 +463,22 @@ const App = () => {
     const maxPull = 96;
     const getScrollY = () => document.body.scrollTop || window.scrollY || document.scrollingElement?.scrollTop || 0;
 
+    const setPullDistance = (distance: number) => {
+      pullDistanceRef.current = distance;
+      const indicator = pullIndicatorRef.current;
+      if (indicator) {
+        indicator.style.transform = `translate(-50%, ${-56 + distance}px)`;
+      }
+    };
+
+    const setPullRefreshing = (value: boolean) => {
+      isPullRefreshingRef.current = value;
+      setIsPullRefreshing(value);
+    };
+
     const onTouchStart = (event: TouchEvent) => {
       suppressItemPressRef.current = false;
-      if (isPopupOpen || isPullRefreshing || event.touches.length !== 1 || getScrollY() > 0) {
+      if (isPopupOpenRef.current || isPullRefreshingRef.current || event.touches.length !== 1 || getScrollY() > 0) {
         pullStartYRef.current = null;
         return;
       }
@@ -459,7 +487,7 @@ const App = () => {
     };
 
     const onTouchMove = (event: TouchEvent) => {
-      if (pullStartYRef.current === null || isPopupOpen || isPullRefreshing) {
+      if (pullStartYRef.current === null || isPopupOpenRef.current || isPullRefreshingRef.current) {
         return;
       }
 
@@ -489,7 +517,8 @@ const App = () => {
 
     const onTouchEnd = () => {
       pullStartYRef.current = null;
-      const shouldRefresh = pullDistanceRef.current >= pullThreshold && !isPopupOpen && !isPullRefreshing;
+      const shouldRefresh =
+        pullDistanceRef.current >= pullThreshold && !isPopupOpenRef.current && !isPullRefreshingRef.current;
 
       if (!shouldRefresh) {
         setPullDistance(0);
@@ -497,7 +526,7 @@ const App = () => {
       }
 
       setPullDistance(pullThreshold);
-      setIsPullRefreshing(true);
+      setPullRefreshing(true);
       pullRefreshStartedAtRef.current = Date.now();
 
       void refreshRealtimeConnection()
@@ -508,7 +537,7 @@ const App = () => {
           const remainingMs = Math.max(0, 1000 - elapsed);
 
           window.setTimeout(() => {
-            setIsPullRefreshing(false);
+            setPullRefreshing(false);
             setPullDistance(0);
             pullRefreshStartedAtRef.current = null;
           }, remainingMs);
@@ -526,7 +555,7 @@ const App = () => {
       window.removeEventListener("touchend", onTouchEnd);
       window.removeEventListener("touchcancel", onTouchEnd);
     };
-  }, [handlePointerCancel, isPopupOpen, isPullRefreshing, refreshRealtimeConnection]);
+  }, [handlePointerCancel, refreshRealtimeConnection]);
 
   // --- Stable callback props for memoized children ---
 
@@ -678,8 +707,9 @@ const App = () => {
   return (
     <div className="app">
       <div
+        ref={pullIndicatorRef}
         className={`pull-refresh-indicator${isPullRefreshing ? " pull-refresh-indicator--active" : ""}`}
-        style={{ transform: `translate(-50%, ${-56 + pullDistance}px)` }}
+        style={{ transform: "translate(-50%, -56px)" }}
         aria-hidden="true"
       >
         <span className="pull-refresh-indicator__ring" />
