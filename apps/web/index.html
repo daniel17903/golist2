@@ -7,11 +7,62 @@
     <link rel="shortcut icon" href="/favicon.ico" />
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#0b3d5c" />
     <meta name="description" content="GoList is a fast, simplistic and offline-ready grocery list app to organize and share shopping lists." />
     <title>GoList</title>
+    <!--
+      Critical inline app shell: this HTML is precached by the service worker
+      and served instantly (even on a slow connection / offline). Painting the
+      branded gradient + spinner here closes the "grey screen" gap that the PWA
+      standalone splash would otherwise leave while the JS bundle loads. React
+      replaces #root on first render, removing the shell automatically.
+      Keep the gradient in sync with `:root` in src/styles.css.
+    -->
+    <style>
+      html {
+        background: radial-gradient(
+          circle at bottom,
+          #e4b2d2 0%,
+          #bde5ee 30%,
+          #d8e8af 55%,
+          #f6f294 75%,
+          #005382 100%
+        );
+        min-height: 100svh;
+      }
+      .app-shell {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .app-shell__ring {
+        width: 32px;
+        height: 32px;
+        border-radius: 999px;
+        border: 3px solid rgba(11, 61, 92, 0.25);
+        border-top-color: #0b3d5c;
+        animation: app-shell-spin 0.8s linear infinite;
+      }
+      @keyframes app-shell-spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .app-shell__ring {
+          animation: none;
+        }
+      }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div class="app-shell" aria-hidden="true">
+        <span class="app-shell__ring"></span>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
