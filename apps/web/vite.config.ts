@@ -39,7 +39,10 @@ export default defineConfig({
         description: "Smart grocery lists with list-specific suggestions and category sorting.",
         categories: ["shopping", "productivity", "utilities"],
         theme_color: "#0b3d5c",
-        background_color: "#404e55",
+        // Matches the dark-blue outer stop of the app's radial gradient
+        // (src/styles.css :root) so the PWA standalone splash blends into the
+        // app shell instead of flashing a neutral grey on launch.
+        background_color: "#005382",
         display: "standalone",
         start_url: "/",
         scope: "/",
