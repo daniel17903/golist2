@@ -1,4 +1,4 @@
-import { defaultCategoryLanguage, getCategoryIdForItemName, getIconNameForItemName, supportedCategoryLanguages } from '@golist/shared/domain/item-category-mapping'
+import { defaultCategoryLanguage, getCategoryAndIconForItemName, supportedCategoryLanguages } from '@golist/shared/domain/item-category-mapping'
 import { type FastifyInstance } from 'fastify'
 import { z } from 'zod'
 
@@ -95,12 +95,14 @@ export function registerListRoutes(app: FastifyInstance, listRepository: ListRep
     const shouldAutoMapIconName = !body.iconName && (!existingItem || existingItem.name !== body.name)
     const existingCategory = existingItem?.category ?? 'other'
     const existingIconName = existingItem?.iconName ?? 'default'
+    const resolved =
+      shouldAutoMapCategory || shouldAutoMapIconName
+        ? getCategoryAndIconForItemName(body.name, body.language)
+        : undefined
     const category =
-      body.category ??
-      (shouldAutoMapCategory ? getCategoryIdForItemName(body.name, body.language) ?? 'other' : existingCategory)
+      body.category ?? (shouldAutoMapCategory ? resolved?.category ?? 'other' : existingCategory)
     const iconName =
-      body.iconName ??
-      (shouldAutoMapIconName ? getIconNameForItemName(body.name, body.language) ?? 'default' : existingIconName)
+      body.iconName ?? (shouldAutoMapIconName ? resolved?.iconName ?? 'default' : existingIconName)
 
     const result = await listRepository.upsertListItem(request.auth!.listId, params.itemId, request.auth!.deviceId, {
       name: body.name,
