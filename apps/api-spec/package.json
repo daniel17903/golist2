@@ -10,7 +10,7 @@
     "@redocly/cli": "^2.30.4"
   },
   "dependencies": {
-    "yaml": "^2.8.1"
+    "yaml": "^2.9.0"
   },
   "engines": {
     "node": ">=24.0.0"
