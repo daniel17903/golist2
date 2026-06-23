@@ -1,4 +1,4 @@
-import { defaultCategoryLanguage, getCategoryAndIconForItemName, supportedCategoryLanguages } from '@golist/shared/domain/item-category-mapping'
+import { defaultCategoryLanguage, detectCategoryLanguageForNames, getCategoryAndIconForItemName, supportedCategoryLanguages } from '@golist/shared/domain/item-category-mapping'
 import { type FastifyInstance } from 'fastify'
 import { z } from 'zod'
 
@@ -14,7 +14,7 @@ const itemUpsertSchema = z.object({
   quantityOrUnit: z.string().min(1).optional(),
   iconName: z.string().min(1).optional(),
   category: z.string().min(1).optional(),
-  language: z.enum(supportedCategoryLanguages).default(defaultCategoryLanguage),
+  language: z.enum(supportedCategoryLanguages).optional(),
   deleted: z.boolean(),
   updatedAt: z.iso.datetime({ offset: true }),
 })
@@ -95,10 +95,21 @@ export function registerListRoutes(app: FastifyInstance, listRepository: ListRep
     const shouldAutoMapIconName = !body.iconName && (!existingItem || existingItem.name !== body.name)
     const existingCategory = existingItem?.category ?? 'other'
     const existingIconName = existingItem?.iconName ?? 'default'
-    const resolved =
-      shouldAutoMapCategory || shouldAutoMapIconName
-        ? getCategoryAndIconForItemName(body.name, body.language)
-        : undefined
+    let resolved: { category: string | undefined; iconName: string | undefined } | undefined
+    if (shouldAutoMapCategory || shouldAutoMapIconName) {
+      // When the client did not specify a language, infer it from the other
+      // items already on the list so categories/icons match the list's
+      // language instead of defaulting to English.
+      let language = body.language
+      if (!language) {
+        const listItems = await listRepository.listItems(request.auth!.listId)
+        const otherItemNames = listItems
+          .filter((item) => !item.deleted && item.id !== params.itemId)
+          .map((item) => item.name)
+        language = detectCategoryLanguageForNames(otherItemNames, defaultCategoryLanguage)
+      }
+      resolved = getCategoryAndIconForItemName(body.name, language)
+    }
     const category =
       body.category ?? (shouldAutoMapCategory ? resolved?.category ?? 'other' : existingCategory)
     const iconName =

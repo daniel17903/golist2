@@ -2862,3 +2862,35 @@ export const getCategoryAndIconForItemName = (
     iconName: itemIconMapByLanguage[language].get(key),
   };
 };
+
+/**
+ * Infers the most likely category language for a set of item names by scoring
+ * how many of the names resolve to a known category in each supported language.
+ * Returns the single highest-scoring language; on a tie (or when no name
+ * resolves in any language) it returns the provided fallback. Useful for
+ * picking the language of an existing list when a caller did not specify one.
+ */
+export const detectCategoryLanguageForNames = (
+  names: string[],
+  fallback: CategoryLanguage = defaultCategoryLanguage,
+): CategoryLanguage => {
+  const scores = supportedCategoryLanguages.map((language) => ({
+    language,
+    score: names.reduce(
+      (total, name) => (resolveCategoryEntryForItemName(name, language) ? total + 1 : total),
+      0,
+    ),
+  }));
+
+  const bestScore = Math.max(...scores.map(({ score }) => score));
+  if (bestScore === 0) {
+    return fallback;
+  }
+
+  const winners = scores.filter(({ score }) => score === bestScore);
+  if (winners.length !== 1) {
+    return fallback;
+  }
+
+  return winners[0]!.language;
+};
