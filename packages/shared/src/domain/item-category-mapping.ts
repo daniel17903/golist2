@@ -894,6 +894,13 @@ const categoryEntriesDe: CategoryEntry[] = [
     ],
     "category": "fruitsVegetables",
   },
+  {
+    "assetFileName": "ginger",
+    "matchingNames": [
+      "ingwer",
+    ],
+    "category": "fruitsVegetables",
+  },
 ];
 
 const categoryEntriesEn: CategoryEntry[] = [
@@ -1788,6 +1795,13 @@ const categoryEntriesEn: CategoryEntry[] = [
     "matchingNames": [
       "celery",
       "celery stalk",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "ginger",
+    "matchingNames": [
+      "ginger",
     ],
     "category": "fruitsVegetables",
   },
@@ -2728,6 +2742,13 @@ const categoryEntriesEs: CategoryEntry[] = [
     "matchingNames": [
       "apio",
       "tallo de apio",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "ginger",
+    "matchingNames": [
+      "jengibre",
     ],
     "category": "fruitsVegetables",
   },
