@@ -45,6 +45,16 @@ const collectDirectSvgReferences = (): string[] => {
   return [...references];
 };
 
+// Mirrors normalizeNameForMatching in
+// packages/shared/src/domain/item-category-mapping.ts so the test detects the
+// same collisions the runtime resolver would see.
+const normalizeNameForMatching = (value: string): string =>
+  value
+    .trim()
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .replace(/\s+/g, " ");
+
 const collectItemIconNames = (): string[] => {
   const names = new Set<string>(["default"]);
 
@@ -66,5 +76,41 @@ describe("item icons", () => {
     );
 
     expect(missingIcons).toEqual([]);
+  });
+
+  // A matching name listed in two entries with different icons (or categories)
+  // is a bug: the resolver silently picks one and the other never wins, so the
+  // intended icon is dead. This guards against reintroducing such collisions.
+  it("maps each item name to exactly one icon and category per language", () => {
+    const conflicts: string[] = [];
+
+    Object.entries(categoryEntriesByLanguage).forEach(([language, entries]) => {
+      const byName = new Map<string, { icons: Set<string>; categories: Set<string> }>();
+
+      entries.forEach((entry) => {
+        entry.matchingNames.forEach((rawName) => {
+          const name = normalizeNameForMatching(rawName);
+          if (!name) {
+            return;
+          }
+
+          const bucket = byName.get(name) ?? { icons: new Set<string>(), categories: new Set<string>() };
+          bucket.icons.add(entry.assetFileName);
+          bucket.categories.add(entry.category);
+          byName.set(name, bucket);
+        });
+      });
+
+      byName.forEach((bucket, name) => {
+        if (bucket.icons.size > 1 || bucket.categories.size > 1) {
+          conflicts.push(
+            `[${language}] "${name}" -> icons: {${[...bucket.icons].join(", ")}}, ` +
+              `categories: {${[...bucket.categories].join(", ")}}`,
+          );
+        }
+      });
+    });
+
+    expect(conflicts).toEqual([]);
   });
 });
