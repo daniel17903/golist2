@@ -68,6 +68,38 @@
 - `apps/web/public/favicon.svg`.
 - PWA manifest configured in `apps/web/vite.config.ts`.
 
+## Item icons (`apps/web/public/icons/`)
+- All item icons are **512×512 SVGs** with the Adobe Illustrator export header
+  (`<svg version="1.1" ... width="512px" height="512px" viewBox="0 0 512 512" ...>`).
+  Match this header and the `512x512` size exactly for new icons.
+- **Visual style**: black, hand-drawn line-art (outline drawings, not filled
+  silhouettes). Every file defines a `.st0` CSS class:
+  `fill:none; stroke:#000000; stroke-width:30; stroke-linecap:round;
+  stroke-linejoin:round; stroke-miterlimit:10;`.
+  The stock icons render their outlines as filled double-contour `<path>`s, but
+  authoring new icons as **stroked paths using `class="st0"`** produces a
+  visually consistent result and is far easier to hand-author. Use a thinner
+  companion class (e.g. `.st1` with `stroke-width:18`) for fine details like
+  feathery fronds so they don't read as chunky as the main `30`px outline.
+- **NEVER verify an icon's appearance yourself** — there is no SVG renderer
+  available locally (`rsvg-convert`, `inkscape`, `sharp`, `cairosvg` are all
+  absent), and you must not spin up a browser/screenshot to judge whether an
+  icon "looks right". Author the SVG, then **ask the user to confirm it looks
+  correct**. Only the user judges visual correctness.
+- Adding the SVG file alone does **not** wire the icon to any item. You **must**
+  also add the icon to `packages/shared/src/domain/item-category-mapping.ts` so
+  item names resolve to it. That file has one `CategoryEntry[]` array per
+  supported language (`categoryEntriesDe`, `categoryEntriesEn`,
+  `categoryEntriesEs`). Add an entry — `{ assetFileName, matchingNames, category }`
+  with `assetFileName` set to the new SVG's base filename — to **every** language
+  array, keeping the `category` the same across all languages and translating
+  only the `matchingNames` (e.g. fennel → de `fenchel`, en `fennel`, es `hinojo`,
+  all `fruitsVegetables`). If you are unsure which `category` to use or which item
+  names should map to the icon, **ask the user** instead of guessing.
+- After editing the mapping, run `npm run typecheck -w apps/web` (the web app
+  consumes the shared package; `packages/shared` has no standalone typecheck
+  script).
+
 ## Storage/migrations
 - Dexie schema lives in `apps/web/src/storage/db.ts`. Keep migrations backward-compatible.
 

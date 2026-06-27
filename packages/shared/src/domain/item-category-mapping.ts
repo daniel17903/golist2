@@ -894,6 +894,13 @@ const categoryEntriesDe: CategoryEntry[] = [
     ],
     "category": "fruitsVegetables",
   },
+  {
+    "assetFileName": "fennel",
+    "matchingNames": [
+      "fenchel",
+    ],
+    "category": "fruitsVegetables",
+  },
 ];
 
 const categoryEntriesEn: CategoryEntry[] = [
@@ -1788,6 +1795,13 @@ const categoryEntriesEn: CategoryEntry[] = [
     "matchingNames": [
       "celery",
       "celery stalk",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "fennel",
+    "matchingNames": [
+      "fennel",
     ],
     "category": "fruitsVegetables",
   },
@@ -2728,6 +2742,13 @@ const categoryEntriesEs: CategoryEntry[] = [
     "matchingNames": [
       "apio",
       "tallo de apio",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "fennel",
+    "matchingNames": [
+      "hinojo",
     ],
     "category": "fruitsVegetables",
   },
