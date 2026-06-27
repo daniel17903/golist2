@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generator: Adobe Adobe Illustrator 24.2.0, SVG Export Plug-In . SVG Version: 6.00 Build 0)  -->
+<svg version="1.1" id="Ebene_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+	 width="512px" height="512px" viewBox="0 0 512 512" style="enable-background:new 0 0 512 512;" xml:space="preserve">
+<style type="text/css">
+	.st0{fill:none;stroke:#000000;stroke-width:30;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:10;}
+	.st1{fill:none;stroke:#000000;stroke-width:18;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:10;}
+</style>
+<g>
+	<!-- knobby rhizome outline -->
+	<path class="st0" d="M104,352c-34,-22,-30,-70,6,-86c-26,-42,-12,-86,22,-92c30,-5,44,28,48,64c20,-8,40,-8,58,2
+		c8,-46,-6,-78,28,-96c30,-15,56,14,60,58c34,-6,68,6,90,34c34,10,50,42,32,72c14,32,-8,64,-44,68c-32,26,-78,28,-112,8
+		c-40,18,-90,18,-126,-4C138,388,118,374,104,352z"/>
+	<!-- finger / growth-ring detail -->
+	<path class="st1" d="M186,212c14,-8,34,-8,50,0"/>
+	<path class="st1" d="M262,200c16,-10,40,-10,58,2"/>
+	<path class="st1" d="M300,300c22,-10,52,-10,76,2"/>
+	<path class="st1" d="M150,300c14,-8,34,-8,50,2"/>
+</g>
+</svg>
