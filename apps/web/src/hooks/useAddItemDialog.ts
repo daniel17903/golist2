@@ -96,6 +96,11 @@ export const useAddItemDialog = ({ openPopup, closePopup }: AddItemDialogOptions
   }, [itemName, locale, currentItemNames]);
 
   const openAddDialog = useCallback(() => {
+    // Always start from a clean slate: closing the dialog via backdrop click
+    // (closeAddDialog below) does not clear itemName, so without this reset
+    // reopening would show stale leftover text and stale derived
+    // suggestions/duplicatePreview from the previous session.
+    setItemName("");
     openPopup("add-item");
   }, [openPopup]);
 

@@ -1,4 +1,4 @@
-import type { FormEvent, MouseEvent, ReactNode } from "react";
+import { memo, type FormEvent, type MouseEvent, type ReactNode } from "react";
 
 type ModalProps = {
   title?: string;
@@ -14,7 +14,7 @@ const stopPropagation = (event: MouseEvent) => {
   event.stopPropagation();
 };
 
-const Modal = ({ title, onClose, actions, children, bodyClassName, onSubmit }: ModalProps) => {
+const Modal = memo(function Modal({ title, onClose, actions, children, bodyClassName, onSubmit }: ModalProps) {
   const header = title ? (
     <div className="modal__header">
       <h2>{title}</h2>
@@ -40,6 +40,6 @@ const Modal = ({ title, onClose, actions, children, bodyClassName, onSubmit }: M
       )}
     </div>
   );
-};
+});
 
 export default Modal;

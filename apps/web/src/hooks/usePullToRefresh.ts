@@ -49,6 +49,12 @@ export const usePullToRefresh = ({ isPopupOpenRef, onPullDetected, refresh }: Pu
     };
 
     const onTouchStart = (event: TouchEvent) => {
+      // Defensive fallback only — the real reset now happens in onTouchEnd/
+      // onTouchCancel below, asynchronously, once the gesture that set the
+      // flag has actually finished. Resetting here too is harmless (it can
+      // only ever be flipping false -> false by the time a new gesture's
+      // touchstart fires) but is kept in case a future code path sets the
+      // flag outside the touchend/touchcancel handling below.
       suppressItemPressRef.current = false;
       if (isPopupOpenRef.current || isPullRefreshingRef.current || event.touches.length !== 1 || getScrollY() > 0) {
         pullStartYRef.current = null;
@@ -89,6 +95,30 @@ export const usePullToRefresh = ({ isPopupOpenRef, onPullDetected, refresh }: Pu
 
     const onTouchEnd = () => {
       pullStartYRef.current = null;
+
+      // suppressItemPressRef must stay true through the rest of THIS event's
+      // synchronous handling: the tap that ends a pull gesture still fires
+      // pointerup/click on whatever ItemCard is underneath, and those
+      // handlers (App.tsx's handleGridPointerUp, and ItemGrid's onClick) read
+      // this flag to swallow that same-gesture tap. Per the Pointer Events
+      // spec, pointerup fires before touchend, and click fires after
+      // touchend, so clearing the flag synchronously here would already be
+      // too late for pointerup-based swallowing but too early for the click
+      // that follows — the click would then execute as if it were a normal,
+      // independent tap. Deferring the reset to a 0ms timeout lets any
+      // click tied to this same gesture run first (browsers dispatch it
+      // essentially immediately after touchend, well within a macrotask),
+      // while still clearing the flag long before a genuinely new gesture
+      // could start (pointerdown for the next tap requires real elapsed
+      // time to lift and press again). This avoids the previous bug where
+      // the flag was only reset lazily on the NEXT gesture's touchstart —
+      // too late, because browsers fire pointerdown before touchstart, so
+      // that next gesture's pointerdown would read a stale `true` and
+      // swallow an unrelated, legitimate tap.
+      window.setTimeout(() => {
+        suppressItemPressRef.current = false;
+      }, 0);
+
       const shouldRefresh =
         pullDistanceRef.current >= PULL_THRESHOLD && !isPopupOpenRef.current && !isPullRefreshingRef.current;
 
