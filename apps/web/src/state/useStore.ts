@@ -273,9 +273,11 @@ export const useStore = create<StoreState>((set, get) => ({
     });
   },
   deleteList: async (listId: string) => {
-    await db.items.where("listId").equals(listId).delete();
-    await db.lists.delete(listId);
-    await db.listShares.delete(listId);
+    await db.transaction("rw", db.items, db.lists, db.listShares, async () => {
+      await db.items.where("listId").equals(listId).delete();
+      await db.lists.delete(listId);
+      await db.listShares.delete(listId);
+    });
     set((state) => {
       const remainingLists = state.lists.filter((list) => list.id !== listId);
       const nextActiveListId =
@@ -435,11 +437,13 @@ export const useStore = create<StoreState>((set, get) => ({
       }));
 
       const syncedAt = Date.now();
-      await db.lists.put(localList);
-      await db.items.bulkPut(localItems);
-      await db.listShares.put({
-        listId: localList.id,
-        lastSyncedAt: syncedAt,
+      await db.transaction("rw", db.lists, db.items, db.listShares, async () => {
+        await db.lists.put(localList);
+        await db.items.bulkPut(localItems);
+        await db.listShares.put({
+          listId: localList.id,
+          lastSyncedAt: syncedAt,
+        });
       });
       persistSelectedListId(localList.id);
       set((current) => {

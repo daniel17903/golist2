@@ -101,8 +101,44 @@ const itemsWhere = vi.fn((field: keyof Item) => ({
   }),
 }));
 
+const listSharesPut = vi.fn(async (entry: { listId: string; lastSyncedAt: number }) => {
+  const index = listSharesData.findIndex((item) => item.listId === entry.listId);
+  if (index >= 0) {
+    listSharesData[index] = entry;
+  } else {
+    listSharesData.push(entry);
+  }
+});
+const listSharesDelete = vi.fn(async (listId: string) => {
+  listSharesData = listSharesData.filter((entry) => entry.listId !== listId);
+});
+
+// Mimics Dexie's transaction rollback semantics for tests: snapshots the
+// in-memory tables before running the callback and restores them if the
+// callback throws, so tests can assert that a failure partway through a
+// transaction leaves no partial writes behind.
+const transactionMock = vi.fn(async (_mode: string, ..._rest: unknown[]) => {
+  const isCallback = (arg: unknown): arg is () => Promise<unknown> => typeof arg === "function";
+  const fn = _rest.find(isCallback);
+  if (!fn) {
+    throw new Error("transaction mock expects a callback function argument");
+  }
+  const listsSnapshot = [...listsData];
+  const itemsSnapshot = [...itemsData];
+  const listSharesSnapshot = [...listSharesData];
+  try {
+    return await fn();
+  } catch (error) {
+    listsData = listsSnapshot;
+    itemsData = itemsSnapshot;
+    listSharesData = listSharesSnapshot;
+    throw error;
+  }
+});
+
 vi.mock("../storage/db", () => ({
   db: {
+    transaction: transactionMock,
     lists: {
       toArray: vi.fn(async () => [...listsData]),
       add: listAdd,
@@ -123,17 +159,8 @@ vi.mock("../storage/db", () => ({
     listShares: {
       toArray: vi.fn(async () => [...listSharesData]),
       get: vi.fn(async (listId: string) => listSharesData.find((entry) => entry.listId === listId)),
-      put: vi.fn(async (entry: { listId: string; lastSyncedAt: number }) => {
-        const index = listSharesData.findIndex((item) => item.listId === entry.listId);
-        if (index >= 0) {
-          listSharesData[index] = entry;
-        } else {
-          listSharesData.push(entry);
-        }
-      }),
-      delete: vi.fn(async (listId: string) => {
-        listSharesData = listSharesData.filter((entry) => entry.listId !== listId);
-      }),
+      put: listSharesPut,
+      delete: listSharesDelete,
     },
   },
 }));
@@ -145,6 +172,7 @@ const { socketSyncManager } = await import("../sharing/socketSync");
 const upsertListMock = vi.mocked(sharingApiClient.upsertList);
 const createShareTokenMock = vi.mocked(sharingApiClient.createShareToken);
 const fetchListMock = vi.mocked(sharingApiClient.fetchList);
+const redeemShareTokenMock = vi.mocked(sharingApiClient.redeemShareToken);
 const socketInitMock = vi.mocked(socketSyncManager.init);
 const socketSetActiveListMock = vi.mocked(socketSyncManager.setActiveList);
 const socketQueueLocalItemPatchMock = vi.mocked(socketSyncManager.queueLocalItemPatch);
@@ -180,9 +208,13 @@ describe("useStore", () => {
     itemPut.mockClear();
     itemBulkPut.mockClear();
     itemsWhere.mockClear();
+    listSharesPut.mockClear();
+    listSharesDelete.mockClear();
+    transactionMock.mockClear();
     upsertListMock.mockReset();
     createShareTokenMock.mockReset();
     fetchListMock.mockReset();
+    redeemShareTokenMock.mockReset();
     socketInitMock.mockReset();
     socketSetActiveListMock.mockReset();
     socketQueueLocalItemPatchMock.mockReset();
@@ -450,6 +482,46 @@ describe("useStore", () => {
     expect(itemsWhere).toHaveBeenCalledWith("listId");
   });
 
+  it("rolls back all writes when deleteList fails partway through its transaction", async () => {
+    listsData = [{ id: "list-1", name: "One", createdAt: 1, updatedAt: 1 }];
+    itemsData = [
+      {
+        id: "item-1",
+        listId: "list-1",
+        name: "Milk",
+        iconName: "milk",
+        category: "other",
+        deleted: false,
+        createdAt: 1,
+        updatedAt: 1,
+      },
+    ];
+    useStore.setState({ lists: [...listsData], items: [...itemsData], activeListId: "list-1" });
+
+    // Simulate a crash/interruption after the items delete succeeded but
+    // before the list record is removed.
+    listDelete.mockImplementationOnce(async () => {
+      throw new Error("boom");
+    });
+
+    await expect(useStore.getState().deleteList("list-1")).rejects.toThrow("boom");
+
+    expect(transactionMock).toHaveBeenCalledTimes(1);
+    // No partial write: the items delete that ran earlier in the same
+    // transaction must be rolled back, and the never-reached listShares
+    // delete must not have run.
+    expect(itemsData).toHaveLength(1);
+    expect(listsData).toHaveLength(1);
+    expect(listSharesDelete).not.toHaveBeenCalled();
+
+    // The store's in-memory state is untouched because deleteList's set()
+    // call is only reached after the transaction resolves successfully.
+    const state = useStore.getState();
+    expect(state.lists.map((list) => list.id)).toEqual(["list-1"]);
+    expect(state.items.map((item) => item.id)).toEqual(["item-1"]);
+    expect(state.activeListId).toBe("list-1");
+  });
+
   it("syncAllLists requests websocket resync", async () => {
     await useStore.getState().syncAllLists();
 
@@ -468,5 +540,57 @@ describe("useStore", () => {
     expect(socketSetActiveListMock).toHaveBeenCalledWith("list-1");
   });
 
+  it("rolls back all writes when joinSharedList fails partway through its transaction", async () => {
+    useStore.setState({
+      metadata: {
+        id: "app",
+        deviceId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        appVersion: "test-version",
+        lastOpenedAt: 1,
+      },
+      lists: [],
+      items: [],
+    });
+
+    redeemShareTokenMock.mockResolvedValueOnce({ listId: "shared-list-1" });
+    fetchListMock.mockResolvedValueOnce({
+      listId: "shared-list-1",
+      name: "Shared List",
+      createdAt: "2024-01-01T00:00:00.000Z",
+      updatedAt: "2024-01-01T00:00:00.000Z",
+      items: [
+        {
+          id: "shared-item-1",
+          name: "Milk",
+          iconName: "milk",
+          category: "other",
+          deleted: false,
+          createdAt: "2024-01-01T00:00:00.000Z",
+          updatedAt: "2024-01-01T00:00:00.000Z",
+        },
+      ],
+    });
+
+    // Simulate a crash/interruption after the list and items were written
+    // but before the listShares bookkeeping record could be saved.
+    listSharesPut.mockImplementationOnce(async () => {
+      throw new Error("boom");
+    });
+
+    await expect(useStore.getState().joinSharedList("share-token")).rejects.toThrow("boom");
+
+    expect(transactionMock).toHaveBeenCalledTimes(1);
+    // No partial write: the list put and items bulkPut that ran earlier in
+    // the same transaction must be rolled back.
+    expect(listsData).toHaveLength(0);
+    expect(itemsData).toHaveLength(0);
+    expect(listSharesData).toHaveLength(0);
+
+    const state = useStore.getState();
+    expect(state.lists).toHaveLength(0);
+    expect(state.items).toHaveLength(0);
+    expect(state.activeListId).toBeUndefined();
+    expect(state.syncNotice).toBeDefined();
+  });
 
 });
