@@ -14,10 +14,18 @@ import { registerSyncWebsocketRoute } from './routes/sync-websocket.js'
 import { ListSyncCache } from './sync/list-sync-cache.js'
 
 const PRODUCTION_ORIGIN = 'https://go-list.app'
-const LOCAL_DEV_ORIGIN = 'http://localhost:5173'
+// Matches any localhost/127.0.0.1 origin regardless of port: the web app's
+// Vite dev server (5173), its preview server used by the Playwright E2E
+// suite (4173), and any other local port a developer runs it on.
+const LOCAL_DEV_ORIGIN_PATTERN = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/
 
-const allowedOrigins =
-  env.NODE_ENV === 'production' ? [PRODUCTION_ORIGIN] : [PRODUCTION_ORIGIN, LOCAL_DEV_ORIGIN]
+function isAllowedOrigin(origin: string): boolean {
+  if (origin === PRODUCTION_ORIGIN) {
+    return true
+  }
+
+  return env.NODE_ENV !== 'production' && LOCAL_DEV_ORIGIN_PATTERN.test(origin)
+}
 
 export function buildServer(deps: { listRepository?: ListRepository } = {}) {
   const app = Fastify({
@@ -48,7 +56,16 @@ export function buildServer(deps: { listRepository?: ListRepository } = {}) {
   const listSyncCache = new ListSyncCache()
 
   void app.register(cors, {
-    origin: allowedOrigins,
+    origin: (origin, callback) => {
+      // No Origin header (e.g. same-origin requests, curl) — allow, matching
+      // the prior @fastify/cors default behavior for non-browser callers.
+      if (!origin || isAllowedOrigin(origin)) {
+        callback(null, true)
+        return
+      }
+
+      callback(new Error('Not allowed by CORS'), false)
+    },
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'X-Device-Id'],
   })
