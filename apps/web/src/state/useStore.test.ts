@@ -91,8 +91,15 @@ const itemBulkPut = vi.fn(async (items: Item[]) => {
     }
   }
 });
+const itemsToArray = vi.fn(async () => [...itemsData]);
 const itemsWhere = vi.fn((field: keyof Item) => ({
   equals: (value: Item[keyof Item]) => ({
+    toArray: vi.fn(async () => {
+      if (field === "listId") {
+        return itemsData.filter((item) => item.listId === value);
+      }
+      return [];
+    }),
     delete: vi.fn(async () => {
       if (field === "listId") {
         itemsData = itemsData.filter((item) => item.listId !== value);
@@ -100,6 +107,18 @@ const itemsWhere = vi.fn((field: keyof Item) => ({
     }),
   }),
 }));
+
+// `load()` hydrates every other list's items in the background (after the
+// active list's items are set synchronously) and only starts the websocket
+// sync manager once that background hydration promise settles. Await this
+// after `load()` in tests that assert on that hydration/sync-init behavior,
+// since `load()` itself intentionally does not await it (so first paint is
+// never blocked on a full item-history scan).
+const flushBackgroundHydration = async () => {
+  for (let i = 0; i < 10; i += 1) {
+    await Promise.resolve();
+  }
+};
 
 const listSharesPut = vi.fn(async (entry: { listId: string; lastSyncedAt: number }) => {
   const index = listSharesData.findIndex((item) => item.listId === entry.listId);
@@ -147,7 +166,7 @@ vi.mock("../storage/db", () => ({
       put: listPut,
     },
     items: {
-      toArray: vi.fn(async () => [...itemsData]),
+      toArray: itemsToArray,
       add: itemAdd,
       put: itemPut,
       bulkPut: itemBulkPut,
@@ -207,6 +226,7 @@ describe("useStore", () => {
     itemAdd.mockClear();
     itemPut.mockClear();
     itemBulkPut.mockClear();
+    itemsToArray.mockClear();
     itemsWhere.mockClear();
     listSharesPut.mockClear();
     listSharesDelete.mockClear();
@@ -260,6 +280,97 @@ describe("useStore", () => {
     expect(metadataPut).toHaveBeenCalledTimes(1);
   });
 
+  it("scopes the boot load to the active list, then hydrates other lists' items in the background", async () => {
+    listsData = [
+      { id: "list-a", name: "Active", createdAt: 1, updatedAt: 1 },
+      { id: "list-b", name: "Other", createdAt: 2, updatedAt: 2 },
+    ];
+    itemsData = [
+      {
+        id: "item-a",
+        listId: "list-a",
+        name: "apple",
+        iconName: "apple",
+        category: "fruitsVegetables",
+        deleted: false,
+        createdAt: 1,
+        updatedAt: 1,
+      },
+      {
+        id: "item-b",
+        listId: "list-b",
+        name: "bread",
+        iconName: "bread",
+        category: "bread",
+        deleted: false,
+        createdAt: 2,
+        updatedAt: 2,
+      },
+    ];
+
+    await useStore.getState().load();
+
+    // The boot path fetches only the active list's items via the indexed
+    // `listId` query — it never scans the full, all-lists item history
+    // synchronously as part of `load()`'s awaited critical path.
+    const stateAfterLoad = useStore.getState();
+    expect(stateAfterLoad.activeListId).toBe("list-a");
+    expect(itemsWhere).toHaveBeenCalledWith("listId");
+
+    // The remaining lists' items hydrate afterwards via an unscoped,
+    // un-awaited background query so first paint is never blocked on it.
+    expect(itemsToArray).toHaveBeenCalledTimes(1);
+
+    await flushBackgroundHydration();
+    const stateAfterHydration = useStore.getState();
+    expect(stateAfterHydration.items.map((item) => item.id).sort()).toEqual(["item-a", "item-b"]);
+  });
+
+  it("preserves object identity for other lists' items when one list's item is mutated", async () => {
+    listsData = [
+      { id: "list-a", name: "Active", createdAt: 1, updatedAt: 1 },
+      { id: "list-b", name: "Other", createdAt: 2, updatedAt: 2 },
+    ];
+    itemsData = [
+      {
+        id: "item-a",
+        listId: "list-a",
+        name: "apple",
+        iconName: "apple",
+        category: "fruitsVegetables",
+        deleted: false,
+        createdAt: 1,
+        updatedAt: 1,
+      },
+      {
+        id: "item-b",
+        listId: "list-b",
+        name: "bread",
+        iconName: "bread",
+        category: "bread",
+        deleted: false,
+        createdAt: 2,
+        updatedAt: 2,
+      },
+    ];
+
+    await useStore.getState().load();
+    await flushBackgroundHydration();
+
+    const itemBBefore = useStore.getState().items.find((item) => item.id === "item-b");
+
+    await useStore.getState().toggleItem("item-a");
+
+    const stateAfterToggle = useStore.getState();
+    const itemAAfter = stateAfterToggle.items.find((item) => item.id === "item-a");
+    const itemBAfter = stateAfterToggle.items.find((item) => item.id === "item-b");
+
+    expect(itemAAfter?.deleted).toBe(true);
+    // The untouched item from the other list keeps the exact same object
+    // reference — the merge patches only the mutated position instead of
+    // mapping over every item in every list.
+    expect(itemBAfter).toBe(itemBBefore);
+  });
 
   it("restores a previously selected list from localStorage", async () => {
     listsData = [
@@ -311,6 +422,7 @@ describe("useStore", () => {
   });
 
   it("recategorizes suggested items when language suggestion is accepted", async () => {
+    listsData = [{ id: "list-1", name: "Groceries", createdAt: 1, updatedAt: 1 }];
     itemsData = [
       {
         id: "item-1",
@@ -535,6 +647,7 @@ describe("useStore", () => {
     listsData = [{ id: "list-1", name: "Groceries", createdAt: 1, updatedAt: 1 }];
 
     await useStore.getState().load();
+    await flushBackgroundHydration();
 
     expect(socketInitMock).toHaveBeenCalledTimes(1);
     expect(socketSetActiveListMock).toHaveBeenCalledWith("list-1");
