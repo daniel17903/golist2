@@ -1,5 +1,7 @@
 import { type FastifyInstance } from 'fastify'
 
+import { redactShareTokenUrl } from '../lib/redact-url.js'
+
 const hasIssues = (value: unknown): boolean => {
   if (typeof value !== 'object' || value === null) {
     return false
@@ -17,7 +19,7 @@ export function registerErrorHandler(app: FastifyInstance) {
       {
         requestId: request.id,
         method: request.method,
-        url: request.url,
+        url: redactShareTokenUrl(request.url),
         errorMessage,
         errorStack,
       },

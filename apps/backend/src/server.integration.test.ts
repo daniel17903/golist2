@@ -1,7 +1,7 @@
 import crypto from 'node:crypto'
 
 import { buildItemHash } from '@golist/shared/domain/sync'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 
 import { buildServer } from './server.js'
@@ -12,8 +12,8 @@ const testDeviceId = '11111111-1111-4111-8111-111111111111'
 let baseUrl = ''
 let app: ReturnType<typeof buildServer>
 
-const openSyncSocket = async () => {
-  const socket = new WebSocket(`${baseUrl.replace('http', 'ws')}/v1/ws`)
+const openSyncSocket = async (targetBaseUrl: string = baseUrl) => {
+  const socket = new WebSocket(`${targetBaseUrl.replace('http', 'ws')}/v1/ws`)
   const messages: Array<Record<string, unknown>> = []
   let notify: (() => void) | null = null
 
@@ -388,6 +388,68 @@ describe('backend runtime integration', () => {
     } finally {
       clientA.socket.close()
       clientB.socket.close()
+    }
+  })
+
+  it('caches the list digest snapshot so repeated list_digest checks do not re-query the repository', async () => {
+    const repository = new InMemoryListRepository()
+    const scopedApp = buildServer({ listRepository: repository })
+    await scopedApp.listen({ host: '127.0.0.1', port: 0 })
+
+    const address = scopedApp.server.address()
+    if (!address || typeof address === 'string') {
+      throw new Error('Failed to resolve server address for scoped test app')
+    }
+
+    const scopedBaseUrl = `http://127.0.0.1:${address.port}`
+
+    try {
+      const listId = crypto.randomUUID()
+      const createResponse = await fetch(`${scopedBaseUrl}/v1/lists/${listId}`, {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json', 'x-device-id': testDeviceId },
+        body: JSON.stringify({ name: 'Digest Cache List' }),
+      })
+
+      expect(createResponse.status).toBe(201)
+
+      const listItemsSpy = vi.spyOn(repository, 'listItems')
+
+      const client = await openSyncSocket(scopedBaseUrl)
+
+      try {
+        client.send({ type: 'hello', deviceId: testDeviceId })
+        await client.waitForMessage((message) => message.type === 'hello_ack')
+
+        client.send({ type: 'subscribe_list', listId })
+        const subscribed = await client.waitForMessage((message) => message.type === 'subscribed')
+
+        // subscribe_list has to read the item set once to build the initial
+        // digest/summaries snapshot — this seeds the cache.
+        expect(listItemsSpy).toHaveBeenCalledTimes(1)
+
+        const serverDigest = z.string().parse(subscribed.serverListDigest)
+
+        client.send({ type: 'list_digest', listId, digest: serverDigest })
+        await new Promise((resolve) => setTimeout(resolve, 100))
+
+        // A digest ping for an unchanged list must be served from the cached
+        // snapshot rather than re-fetching and re-hashing every item.
+        expect(listItemsSpy).toHaveBeenCalledTimes(1)
+        // Digests match, so no unsolicited hash_diff should follow (only the
+        // one hash_diff subscribe_list already sent).
+        expect(client.messages.filter((message) => message.type === 'hash_diff')).toHaveLength(1)
+
+        // A second, independent list_digest ping must also hit the cache.
+        client.send({ type: 'list_digest', listId, digest: serverDigest })
+        await new Promise((resolve) => setTimeout(resolve, 100))
+
+        expect(listItemsSpy).toHaveBeenCalledTimes(1)
+      } finally {
+        client.socket.close()
+      }
+    } finally {
+      await scopedApp.close()
     }
   })
 
