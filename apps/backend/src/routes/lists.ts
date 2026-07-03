@@ -4,6 +4,7 @@ import { z } from 'zod'
 
 import { createAuthGuards } from '../auth.js'
 import { type ListRepository } from '../repositories/list-repository.js'
+import { ListSyncCache } from '../sync/list-sync-cache.js'
 
 const listIdParamsSchema = z.object({ listId: z.uuid() })
 const listPutBodySchema = z.object({ name: z.string().min(1) })
@@ -19,7 +20,11 @@ const itemUpsertSchema = z.object({
   updatedAt: z.iso.datetime({ offset: true }),
 })
 
-export function registerListRoutes(app: FastifyInstance, listRepository: ListRepository) {
+export function registerListRoutes(
+  app: FastifyInstance,
+  listRepository: ListRepository,
+  listSyncCache: ListSyncCache = new ListSyncCache(),
+) {
   const { requireListAccess } = createAuthGuards(listRepository)
 
   app.put('/v1/lists/:listId', async (request, reply) => {
@@ -34,6 +39,12 @@ export function registerListRoutes(app: FastifyInstance, listRepository: ListRep
       return { message: 'Forbidden' }
     }
 
+    // List name/updatedAt aren't part of the item digest today, but
+    // invalidate defensively so a WebSocket-side cache entry can never
+    // predate an accepted write to the list made over REST.
+    if (result.outcome !== 'ignored') {
+      listSyncCache.invalidate(params.listId)
+    }
 
     reply.code(result.outcome === 'created' ? 201 : 200)
     return { listId: params.listId }
@@ -64,6 +75,8 @@ export function registerListRoutes(app: FastifyInstance, listRepository: ListRep
       reply.code(403)
       return { message: 'Forbidden' }
     }
+
+    listSyncCache.invalidate(request.auth!.listId)
 
     reply.code(204)
   })
@@ -127,6 +140,10 @@ export function registerListRoutes(app: FastifyInstance, listRepository: ListRep
     if (result.outcome === 'conflict') {
       reply.code(409)
       return { message: 'Item id belongs to another list' }
+    }
+
+    if (result.outcome === 'created' || result.outcome === 'updated') {
+      listSyncCache.invalidate(request.auth!.listId)
     }
 
     reply.code(result.outcome === 'created' ? 201 : 204)

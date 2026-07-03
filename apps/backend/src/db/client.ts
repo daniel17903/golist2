@@ -29,10 +29,21 @@ console.info(
       },
 )
 
+// Conservative pool sizing for a serverless deployment (Vercel, see
+// apps/backend/api/index.ts): each function instance can spin up its own
+// pool, so we keep per-instance connection usage low and fail fast instead
+// of letting connection attempts hang against a small Postgres instance.
+const SERVERLESS_POOL_CONFIG = {
+  max: 5,
+  idleTimeoutMillis: 10_000,
+  connectionTimeoutMillis: 5_000,
+} as const
+
 export const pool = new Pool(
   hasDatabaseUrl
     ? {
         connectionString: env.DATABASE_URL,
+        ...SERVERLESS_POOL_CONFIG,
       }
     : {
         host: env.PGHOST,
@@ -40,6 +51,7 @@ export const pool = new Pool(
         database: env.PGDATABASE,
         password: env.PGPASSWORD,
         ssl,
+        ...SERVERLESS_POOL_CONFIG,
       },
 )
 

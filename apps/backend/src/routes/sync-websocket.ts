@@ -1,11 +1,11 @@
 import type { Item } from '@golist/shared/domain/types'
-import { buildItemHash, buildItemSummaries, buildListDigest } from '@golist/shared/domain/sync'
 import websocket from '@fastify/websocket'
 import type { RawData, WebSocket } from 'ws'
 import { type FastifyInstance } from 'fastify'
 import { z } from 'zod'
 
 import { type ListRepository, type ListItemRecord } from '../repositories/list-repository.js'
+import { ListSyncCache } from '../sync/list-sync-cache.js'
 
 type ClientMessage =
   | { type: 'hello'; deviceId: string }
@@ -142,8 +142,15 @@ const toSyncItem = (item: ListItemRecord): Item => ({
   updatedAt: Date.parse(item.updatedAt),
 })
 
-export function registerSyncWebsocketRoute(app: FastifyInstance, listRepository: ListRepository) {
+export function registerSyncWebsocketRoute(
+  app: FastifyInstance,
+  listRepository: ListRepository,
+  listSyncCache: ListSyncCache = new ListSyncCache(),
+) {
   const subscribers = new Map<string, Set<ServerSocket>>()
+
+  const loadSnapshot = (listId: string) =>
+    listSyncCache.getSnapshot(listId, async () => (await listRepository.listItems(listId)).map(toSyncItem))
 
   const send = (socket: ServerSocket, message: ServerMessage) => {
     socket.send(JSON.stringify(message))
@@ -242,7 +249,7 @@ export function registerSyncWebsocketRoute(app: FastifyInstance, listRepository:
             listSockets.add(socket)
             subscribers.set(parsedPayload.listId, listSockets)
 
-            const serverItems = (await listRepository.listItems(parsedPayload.listId)).map(toSyncItem)
+            const snapshot = await loadSnapshot(parsedPayload.listId)
             const listRecord = await listRepository.getList(parsedPayload.listId)
             const listUpdatedAt = listRecord ? Date.parse(listRecord.updatedAt) : Date.now()
             send(socket, {
@@ -250,12 +257,12 @@ export function registerSyncWebsocketRoute(app: FastifyInstance, listRepository:
               listId: parsedPayload.listId,
               listName: listRecord?.name ?? '',
               listUpdatedAt,
-              serverListDigest: buildListDigest(serverItems),
+              serverListDigest: snapshot.digest,
             })
             send(socket, {
               type: 'hash_diff',
               listId: parsedPayload.listId,
-              summaries: buildItemSummaries(serverItems),
+              summaries: snapshot.summaries,
             })
             return
           }
@@ -266,28 +273,28 @@ export function registerSyncWebsocketRoute(app: FastifyInstance, listRepository:
           }
 
           if (parsedPayload.type === 'list_digest') {
-            const serverItems = (await listRepository.listItems(parsedPayload.listId)).map(toSyncItem)
-            const serverDigest = buildListDigest(serverItems)
-            if (serverDigest !== parsedPayload.digest) {
+            const snapshot = await loadSnapshot(parsedPayload.listId)
+            if (snapshot.digest !== parsedPayload.digest) {
               send(socket, {
                 type: 'hash_diff',
                 listId: parsedPayload.listId,
-                summaries: buildItemSummaries(serverItems),
+                summaries: snapshot.summaries,
               })
             }
             return
           }
 
           if (parsedPayload.type === 'hash_diff') {
-            const serverItems = (await listRepository.listItems(parsedPayload.listId)).map(toSyncItem)
+            const snapshot = await loadSnapshot(parsedPayload.listId)
             const clientSummaryById = new Map(parsedPayload.summaries.map((entry) => [entry.itemId, entry]))
+            const serverSummaryById = new Map(snapshot.summaries.map((entry) => [entry.itemId, entry]))
 
-            const serverMissingOrStaleForClient = serverItems.filter((serverItem) => {
-              const summary = clientSummaryById.get(serverItem.id)
-              if (!summary) {
+            const serverMissingOrStaleForClient = snapshot.items.filter((serverItem) => {
+              const clientSummary = clientSummaryById.get(serverItem.id)
+              if (!clientSummary) {
                 return true
               }
-              return summary.itemHash !== buildItemHash(serverItem)
+              return serverSummaryById.get(serverItem.id)?.itemHash !== clientSummary.itemHash
             })
 
             if (serverMissingOrStaleForClient.length > 0) {
@@ -320,6 +327,10 @@ export function registerSyncWebsocketRoute(app: FastifyInstance, listRepository:
             }
 
             if (accepted.length > 0) {
+              // The cached digest/summaries snapshot no longer reflects the
+              // persisted item set, so drop it and let the next
+              // subscribe_list/list_digest/hash_diff rebuild it from Postgres.
+              listSyncCache.invalidate(parsedPayload.listId)
               broadcastItemPatch(parsedPayload.listId, accepted, socket)
             }
 
@@ -342,6 +353,11 @@ export function registerSyncWebsocketRoute(app: FastifyInstance, listRepository:
             if (listResult.outcome === 'ignored') {
               return
             }
+
+            // List name/updatedAt aren't part of the item digest today, but
+            // invalidate defensively so the cache can never serve a snapshot
+            // that predates an accepted write to the list.
+            listSyncCache.invalidate(parsedPayload.listId)
 
             broadcastListMetadataPatch(
               parsedPayload.listId,
