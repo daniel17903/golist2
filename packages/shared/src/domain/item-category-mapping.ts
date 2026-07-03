@@ -2772,6 +2772,21 @@ const itemMatchersByLanguage: Record<CategoryLanguage, NormalizedCategoryMatcher
   es: [],
 };
 
+// Fast path for the common case where a (normalized) item name is exactly
+// equal to one of the matcher strings (e.g. a suggestion picked verbatim, or
+// a repeated resolution of the same previously-typed name). A full-string
+// match can never be beaten by a longer substring match (nothing can be
+// longer than the whole string), so whenever this map has an entry it is
+// guaranteed to be the same entry the linear scan below would have produced
+// — first entry wins on a tie, matching the linear scan's array-order
+// tie-break (see the `reduce` below) and the "first wins" convention already
+// used for itemCategoryMapByLanguage/itemIconMapByLanguage.
+const exactMatchEntryByLanguage: Record<CategoryLanguage, Map<string, CategoryEntry>> = {
+  en: new Map(),
+  de: new Map(),
+  es: new Map(),
+};
+
 (["en", "de", "es"] as const).forEach((locale) => {
   categoryEntriesByLanguage[locale].forEach((entry) => {
     entry.matchingNames.forEach((name) => {
@@ -2787,16 +2802,35 @@ const itemMatchersByLanguage: Record<CategoryLanguage, NormalizedCategoryMatcher
       const normalizedName = normalizeNameForMatching(name);
       if (!normalizedName) {return;}
       itemMatchersByLanguage[locale].push({ normalizedName, entry });
+      if (!exactMatchEntryByLanguage[locale].has(normalizedName)) {
+        exactMatchEntryByLanguage[locale].set(normalizedName, entry);
+      }
     });
   });
 });
 
-const resolveCategoryEntryForItemName = (
-  name: string,
+// Per-language memo cache keyed by normalized item name, capped so it can't
+// grow unbounded across a long-running session (e.g. many distinct,
+// never-repeated item names typed over time). Callers that repeatedly
+// resolve the same name (keystroke-driven adds, `findLanguageSuggestion`
+// scanning the same items across candidate locales) hit this in O(1) instead
+// of re-running the linear scan below.
+const CATEGORY_ENTRY_MEMO_CACHE_LIMIT = 300;
+
+const categoryEntryMemoByLanguage: Record<CategoryLanguage, Map<string, CategoryEntry | undefined>> = {
+  en: new Map(),
+  de: new Map(),
+  es: new Map(),
+};
+
+const scanForCategoryEntry = (
+  normalizedItemName: string,
   language: CategoryLanguage,
 ): CategoryEntry | undefined => {
-  const normalizedItemName = normalizeNameForMatching(name);
-  if (!normalizedItemName) {return undefined;}
+  const exactMatch = exactMatchEntryByLanguage[language].get(normalizedItemName);
+  if (exactMatch) {
+    return exactMatch;
+  }
 
   const matches = itemMatchersByLanguage[language].filter(({ normalizedName }) =>
     normalizedItemName.includes(normalizedName),
@@ -2821,6 +2855,32 @@ const resolveCategoryEntryForItemName = (
       ? currentMatch
       : bestMatch,
   ).entry;
+};
+
+const resolveCategoryEntryForItemName = (
+  name: string,
+  language: CategoryLanguage,
+): CategoryEntry | undefined => {
+  const normalizedItemName = normalizeNameForMatching(name);
+  if (!normalizedItemName) {return undefined;}
+
+  const memoCache = categoryEntryMemoByLanguage[language];
+  if (memoCache.has(normalizedItemName)) {
+    return memoCache.get(normalizedItemName);
+  }
+
+  const resolved = scanForCategoryEntry(normalizedItemName, language);
+
+  if (memoCache.size >= CATEGORY_ENTRY_MEMO_CACHE_LIMIT) {
+    // Map iteration order is insertion order, so this evicts the oldest entry.
+    const oldestKey = memoCache.keys().next().value;
+    if (oldestKey !== undefined) {
+      memoCache.delete(oldestKey);
+    }
+  }
+  memoCache.set(normalizedItemName, resolved);
+
+  return resolved;
 };
 
 export const getCategoryIdForItemName = (
