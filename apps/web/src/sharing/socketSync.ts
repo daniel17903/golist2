@@ -38,7 +38,13 @@ type ItemSummary = { itemId: string; updatedAt: number; itemHash: string };
 // Incoming frames decoded into a discriminated union, so the handlers below
 // work with validated data instead of raw `unknown` payloads.
 type ServerMessage =
-  | { type: 'subscribed'; listId: string; listName: string | null; listUpdatedAt: number | null }
+  | {
+      type: 'subscribed';
+      listId: string;
+      listName: string | null;
+      listUpdatedAt: number | null;
+      serverListDigest: string | null;
+    }
   | { type: 'hash_diff'; listId: string; summaries: ItemSummary[] }
   | { type: 'item_patch'; listId: string; items: Item[] }
   | { type: 'list_metadata_patch'; listId: string; name: string; updatedAt: number }
@@ -78,6 +84,7 @@ const parseServerMessage = (value: unknown): ServerMessage | null => {
       listId,
       listName: typeof value.listName === 'string' ? value.listName : null,
       listUpdatedAt: typeof value.listUpdatedAt === 'number' ? value.listUpdatedAt : null,
+      serverListDigest: typeof value.serverListDigest === 'string' ? value.serverListDigest : null,
     };
   }
 
@@ -143,6 +150,10 @@ class SocketSyncManager {
   private forcedReconnectResolver: ((result: 'success' | 'failed') => void) | null = null;
   private forcedReconnectTimeout: number | null = null;
   private consecutiveForbiddenCount = 0;
+  // Set synchronously when `subscribed`'s `serverListDigest` fast-path already
+  // matches the local item digest for a list, so the eager `hash_diff` the
+  // server sends right after `subscribed` is skipped instead of reprocessed.
+  private skipNextHashDiffForListId: string | null = null;
 
   init(deviceId: string, callbacks: SocketSyncCallbacks) {
     this.deviceId = deviceId;
@@ -408,7 +419,12 @@ class SocketSyncManager {
 
     switch (message.type) {
       case 'subscribed':
-        await this.handleSubscribedMessage(message.listId, message.listName, message.listUpdatedAt);
+        await this.handleSubscribedMessage(
+          message.listId,
+          message.listName,
+          message.listUpdatedAt,
+          message.serverListDigest,
+        );
         return;
       case 'hash_diff':
         this.handleHashDiffMessage(message.listId, message.summaries);
@@ -424,13 +440,34 @@ class SocketSyncManager {
     }
   }
 
-  private async handleSubscribedMessage(listId: string, listName: string | null, listUpdatedAt: number | null) {
+  private async handleSubscribedMessage(
+    listId: string,
+    listName: string | null,
+    listUpdatedAt: number | null,
+    serverListDigest: string | null,
+  ) {
     if (listId !== this.subscribedListId) {
       return;
     }
 
     this.isSubscribedReady = true;
     this.consecutiveForbiddenCount = 0;
+
+    // Fast path: if the server's item digest for this list already matches
+    // ours, items are already reconciled — skip waiting for/processing the
+    // eager `hash_diff` the server sends right after `subscribed`. This check
+    // (and the flag it sets) must run synchronously, before any `await`
+    // below, so it wins the race against that `hash_diff` message, which can
+    // otherwise be received and handled before this function's own awaits
+    // resolve.
+    if (serverListDigest !== null && this.callbacks) {
+      const localItems = this.callbacks.getItemsForList(listId);
+      if (buildListDigest(localItems) === serverListDigest) {
+        this.skipNextHashDiffForListId = listId;
+        this.onListExchangeComplete(listId);
+      }
+    }
+
     if (listName && listUpdatedAt !== null) {
       await this.callbacks?.applyIncomingListMetadata(listId, {
         name: listName,
@@ -453,6 +490,14 @@ class SocketSyncManager {
 
   private handleHashDiffMessage(listId: string, remoteSummaries: ItemSummary[]) {
     if (!this.callbacks || listId !== this.subscribedListId) {
+      return;
+    }
+
+    // Already reconciled via the `serverListDigest` fast path in
+    // `handleSubscribedMessage` — this is the eager hash_diff the server
+    // always sends right after `subscribed`, now redundant.
+    if (this.skipNextHashDiffForListId === listId) {
+      this.skipNextHashDiffForListId = null;
       return;
     }
 

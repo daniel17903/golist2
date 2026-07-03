@@ -131,15 +131,20 @@ export class PostgresListRepository implements ListRepository {
         return { outcome: 'updated' }
       }
 
-      // Mirrors the client's metadata LWW rule: apply only when the incoming
-      // change is newer, or carries a different name at the same millisecond.
+      // Mirrors the client's metadata LWW rule (`shouldAcceptListMetadata` in
+      // `@golist/shared/domain/sync`): apply when the incoming change is
+      // newer, or — on an equal millisecond timestamp — when it carries a
+      // lexicographically greater name. The name comparison is done on raw
+      // UTF-8 bytes (`bytea`) rather than `<`/`>` so the result never depends
+      // on the database collation and always matches the client's plain JS
+      // string comparison, guaranteeing both sides pick the same winner.
       const updateResult = await client.query(
         `UPDATE shared_lists
             SET name = $1, updated_at = $3
           WHERE id = $2
             AND (
               date_trunc('milliseconds', updated_at) < $3::timestamptz
-              OR (date_trunc('milliseconds', updated_at) = $3::timestamptz AND name <> $1)
+              OR (date_trunc('milliseconds', updated_at) = $3::timestamptz AND name::bytea < $1::bytea)
             )`,
         [name, listId, updatedAt],
       )

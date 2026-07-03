@@ -1,5 +1,5 @@
 import type { Item, List } from "@golist/shared/domain/types";
-import { buildItemHash } from "@golist/shared/domain/sync";
+import { buildItemHash, shouldAcceptListMetadata } from "@golist/shared/domain/sync";
 import { db } from "../storage/db";
 import { sharingApiClient } from "./apiClient";
 import type { SocketSyncCallbacks } from "./socketSync";
@@ -78,11 +78,11 @@ export const createStoreSyncCallbacks = (deps: StoreSyncBridgeDeps): SocketSyncC
       return;
     }
 
-    if (payload.updatedAt < currentList.updatedAt) {
-      return;
-    }
-
-    if (payload.updatedAt === currentList.updatedAt && payload.name === currentList.name) {
+    // Deterministic tie-break shared with the backend (postgres + in-memory
+    // list repositories): on an equal `updatedAt`, the lexicographically
+    // greater name wins on every peer so renames converge regardless of
+    // arrival order (see `shouldAcceptListMetadata`).
+    if (!shouldAcceptListMetadata(payload, currentList)) {
       return;
     }
 

@@ -97,7 +97,6 @@ const syncListNameImmediately = async (listId: string, listName: string) => {
   });
 
   socketSyncManager.setActiveList(listId);
-  socketSyncManager.requestResync();
   markBackendOnline();
 };
 
