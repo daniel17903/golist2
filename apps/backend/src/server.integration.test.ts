@@ -311,6 +311,72 @@ describe('backend runtime integration', () => {
     }
   })
 
+  it('deterministically resolves same-timestamp websocket list-metadata rename conflicts regardless of arrival order', async () => {
+    // Simulates two offline devices independently renaming the same shared
+    // list, then reconnecting near-simultaneously so both `list_metadata_patch`
+    // messages carry the exact same millisecond `updatedAt`. Without a
+    // deterministic tie-break, whichever patch the server happened to apply
+    // last would win — letting devices diverge depending on network timing.
+    // The rule (lexicographically greater name wins on a tie) must produce
+    // the same final name no matter which patch arrives first.
+    const runScenario = async (firstPatchName: string, secondPatchName: string) => {
+      const listId = crypto.randomUUID()
+      const createResponse = await fetch(`${baseUrl}/v1/lists/${listId}`, {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json', 'x-device-id': testDeviceId },
+        body: JSON.stringify({ name: 'Original Name' }),
+      })
+
+      expect(createResponse.status).toBe(201)
+
+      const clientA = await openSyncSocket()
+      const clientB = await openSyncSocket()
+
+      try {
+        for (const client of [clientA, clientB]) {
+          client.send({ type: 'hello', deviceId: testDeviceId })
+          await client.waitForMessage((message) => message.type === 'hello_ack')
+          client.send({ type: 'subscribe_list', listId })
+          await client.waitForMessage((message) => message.type === 'subscribed')
+        }
+
+        const subscribed = await clientB.waitForMessage((message) => message.type === 'subscribed')
+        const listUpdatedAt = z.number().parse(subscribed.listUpdatedAt)
+        const tiedUpdatedAt = listUpdatedAt + 60_000
+
+        clientB.send({ type: 'list_metadata_patch', listId, name: firstPatchName, updatedAt: tiedUpdatedAt })
+        clientB.send({ type: 'list_metadata_patch', listId, name: secondPatchName, updatedAt: tiedUpdatedAt })
+
+        // "Zebra" always wins the tie, so it always ends up broadcast to the
+        // observing client — either directly (it's the winning patch) or
+        // because it was applied first and the later, losing patch is
+        // dropped without a broadcast.
+        await clientA.waitForMessage(
+          (message) => message.type === 'list_metadata_patch' && message.name === 'Zebra',
+        )
+
+        const listResponse = await fetch(`${baseUrl}/v1/lists/${listId}`, {
+          headers: { 'x-device-id': testDeviceId },
+        })
+
+        expect(listResponse.status).toBe(200)
+        return z.object({ name: z.string(), updatedAt: z.string() }).parse(await listResponse.json())
+      } finally {
+        clientA.socket.close()
+        clientB.socket.close()
+      }
+    }
+
+    // Each scenario uses its own list (and therefore its own tied `updatedAt`,
+    // derived from that list's creation time) — what must hold regardless of
+    // arrival order is that the lexicographically greater name always wins.
+    const orderOneResult = await runScenario('Alpha', 'Zebra')
+    const orderTwoResult = await runScenario('Zebra', 'Alpha')
+
+    expect(orderOneResult.name).toBe('Zebra')
+    expect(orderTwoResult.name).toBe('Zebra')
+  })
+
   it('does not rebroadcast websocket item patches that lose conflict resolution', async () => {
     const listId = crypto.randomUUID()
     const createResponse = await fetch(`${baseUrl}/v1/lists/${listId}`, {

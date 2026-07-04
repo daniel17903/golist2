@@ -49,7 +49,7 @@ frontend via Vite preview on a different origin/port). Fixed by matching any
 - Deliberately left out of scope: pruning soft-deleted (`deleted_at`) rows —
   a data-retention decision, not a pure perf fix.
 
-## Step 3 — List-rename tie-break + sync protocol cleanup ⬜
+## Step 3 — List-rename tie-break + sync protocol cleanup ✅
 
 **Files:** `apps/web/src/sharing/storeSyncBridge.ts`,
 `apps/backend/src/repositories/postgres-list-repository.ts`,
@@ -79,23 +79,28 @@ frontend via Vite preview on a different origin/port). Fixed by matching any
   leave orphaned rows (e.g. items surviving a partial list delete).
 - Added rollback tests covering partial-failure cases.
 
-## Step 5 — Store mutation & load performance (investigate-first) ⬜
+## Step 5 — Store mutation & load performance (investigate-first) ✅
 
 **File:** `apps/web/src/state/useStore.ts`, possibly `apps/web/src/storage/db.ts`
 
-- `mergeItemsById`/`applyLocalItemChanges` rebuild the entire in-memory
-  `items` array (all lists, full history — items are never pruned) on every
-  single mutation; `load()` does a full unindexed `db.items.toArray()` scan
-  on every app boot. Investigate before rewriting — this is the riskiest
-  step since `useStore.ts` is central and must keep the Zustand-selector/
-  memoization rules in `AGENTS.md` intact. Prefer scoping `load()` to the
-  active list and/or narrowing the mutation rebuild to the affected list's
-  slice, over a full data-structure rewrite, unless investigation shows the
-  narrower fix is insufficient.
+- `mergeItemsById` now patches only changed positions via a lazily-rebuilt
+  id→index cache (keyed by array reference, so wholesale replacements
+  self-invalidate) instead of `.map()`ing every item in every list;
+  `toggleItem`/`updateItem` lookups use the same cache.
+- `load()` boots by querying only the active list's items via the indexed
+  `listId` Dexie query, renders, then hydrates the remaining history in the
+  background. WebSocket sync init is gated on that hydration completing,
+  because its full-sync pass reads every list's local items synchronously —
+  starting earlier could make an un-hydrated list look empty and let stale
+  server data overwrite genuine offline edits.
+- Deferred as follow-up: fully decoupling the sync layer from needing
+  all-lists items in memory (making `getItemsForList` async with per-list
+  Dexie reads at sync time) — it touches the race-sensitive digest fast-path
+  in `handleSubscribedMessage` and is a larger, separate refactor.
 
 **Should run after Step 4** — both touch `useStore.ts`.
 
-## Step 6 — UI component/hook fixes ⬜
+## Step 6 — UI component/hook fixes ✅
 
 **Files:** `apps/web/src/components/ItemGrid.tsx`,
 `apps/web/src/hooks/useAddItemDialog.ts`, `apps/web/src/components/Modal.tsx`,
@@ -112,7 +117,7 @@ frontend via Vite preview on a different origin/port). Fixed by matching any
   and `App.tsx` that can swallow one tap immediately after an aborted pull
   gesture.
 
-## Step 7 — Domain logic fixes ⬜
+## Step 7 — Domain logic fixes ✅
 
 **Files:** `apps/web/src/domain/relativeTime.ts`,
 `packages/shared/src/domain/item-category-mapping.ts`,

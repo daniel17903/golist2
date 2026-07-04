@@ -1,4 +1,4 @@
-import { memo, type MutableRefObject } from "react";
+import { memo, useCallback, type MouseEvent, type MutableRefObject } from "react";
 import type { Item } from "@golist/shared/domain/types";
 import ItemCard from "./ItemCard";
 
@@ -25,6 +25,19 @@ const ItemGrid = memo(function ItemGrid({
   onPointerUp,
   onPointerCancel,
 }: ItemGridProps) {
+  // Hoisted so ItemCard (a React.memo component) receives a stable onClick
+  // identity — an inline arrow here would give every card a new prop on
+  // every ItemGrid render, defeating memoization. Reads two stable ref
+  // objects, so the callback itself never needs to change identity.
+  const handleItemClick = useCallback(
+    (event: MouseEvent<HTMLButtonElement>) => {
+      if (longPressTriggeredRef.current || suppressItemPressRef.current) {
+        event.preventDefault();
+      }
+    },
+    [longPressTriggeredRef, suppressItemPressRef],
+  );
+
   return (
     <main className="list-grid">
       {items.map((item) => (
@@ -38,11 +51,7 @@ const ItemGrid = memo(function ItemGrid({
           onPointerUp={onPointerUp}
           onPointerLeave={onPointerCancel}
           onPointerCancel={onPointerCancel}
-          onClick={(event) => {
-            if (longPressTriggeredRef.current || suppressItemPressRef.current) {
-              event.preventDefault();
-            }
-          }}
+          onClick={handleItemClick}
         />
       ))}
     </main>

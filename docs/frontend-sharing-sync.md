@@ -52,6 +52,14 @@ this, every (re)connect triggers one reconciliation pass over **all** locally kn
    remain inaccessible are skipped so the rest of the pass still runs.
 5. On `subscribed`, the client compares the server's list name/`updatedAt` with the local copy and pushes
    a `list_metadata_patch` when the local rename is newer (so offline renames survive app restarts).
+   If `updatedAt` ties and the names differ, the client applies the same deterministic
+   tie-break as incoming `list_metadata_patch` messages (see below) instead of always
+   keeping the local name.
+6. On `subscribed`, the client also compares the server's `serverListDigest` (the same
+   item digest used for `list_digest`/`hash_diff`) against its own local digest for that
+   list. If they match, the client treats the list as already reconciled and skips
+   waiting for/processing the `hash_diff` the server sends right after `subscribed`; if
+   they differ, the client proceeds with the hash-diff exchange as usual.
 
 ### 5. Reconciliation protocol
 
@@ -62,6 +70,10 @@ On subscription and manual resync:
 2. On mismatch, both sides exchange per-item `hash_diff` summaries (`itemId`, `itemHash`, `updatedAt`).
 3. Each side computes missing/stale items and exchanges targeted `item_patch` payloads.
 4. Incoming items are applied only when their `updatedAt` wins; equal timestamps use deterministic hash tie-break.
+5. Incoming list-metadata (rename) patches use the same last-write-wins rule; on an equal
+   `updatedAt`, the lexicographically greater name wins (`shouldAcceptListMetadata` in
+   `packages/shared/src/domain/sync.ts`), applied identically by
+   `storeSyncBridge.ts` on the client and by both list repositories on the backend.
 
 Protocol details are documented in `docs/websocket-sync-protocol.md` and mirrored in `apps/api-spec/openapi.yaml` under `/v1/ws`.
 

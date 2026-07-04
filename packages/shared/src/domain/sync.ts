@@ -46,3 +46,32 @@ export const buildItemSummaries = (items: readonly SyncItemSnapshot[]): SyncItem
       itemHash: buildItemHash(item),
     }))
     .sort((left, right) => left.itemId.localeCompare(right.itemId));
+
+export type ListMetadataSnapshot = {
+  name: string;
+  updatedAt: number;
+};
+
+/**
+ * Deterministic conflict rule for list-metadata (rename) sync, shared by the
+ * client (`storeSyncBridge.ts`) and both backend list repositories so they
+ * never disagree.
+ *
+ * Mirrors the item-sync tie-break style (last-write-wins by `updatedAt`,
+ * falling back to a deterministic comparison when timestamps tie): when two
+ * offline devices rename the same list within the same millisecond, the
+ * lexicographically greater name wins on every peer, so all devices converge
+ * on one final name regardless of message arrival order.
+ */
+export const shouldAcceptListMetadata = (
+  incoming: ListMetadataSnapshot,
+  current: ListMetadataSnapshot,
+): boolean => {
+  if (incoming.updatedAt > current.updatedAt) {
+    return true;
+  }
+  if (incoming.updatedAt < current.updatedAt) {
+    return false;
+  }
+  return incoming.name > current.name;
+};

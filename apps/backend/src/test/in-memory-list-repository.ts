@@ -1,6 +1,6 @@
 import crypto from 'node:crypto'
 
-import { buildItemHash } from '@golist/shared/domain/sync'
+import { buildItemHash, shouldAcceptListMetadata } from '@golist/shared/domain/sync'
 
 import {
   type ItemUpsertInput,
@@ -99,11 +99,16 @@ export class InMemoryListRepository implements ListRepository {
       return { outcome: 'updated' }
     }
 
+    // Same deterministic tie-break rule the client and Postgres repository
+    // apply (`shouldAcceptListMetadata`), so all three agree on a winner when
+    // two renames share the same millisecond `updatedAt`.
     const incomingUpdatedAt = Date.parse(updatedAt)
     const existingUpdatedAt = Date.parse(existing.data.updatedAt)
     if (
-      incomingUpdatedAt < existingUpdatedAt ||
-      (incomingUpdatedAt === existingUpdatedAt && existing.data.name === name)
+      !shouldAcceptListMetadata(
+        { name, updatedAt: incomingUpdatedAt },
+        { name: existing.data.name, updatedAt: existingUpdatedAt },
+      )
     ) {
       return { outcome: 'ignored' }
     }
