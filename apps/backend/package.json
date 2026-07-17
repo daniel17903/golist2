@@ -22,7 +22,7 @@
     "@fastify/websocket": "11.2.0"
   },
   "devDependencies": {
-    "@types/node": "25.9.3",
+    "@types/node": "26.1.1",
     "@types/pg": "8.20.0",
     "@typescript-eslint/eslint-plugin": "^8.61.1",
     "@typescript-eslint/parser": "^8.59.2",
