@@ -1,5 +1,5 @@
 import type { Item } from '@golist/shared/domain/types';
-import { buildItemHash, buildItemSummaries, buildListDigest } from '@golist/shared/domain/sync';
+import { buildItemHash, buildItemSummaries, buildListDigest, shouldAcceptListMetadata } from '@golist/shared/domain/sync';
 
 import { isBackendSharingEnabled } from './apiClient';
 
@@ -154,6 +154,8 @@ class SocketSyncManager {
   // matches the local item digest for a list, so the eager `hash_diff` the
   // server sends right after `subscribed` is skipped instead of reprocessed.
   private skipNextHashDiffForListId: string | null = null;
+  private readonly messageQueue: Array<{ socket: WebSocket; payload: string }> = [];
+  private isHandlingMessage = false;
 
   init(deviceId: string, callbacks: SocketSyncCallbacks) {
     this.deviceId = deviceId;
@@ -183,6 +185,9 @@ class SocketSyncManager {
     const previousDesiredListId = this.desiredListId;
     this.desiredListId = nextListId;
     this.fullSyncQueue = this.fullSyncQueue.filter((entry) => entry !== nextListId);
+    if (this.subscribedListId !== nextListId) {
+      this.skipNextHashDiffForListId = null;
+    }
 
     if (this.subscribedListId === nextListId && this.isSubscribedReady) {
       return;
@@ -326,7 +331,7 @@ class SocketSyncManager {
         return;
       }
 
-      void this.handleMessage(event.data);
+      this.enqueueMessage(socket, event.data);
     });
 
     socket.addEventListener('close', () => {
@@ -383,6 +388,33 @@ class SocketSyncManager {
 
     if (resolver) {
       resolver(result);
+    }
+  }
+
+  private enqueueMessage(socket: WebSocket, payload: string) {
+    this.messageQueue.push({ socket, payload });
+    if (!this.isHandlingMessage) {
+      void this.drainMessageQueue();
+    }
+  }
+
+  private async drainMessageQueue() {
+    this.isHandlingMessage = true;
+    try {
+      while (this.messageQueue.length > 0) {
+        const message = this.messageQueue.shift();
+        if (!message || this.socket !== message.socket) {
+          continue;
+        }
+
+        try {
+          await this.handleMessage(message.payload);
+        } catch {
+          this.callbacks?.onError('sync message handling failed');
+        }
+      }
+    } finally {
+      this.isHandlingMessage = false;
     }
   }
 
@@ -453,20 +485,23 @@ class SocketSyncManager {
     this.isSubscribedReady = true;
     this.consecutiveForbiddenCount = 0;
 
-    // Fast path: if the server's item digest for this list already matches
-    // ours, items are already reconciled — skip waiting for/processing the
-    // eager `hash_diff` the server sends right after `subscribed`. This check
-    // (and the flag it sets) must run synchronously, before any `await`
-    // below, so it wins the race against that `hash_diff` message, which can
-    // otherwise be received and handled before this function's own awaits
-    // resolve.
+    // The server always follows `subscribed` with an eager hash_diff. Mark it
+    // as the completion frame when the digests already match, but do not
+    // advance the full-sync queue yet: list metadata must finish reconciling
+    // while this list is still the active server subscription.
     if (serverListDigest !== null && this.callbacks) {
       const localItems = this.callbacks.getItemsForList(listId);
       if (buildListDigest(localItems) === serverListDigest) {
         this.skipNextHashDiffForListId = listId;
-        this.onListExchangeComplete(listId);
       }
     }
+
+    const localMetadata = this.callbacks?.getListMetadata(listId) ?? null;
+    const shouldPushLocalMetadata =
+      localMetadata !== null &&
+      listName !== null &&
+      listUpdatedAt !== null &&
+      shouldAcceptListMetadata(localMetadata, { name: listName, updatedAt: listUpdatedAt });
 
     if (listName && listUpdatedAt !== null) {
       await this.callbacks?.applyIncomingListMetadata(listId, {
@@ -474,15 +509,15 @@ class SocketSyncManager {
         updatedAt: listUpdatedAt,
       });
     }
-    // A rename made while offline survives only in IndexedDB — push it
-    // back to the backend when the local copy is newer.
-    const localMetadata = this.callbacks?.getListMetadata(listId) ?? null;
-    if (localMetadata && listUpdatedAt !== null && localMetadata.updatedAt > listUpdatedAt) {
+
+    // Compare before applying the server copy so an offline rename — including
+    // the deterministic equal-timestamp winner — is still pushed upstream.
+    if (shouldPushLocalMetadata) {
       this.send({
         type: 'list_metadata_patch',
         listId,
-        name: localMetadata.name,
-        updatedAt: localMetadata.updatedAt,
+        name: localMetadata!.name,
+        updatedAt: localMetadata!.updatedAt,
       });
     }
     this.flushQueue();
@@ -493,11 +528,12 @@ class SocketSyncManager {
       return;
     }
 
-    // Already reconciled via the `serverListDigest` fast path in
-    // `handleSubscribedMessage` — this is the eager hash_diff the server
-    // always sends right after `subscribed`, now redundant.
+    // Already reconciled via the `serverListDigest` fast path. This eager
+    // hash_diff is the ordered signal that metadata work has finished and the
+    // full-sync queue may advance.
     if (this.skipNextHashDiffForListId === listId) {
       this.skipNextHashDiffForListId = null;
+      this.onListExchangeComplete(listId);
       return;
     }
 
@@ -674,6 +710,7 @@ class SocketSyncManager {
 
       next = this.desiredListId;
     }
+    this.skipNextHashDiffForListId = null;
 
     this.subscribedListId = next;
     this.isSubscribedReady = false;

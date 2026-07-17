@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Item } from "@golist/shared/domain/types";
+import { buildListDigest } from "@golist/shared/domain/sync";
 
 type Listener = (event?: { data?: string }) => void;
 
@@ -362,4 +363,89 @@ describe("socketSyncManager", () => {
 
     expect(socket?.sent.some((frame) => frame.includes('"type":"subscribe_list"') && frame.includes('"listId":"list-3"'))).toBe(true);
   });
+
+  it("finishes metadata reconciliation before the matching-digest fast path advances lists", async () => {
+    stubEnvironment();
+
+    let releaseMetadata!: () => void;
+    const metadataGate = new Promise<void>((resolve) => {
+      releaseMetadata = resolve;
+    });
+    const { socketSyncManager } = await import("./socketSync");
+
+    socketSyncManager.init("device-1", {
+      ...createCallbacks(),
+      getAllListIds: () => ["list-1", "list-2"],
+      getListMetadata: () => ({ name: "Renamed offline", updatedAt: 2000 }),
+      applyIncomingListMetadata: async () => metadataGate,
+    });
+
+    socketSyncManager.setActiveList("list-1");
+    const socket = FakeWebSocket.instances[0];
+    socket?.emit("open");
+    socket!.sent = [];
+
+    socket?.emit("message", {
+      data: JSON.stringify({
+        type: "subscribed",
+        listId: "list-1",
+        listName: "Old name",
+        listUpdatedAt: 1000,
+        serverListDigest: buildListDigest([]),
+      }),
+    });
+    socket?.emit("message", { data: hashDiffFrame("list-1") });
+    await flushAsync();
+
+    expect(
+      socket?.sent.some(
+        (frame) => frame.includes('"type":"subscribe_list"') && frame.includes('"listId":"list-2"'),
+      ),
+    ).toBe(false);
+
+    releaseMetadata();
+    await flushAsync();
+    await flushAsync();
+
+    const metadataPatchIndex = socket!.sent.findIndex(
+      (frame) => frame.includes('"type":"list_metadata_patch"') && frame.includes('"Renamed offline"'),
+    );
+    const nextSubscriptionIndex = socket!.sent.findIndex(
+      (frame) => frame.includes('"type":"subscribe_list"') && frame.includes('"listId":"list-2"'),
+    );
+    expect(metadataPatchIndex).toBeGreaterThanOrEqual(0);
+    expect(nextSubscriptionIndex).toBeGreaterThan(metadataPatchIndex);
+  });
+
+  it("pushes the deterministic local winner when list timestamps tie", async () => {
+    stubEnvironment();
+
+    const { socketSyncManager } = await import("./socketSync");
+    socketSyncManager.init("device-1", {
+      ...createCallbacks(),
+      getListMetadata: () => ({ name: "Zebra", updatedAt: 500 }),
+    });
+
+    socketSyncManager.setActiveList("list-1");
+    const socket = FakeWebSocket.instances[0];
+    socket?.emit("open");
+    socket!.sent = [];
+    socket?.emit("message", {
+      data: JSON.stringify({
+        type: "subscribed",
+        listId: "list-1",
+        listName: "Alpha",
+        listUpdatedAt: 500,
+        serverListDigest: "different-digest",
+      }),
+    });
+    await flushAsync();
+
+    expect(
+      socket?.sent.some(
+        (frame) => frame.includes('"type":"list_metadata_patch"') && frame.includes('"Zebra"'),
+      ),
+    ).toBe(true);
+  });
+
 });

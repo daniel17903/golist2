@@ -58,6 +58,10 @@ The API contract is maintained in `apps/api-spec/openapi.yaml` (and related file
 3. Seed utilities are implemented with `apps/backend/src/db/seed.ts` and exposed via `npm run db:seed -w apps/backend`.
 4. Transaction helpers are implemented in `apps/backend/src/db/client.ts` via `withTransaction(...)` for atomic writes.
 5. **GitHub Actions update**: `.github/workflows/backend-bootstrap.yml` now runs `db:migrate` against an ephemeral Postgres service.
+6. Migration `004_separate_list_metadata_updated_at.sql` adds a dedicated
+   `metadata_updated_at` column for list-name conflict resolution. Aggregate
+   item activity continues to update `updated_at` without changing the
+   metadata version.
 
 ### Phase 2 — API v1 implementation ✅ Implemented
 1. API v1 endpoints from `apps/api-spec/openapi.yaml` are implemented in `apps/backend/src/server.ts`.

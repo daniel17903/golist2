@@ -7,7 +7,10 @@ import { type ListRepository } from '../repositories/list-repository.js'
 import { ListSyncCache } from '../sync/list-sync-cache.js'
 
 const listIdParamsSchema = z.object({ listId: z.uuid() })
-const listPutBodySchema = z.object({ name: z.string().min(1) })
+const listPutBodySchema = z.object({
+  name: z.string().min(1),
+  updatedAt: z.iso.datetime({ offset: true }).optional(),
+})
 const listCreateHeadersSchema = z.object({ 'x-device-id': z.uuid() })
 const itemParamsSchema = z.object({ listId: z.uuid(), itemId: z.uuid() })
 const itemUpsertSchema = z.object({
@@ -32,7 +35,7 @@ export function registerListRoutes(
     const body = listPutBodySchema.parse(request.body)
     const headers = listCreateHeadersSchema.parse(request.headers)
 
-    const result = await listRepository.putList(params.listId, body.name, headers['x-device-id'])
+    const result = await listRepository.putList(params.listId, body.name, headers['x-device-id'], body.updatedAt)
 
     if (result.outcome === 'forbidden') {
       reply.code(403)

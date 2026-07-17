@@ -25,6 +25,7 @@ type ServerMessage =
   | { type: 'error'; message: string }
 
 const helloSchema = z.object({ type: z.literal('hello'), deviceId: z.uuid() })
+const dateMillisSchema = z.number().int().min(-8_640_000_000_000_000).max(8_640_000_000_000_000)
 const subscribeSchema = z.object({ type: z.literal('subscribe_list'), listId: z.uuid() })
 const unsubscribeSchema = z.object({ type: z.literal('unsubscribe_list'), listId: z.uuid() })
 const digestSchema = z.object({ type: z.literal('list_digest'), listId: z.uuid(), digest: z.string().min(1) })
@@ -45,16 +46,26 @@ const itemPatchSchema = z.object({
       quantityOrUnit: z.string().min(1).optional(),
       category: z.string().min(1),
       deleted: z.boolean(),
-      createdAt: z.number().int(),
-      updatedAt: z.number().int(),
+      createdAt: dateMillisSchema,
+      updatedAt: dateMillisSchema,
     }),
   ),
+}).superRefine((payload, context) => {
+  payload.items.forEach((item, index) => {
+    if (item.listId !== payload.listId) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Item listId must match patch listId',
+        path: ['items', index, 'listId'],
+      })
+    }
+  })
 })
 const listMetadataPatchSchema = z.object({
   type: z.literal('list_metadata_patch'),
   listId: z.uuid(),
   name: z.string().min(1),
-  updatedAt: z.number().int(),
+  updatedAt: dateMillisSchema,
 })
 
 type ConnectionState = {
@@ -168,16 +179,13 @@ export function registerSyncWebsocketRoute(
     state.subscribedListId = undefined
   }
 
-  const broadcastItemPatch = (listId: string, items: Item[], sender: ServerSocket) => {
+  const broadcastItemPatch = (listId: string, items: Item[]) => {
     const listSockets = subscribers.get(listId)
     if (!listSockets) {
       return
     }
 
     for (const socket of listSockets.values()) {
-      if (socket === sender) {
-        continue
-      }
       send(socket, { type: 'item_patch', listId, items })
     }
   }
@@ -308,30 +316,49 @@ export function registerSyncWebsocketRoute(
           }
 
           if (parsedPayload.type === 'item_patch') {
-            const accepted: Item[] = []
-            for (const item of parsedPayload.items) {
-              const result = await listRepository.upsertListItem(parsedPayload.listId, item.id, state.deviceId, {
-                name: item.name,
-                iconName: item.iconName,
-                quantityOrUnit: item.quantityOrUnit,
-                category: item.category,
-                deleted: item.deleted,
-                updatedAt: new Date(item.updatedAt).toISOString(),
-              })
+            const results = await listRepository.upsertListItems(
+              parsedPayload.listId,
+              state.deviceId,
+              parsedPayload.items.map((item) => ({
+                itemId: item.id,
+                input: {
+                  name: item.name,
+                  iconName: item.iconName,
+                  quantityOrUnit: item.quantityOrUnit,
+                  category: item.category,
+                  deleted: item.deleted,
+                  updatedAt: new Date(item.updatedAt).toISOString(),
+                },
+              })),
+            )
 
-              // Only rebroadcast what was actually persisted, so connected
-              // clients never diverge from the database.
-              if (result.outcome === 'created' || result.outcome === 'updated') {
-                accepted.push(item)
-              }
-            }
+            const acceptedIndexes = results
+              .map((result, index) =>
+                result.outcome === 'created' || result.outcome === 'updated' ? index : -1,
+              )
+              .filter((index) => index >= 0)
 
-            if (accepted.length > 0) {
+            if (acceptedIndexes.length > 0) {
               // The cached digest/summaries snapshot no longer reflects the
               // persisted item set, so drop it and let the next
               // subscribe_list/list_digest/hash_diff rebuild it from Postgres.
               listSyncCache.invalidate(parsedPayload.listId)
-              broadcastItemPatch(parsedPayload.listId, accepted, socket)
+
+              const canonicalItems = await Promise.all(
+                acceptedIndexes.map(async (index) => {
+                  const item = await listRepository.getListItem(
+                    parsedPayload.listId,
+                    parsedPayload.items[index].id,
+                  )
+                  return item ? toSyncItem(item) : null
+                }),
+              )
+              const accepted = canonicalItems.filter((item): item is Item => item !== null)
+              if (accepted.length > 0) {
+                // Include the sender so its client-generated createdAt/listId
+                // are replaced with the canonical persisted representation.
+                broadcastItemPatch(parsedPayload.listId, accepted)
+              }
             }
 
             return

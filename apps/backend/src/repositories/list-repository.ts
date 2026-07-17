@@ -26,6 +26,11 @@ export type ItemUpsertInput = {
   updatedAt: string
 }
 
+export type ItemBatchUpsertEntry = {
+  itemId: string
+  input: ItemUpsertInput
+}
+
 export type PutListResult =
   | { outcome: 'created' }
   | { outcome: 'updated' }
@@ -49,6 +54,7 @@ export interface ListRepository {
   listItemsUpdatedAfter(listId: string, updatedAfter: string): Promise<ListItemRecord[]>
   getListItem(listId: string, itemId: string): Promise<ListItemRecord | null>
   upsertListItem(listId: string, itemId: string, deviceId: string, input: ItemUpsertInput): Promise<UpsertListItemResult>
+  upsertListItems(listId: string, deviceId: string, entries: ItemBatchUpsertEntry[]): Promise<UpsertListItemResult[]>
   createShareToken(listId: string, deviceId: string): Promise<{ tokenId: string; createdAt: string }>
   recordShareTokenRedemption(tokenId: string, deviceId: string): Promise<void>
 }

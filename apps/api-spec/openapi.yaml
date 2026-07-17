@@ -101,6 +101,9 @@ components:
       properties:
         name:
           type: string
+        updatedAt:
+          type: string
+          format: date-time
     ListCreateResponse:
       type: object
       required: [listId]

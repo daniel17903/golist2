@@ -36,7 +36,7 @@ export const createStoreSyncCallbacks = (deps: StoreSyncBridgeDeps): SocketSyncC
       await sharingApiClient.upsertList({
         deviceId,
         listId: list.id,
-        body: { name: list.name },
+        body: { name: list.name, updatedAt: new Date(list.updatedAt).toISOString() },
       });
       return true;
     } catch {
@@ -52,6 +52,9 @@ export const createStoreSyncCallbacks = (deps: StoreSyncBridgeDeps): SocketSyncC
     );
 
     const acceptedItems = incomingItems.filter((incoming) => {
+      if (incoming.listId !== listId) {
+        return false;
+      }
       const localItem = localById.get(incoming.id);
       if (!localItem) {
         return true;

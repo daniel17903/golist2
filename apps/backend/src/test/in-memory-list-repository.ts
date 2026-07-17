@@ -4,6 +4,7 @@ import { buildItemHash, shouldAcceptListMetadata } from '@golist/shared/domain/s
 
 import {
   type ItemUpsertInput,
+  type ItemBatchUpsertEntry,
   type ListItemRecord,
   type ListRecord,
   type ListRepository,
@@ -181,7 +182,6 @@ export class InMemoryListRepository implements ListRepository {
         createdAt: new Date().toISOString(),
         updatedAt: input.updatedAt,
       })
-      list.data.updatedAt = input.updatedAt > list.data.updatedAt ? input.updatedAt : list.data.updatedAt
       return { outcome: 'created' }
     }
 
@@ -231,9 +231,34 @@ export class InMemoryListRepository implements ListRepository {
       deleted: input.deleted,
       updatedAt: input.updatedAt,
     })
-    list.data.updatedAt = input.updatedAt > list.data.updatedAt ? input.updatedAt : list.data.updatedAt
 
     return { outcome: 'updated' }
+  }
+
+  async upsertListItems(
+    listId: string,
+    deviceId: string,
+    entries: ItemBatchUpsertEntry[],
+  ): Promise<UpsertListItemResult[]> {
+    const listSnapshot = [...this.lists.entries()].map(([id, list]) => [
+      id,
+      { createdByDeviceId: list.createdByDeviceId, data: { ...list.data } },
+    ] as const)
+    const itemSnapshot = [...this.items.entries()].map(([id, item]) => [id, { ...item }] as const)
+
+    try {
+      const results: UpsertListItemResult[] = []
+      for (const entry of entries) {
+        results.push(await this.upsertListItem(listId, entry.itemId, deviceId, entry.input))
+      }
+      return results
+    } catch (error) {
+      this.lists.clear()
+      listSnapshot.forEach(([id, list]) => this.lists.set(id, list))
+      this.items.clear()
+      itemSnapshot.forEach(([id, item]) => this.items.set(id, item))
+      throw error
+    }
   }
 
   async createShareToken(listId: string, deviceId: string): Promise<{ tokenId: string; createdAt: string }> {

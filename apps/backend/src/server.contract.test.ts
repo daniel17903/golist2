@@ -436,4 +436,53 @@ describe('sharing API contract basics', () => {
 
     await app.close()
   })
+
+  it('keeps list metadata version independent from newer item activity', async () => {
+    const app = buildServer({ listRepository: new InMemoryListRepository() })
+    const listId = '77777777-7777-4777-8777-777777777777'
+    const itemId = '88888888-8888-4888-8888-888888888888'
+    const deviceId = '99999999-9999-4999-8999-999999999999'
+    const metadataUpdatedAt = '2026-01-01T00:00:00.000Z'
+
+    const createResponse = await app.inject({
+      method: 'PUT',
+      url: `/v1/lists/${listId}`,
+      headers: { 'x-device-id': deviceId },
+      payload: {
+        name: 'Metadata List',
+        updatedAt: metadataUpdatedAt,
+      },
+    })
+    expect(createResponse.statusCode).toBe(201)
+
+    const itemResponse = await app.inject({
+      method: 'PUT',
+      url: `/v1/lists/${listId}/items/${itemId}`,
+      headers: { 'x-device-id': deviceId },
+      payload: {
+        name: 'Milk',
+        iconName: 'default',
+        category: 'other',
+        deleted: false,
+        updatedAt: '2026-01-02T00:00:00.000Z',
+      },
+    })
+    expect(itemResponse.statusCode).toBe(201)
+
+    const listResponse = await app.inject({
+      method: 'GET',
+      url: `/v1/lists/${listId}`,
+      headers: { 'x-device-id': deviceId },
+    })
+    expect(listResponse.statusCode).toBe(200)
+    expect(listResponse.json()).toEqual(
+      expect.objectContaining({
+        name: 'Metadata List',
+        updatedAt: metadataUpdatedAt,
+      }),
+    )
+
+    await app.close()
+  })
+
 })

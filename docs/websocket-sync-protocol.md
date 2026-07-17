@@ -35,10 +35,10 @@ This document defines the list-scoped realtime sync protocol used by GoList web 
   - `{ "type": "subscribed", "listId": "<uuid>", "listName": "<string>", "listUpdatedAt": <number>, "serverListDigest": "<string>" }`
   - `serverListDigest` is the same item digest computed for `list_digest`/`hash_diff`
     (see `buildListDigest` in `packages/shared/src/domain/sync.ts`). The client
-    compares it against its own local digest for the list as a fast path: if
-    they match, items are already reconciled and the client skips waiting
-    for/processing the `hash_diff` the server sends immediately afterward; if
-    they differ, the client proceeds with the normal hash-diff exchange below.
+    compares it against its own local digest for the list as a fast path. If
+    they match, the immediately following `hash_diff` is used only as the
+    ordered completion signal after list metadata reconciliation; if they
+    differ, the client performs the normal hash-diff exchange below.
 - `hash_diff`
   - same shape as client `hash_diff`
 - `item_patch`
@@ -55,13 +55,22 @@ This document defines the list-scoped realtime sync protocol used by GoList web 
 3. `item_patch` carries full item state deltas only for missing/stale records.
 4. Last-write-wins by `updatedAt`.
 5. If `updatedAt` is equal, both sides use deterministic item-hash tie-break to guarantee convergence.
-6. `list_metadata_patch` (rename) uses the same last-write-wins-by-`updatedAt` rule. If
+6. Every item inside an `item_patch` must carry the same `listId` as the
+   enclosing message. The server validates the complete batch before writing,
+   persists the batch in one transaction, and echoes canonical persisted item
+   records to every subscribed socket, including the sender. This canonicalizes
+   server-owned fields such as `createdAt`.
+7. `list_metadata_patch` (rename) uses the same last-write-wins-by-`updatedAt` rule. If
    `updatedAt` ties, the lexicographically greater `name` wins deterministically on every
    peer — client and both backend list repositories (Postgres and in-memory) apply the
    identical rule via the shared `shouldAcceptListMetadata` helper
    (`packages/shared/src/domain/sync.ts`), so two devices renaming the same list to
    different names within the same millisecond still converge on one final name
    regardless of which patch arrives first.
+
+8. List-name conflict resolution uses its own persisted metadata timestamp.
+   Item activity may advance the aggregate list activity timestamp, but it
+   cannot make an unchanged server-side name defeat an offline rename.
 
 ## Scope
 

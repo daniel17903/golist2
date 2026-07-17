@@ -104,6 +104,7 @@ describe("createStoreSyncCallbacks - applyIncomingListMetadata", () => {
     const callbacksB = createStoreSyncCallbacks(depsB);
     await callbacksB.applyIncomingListMetadata("list-1", { name: "Zebra", updatedAt: 500 });
 
+
     // "Zebra" > "Alpha" lexicographically, so it must win everywhere:
     // device A keeps its local "Zebra" (rejects the incoming "Alpha"), and
     // device B adopts "Zebra" from the incoming patch. Both devices converge
@@ -112,5 +113,33 @@ describe("createStoreSyncCallbacks - applyIncomingListMetadata", () => {
     expect(applyOnDeviceB).toHaveBeenCalledWith(
       expect.objectContaining({ id: "list-1", name: "Zebra", updatedAt: 500 }),
     );
+  });
+});
+
+describe("createStoreSyncCallbacks - applyIncomingItems", () => {
+  beforeEach(() => {
+    itemsBulkPut.mockClear();
+  });
+
+  it("rejects an item whose listId does not match the patch list", async () => {
+    const { createStoreSyncCallbacks } = await import("./storeSyncBridge");
+    const list: List = { id: "list-1", name: "List", createdAt: 1, updatedAt: 100 };
+    const { deps, applyAcceptedItems } = buildDeps([list]);
+    const callbacks = createStoreSyncCallbacks(deps);
+    const incoming: Item = {
+      id: "item-1",
+      listId: "different-list",
+      name: "Milk",
+      iconName: "default",
+      category: "other",
+      deleted: false,
+      createdAt: 100,
+      updatedAt: 100,
+    };
+
+    await callbacks.applyIncomingItems("list-1", [incoming]);
+
+    expect(itemsBulkPut).not.toHaveBeenCalled();
+    expect(applyAcceptedItems).not.toHaveBeenCalled();
   });
 });
