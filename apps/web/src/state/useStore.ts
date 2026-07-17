@@ -76,7 +76,7 @@ type StoreState = {
 };
 
 
-const syncListNameImmediately = async (listId: string, listName: string) => {
+const syncListNameImmediately = async (listId: string, listName: string, updatedAt: number) => {
   const state = useStore.getState();
   if (!state.metadata?.deviceId) {
     logSkippedBackendCall("List name sync skipped: device metadata missing.");
@@ -88,6 +88,7 @@ const syncListNameImmediately = async (listId: string, listName: string) => {
     listId,
     body: {
       name: listName,
+      updatedAt: new Date(updatedAt).toISOString(),
     },
   });
 
@@ -321,7 +322,7 @@ export const useStore = create<StoreState>((set, get) => ({
     }));
 
     runBackendSyncInBackground(
-      () => syncListNameImmediately(list.id, list.name),
+      () => syncListNameImmediately(list.id, list.name, list.updatedAt),
       t("sync.offline"),
     );
 
@@ -336,7 +337,7 @@ export const useStore = create<StoreState>((set, get) => ({
       ),
     }));
     runBackendSyncInBackground(
-      () => syncListNameImmediately(listId, name),
+      () => syncListNameImmediately(listId, name, now),
       t("sync.offline"),
     );
     socketSyncManager.queueLocalListMetadataPatch(listId, {
@@ -451,7 +452,7 @@ export const useStore = create<StoreState>((set, get) => ({
     await sharingApiClient.upsertList({
       deviceId: state.metadata.deviceId,
       listId: list.id,
-      body: { name: list.name },
+      body: { name: list.name, updatedAt: new Date(list.updatedAt).toISOString() },
     });
 
     const tokenResponse = await sharingApiClient.createShareToken({

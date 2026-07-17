@@ -5,6 +5,7 @@ import { z } from 'zod'
 
 import { query, withTransaction } from '../db/client.js'
 import {
+  type ItemBatchUpsertEntry,
   type ItemUpsertInput,
   type ListItemRecord,
   type ListRecord,
@@ -79,6 +80,91 @@ async function hasListAccessWithClient(client: Queryable, listId: string, device
   return parsed.success ? parsed.data.has_access : false
 }
 
+async function upsertListItemWithClient(
+  client: Queryable,
+  listId: string,
+  itemId: string,
+  deviceId: string,
+  input: ItemUpsertInput,
+): Promise<UpsertListItemResult> {
+  const existingItemResult = await client.query(
+    'SELECT list_id, name, icon_name, quantity_or_unit, category, deleted, updated_at FROM list_items WHERE id = $1 FOR UPDATE',
+    [itemId],
+  )
+
+  if (!existingItemResult.rowCount) {
+    await client.query(
+      `INSERT INTO list_items(id, list_id, name, icon_name, quantity_or_unit, category, deleted, created_by_device_id, created_at, updated_at, deleted_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), $9, CASE WHEN $7 THEN NOW() ELSE NULL END)`,
+      [itemId, listId, input.name, input.iconName, input.quantityOrUnit ?? null, input.category, input.deleted, deviceId, input.updatedAt],
+    )
+
+    await touchListUpdatedAt(client, listId, input.updatedAt)
+    return { outcome: 'created' }
+  }
+
+  const existing = z.object({
+    list_id: z.string(),
+    name: z.string(),
+    icon_name: z.string(),
+    quantity_or_unit: z.string().nullable(),
+    category: z.string(),
+    deleted: z.boolean(),
+    updated_at: z.union([z.string(), z.date()]),
+  }).parse(existingItemResult.rows[0])
+
+  if (existing.list_id !== listId) {
+    return { outcome: 'conflict' }
+  }
+
+  const incomingUpdatedAt = Date.parse(input.updatedAt)
+  const existingUpdatedAt = Date.parse(toIsoTimestamp(existing.updated_at))
+  const shouldUpdate =
+    incomingUpdatedAt > existingUpdatedAt ||
+    (incomingUpdatedAt === existingUpdatedAt &&
+      buildItemHash({
+        id: itemId,
+        listId,
+        name: input.name,
+        iconName: input.iconName,
+        quantityOrUnit: input.quantityOrUnit,
+        category: input.category,
+        deleted: input.deleted,
+        updatedAt: incomingUpdatedAt,
+      }) >
+        buildItemHash({
+          id: itemId,
+          listId,
+          name: existing.name,
+          iconName: existing.icon_name,
+          quantityOrUnit: existing.quantity_or_unit ?? undefined,
+          category: existing.category,
+          deleted: existing.deleted,
+          updatedAt: existingUpdatedAt,
+        }))
+
+  if (!shouldUpdate) {
+    return { outcome: 'ignored' }
+  }
+
+  await client.query(
+    `UPDATE list_items
+        SET name = $1,
+            icon_name = $2,
+            quantity_or_unit = $3,
+            category = $4,
+            deleted = $5,
+            updated_at = $6,
+            deleted_at = CASE WHEN $5 THEN NOW() ELSE NULL END
+      WHERE id = $7
+        AND list_id = $8`,
+    [input.name, input.iconName, input.quantityOrUnit ?? null, input.category, input.deleted, input.updatedAt, itemId, listId],
+  )
+
+  await touchListUpdatedAt(client, listId, input.updatedAt)
+  return { outcome: 'updated' }
+}
+
 export class PostgresListRepository implements ListRepository {
   async ping(): Promise<void> {
     await query('SELECT 1')
@@ -116,7 +202,7 @@ export class PostgresListRepository implements ListRepository {
 
       if (!existingListResult.rowCount) {
         await client.query(
-          'INSERT INTO shared_lists(id, name, created_by_device_id, created_at, updated_at) VALUES ($1, $2, $3, NOW(), COALESCE($4::timestamptz, NOW()))',
+          'INSERT INTO shared_lists(id, name, created_by_device_id, created_at, updated_at, metadata_updated_at) VALUES ($1, $2, $3, NOW(), COALESCE($4::timestamptz, NOW()), COALESCE($4::timestamptz, NOW()))',
           [listId, name, deviceId, updatedAt ?? null],
         )
         return { outcome: 'created' }
@@ -127,7 +213,7 @@ export class PostgresListRepository implements ListRepository {
       }
 
       if (updatedAt === undefined) {
-        await client.query('UPDATE shared_lists SET name = $1, updated_at = NOW() WHERE id = $2', [name, listId])
+        await client.query('UPDATE shared_lists SET name = $1, updated_at = NOW(), metadata_updated_at = NOW() WHERE id = $2', [name, listId])
         return { outcome: 'updated' }
       }
 
@@ -140,11 +226,13 @@ export class PostgresListRepository implements ListRepository {
       // string comparison, guaranteeing both sides pick the same winner.
       const updateResult = await client.query(
         `UPDATE shared_lists
-            SET name = $1, updated_at = $3
+            SET name = $1,
+                updated_at = GREATEST(updated_at, $3::timestamptz),
+                metadata_updated_at = $3
           WHERE id = $2
             AND (
-              date_trunc('milliseconds', updated_at) < $3::timestamptz
-              OR (date_trunc('milliseconds', updated_at) = $3::timestamptz AND name::bytea < $1::bytea)
+              date_trunc('milliseconds', metadata_updated_at) < $3::timestamptz
+              OR (date_trunc('milliseconds', metadata_updated_at) = $3::timestamptz AND name::bytea < $1::bytea)
             )`,
         [name, listId, updatedAt],
       )
@@ -155,7 +243,7 @@ export class PostgresListRepository implements ListRepository {
 
   async getList(listId: string): Promise<ListRecord | null> {
     const listResult = await query<{ id: string; name: string; created_at: TimestampColumn; updated_at: TimestampColumn }>(
-      'SELECT id, name, created_at, updated_at FROM shared_lists WHERE id = $1 LIMIT 1',
+      'SELECT id, name, created_at, metadata_updated_at AS updated_at FROM shared_lists WHERE id = $1 LIMIT 1',
       [listId],
     )
 
@@ -256,90 +344,23 @@ export class PostgresListRepository implements ListRepository {
     deviceId: string,
     input: ItemUpsertInput,
   ): Promise<UpsertListItemResult> {
+    const [result] = await this.upsertListItems(listId, deviceId, [{ itemId, input }])
+    return result
+  }
+
+  async upsertListItems(
+    listId: string,
+    deviceId: string,
+    entries: ItemBatchUpsertEntry[],
+  ): Promise<UpsertListItemResult[]> {
     return withTransaction(async (client) => {
       await client.query('SELECT id FROM shared_lists WHERE id = $1 FOR UPDATE', [listId])
 
-      const existingItemResult = await client.query<{
-        list_id: string
-        name: string
-        icon_name: string
-        quantity_or_unit: string | null
-        category: string
-        deleted: boolean
-        updated_at: TimestampColumn
-      }>(
-        'SELECT list_id, name, icon_name, quantity_or_unit, category, deleted, updated_at FROM list_items WHERE id = $1 FOR UPDATE',
-        [itemId],
-      )
-
-      if (!existingItemResult.rowCount) {
-        await client.query(
-          `INSERT INTO list_items(id, list_id, name, icon_name, quantity_or_unit, category, deleted, created_by_device_id, created_at, updated_at, deleted_at)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), $9, CASE WHEN $7 THEN NOW() ELSE NULL END)`,
-          [itemId, listId, input.name, input.iconName, input.quantityOrUnit ?? null, input.category, input.deleted, deviceId, input.updatedAt],
-        )
-
-        await touchListUpdatedAt(client, listId, input.updatedAt)
-
-        return { outcome: 'created' }
+      const results: UpsertListItemResult[] = []
+      for (const entry of entries) {
+        results.push(await upsertListItemWithClient(client, listId, entry.itemId, deviceId, entry.input))
       }
-
-      const existing = existingItemResult.rows[0]
-
-      if (existing.list_id !== listId) {
-        return { outcome: 'conflict' }
-      }
-
-      // Same LWW rule the clients apply (shared sync hashes), so the persisted
-      // winner always matches what connected devices resolve locally. The row
-      // is locked above, so deciding here is race-free.
-      const incomingUpdatedAt = Date.parse(input.updatedAt)
-      const existingUpdatedAt = Date.parse(toIsoTimestamp(existing.updated_at))
-      const shouldUpdate =
-        incomingUpdatedAt > existingUpdatedAt ||
-        (incomingUpdatedAt === existingUpdatedAt &&
-          buildItemHash({
-            id: itemId,
-            listId,
-            name: input.name,
-            iconName: input.iconName,
-            quantityOrUnit: input.quantityOrUnit,
-            category: input.category,
-            deleted: input.deleted,
-            updatedAt: incomingUpdatedAt,
-          }) >
-            buildItemHash({
-              id: itemId,
-              listId,
-              name: existing.name,
-              iconName: existing.icon_name,
-              quantityOrUnit: existing.quantity_or_unit ?? undefined,
-              category: existing.category,
-              deleted: existing.deleted,
-              updatedAt: existingUpdatedAt,
-            }))
-
-      if (!shouldUpdate) {
-        return { outcome: 'ignored' }
-      }
-
-      await client.query(
-        `UPDATE list_items
-            SET name = $1,
-                icon_name = $2,
-                quantity_or_unit = $3,
-                category = $4,
-                deleted = $5,
-                updated_at = $6,
-                deleted_at = CASE WHEN $5 THEN NOW() ELSE NULL END
-          WHERE id = $7
-            AND list_id = $8`,
-        [input.name, input.iconName, input.quantityOrUnit ?? null, input.category, input.deleted, input.updatedAt, itemId, listId],
-      )
-
-      await touchListUpdatedAt(client, listId, input.updatedAt)
-
-      return { outcome: 'updated' }
+      return results
     })
   }
 

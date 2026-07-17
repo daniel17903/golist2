@@ -618,4 +618,119 @@ describe('backend runtime integration', () => {
 
     expect(secondRedeemedListResponse.status).toBe(200)
   })
+
+  it('rejects invalid patch batches atomically and echoes canonical accepted items to the sender', async () => {
+    const listId = crypto.randomUUID()
+    const metadataUpdatedAt = '2026-01-01T00:00:00.000Z'
+    const createResponse = await fetch(`${baseUrl}/v1/lists/${listId}`, {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json', 'x-device-id': testDeviceId },
+      body: JSON.stringify({ name: 'Validated Patch List', updatedAt: metadataUpdatedAt }),
+    })
+    expect(createResponse.status).toBe(201)
+
+    const client = await openSyncSocket()
+    try {
+      client.send({ type: 'hello', deviceId: testDeviceId })
+      await client.waitForMessage((message) => message.type === 'hello_ack')
+      client.send({ type: 'subscribe_list', listId })
+      await client.waitForMessage((message) => message.type === 'subscribed')
+
+      const mismatchedItemId = crypto.randomUUID()
+      client.send({
+        type: 'item_patch',
+        listId,
+        items: [{
+          id: mismatchedItemId,
+          listId: crypto.randomUUID(),
+          name: 'Wrong list',
+          iconName: 'default',
+          category: 'other',
+          deleted: false,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        }],
+      })
+      await client.waitForMessage(
+        (message) => message.type === 'error' && message.message === 'invalid_message',
+      )
+
+      const atomicallyRejectedItemId = crypto.randomUUID()
+      client.send({
+        type: 'item_patch',
+        listId,
+        items: [
+          {
+            id: atomicallyRejectedItemId,
+            listId,
+            name: 'Would otherwise persist',
+            iconName: 'default',
+            category: 'other',
+            deleted: false,
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+          },
+          {
+            id: crypto.randomUUID(),
+            listId,
+            name: 'Invalid timestamp',
+            iconName: 'default',
+            category: 'other',
+            deleted: false,
+            createdAt: Date.now(),
+            updatedAt: 8_640_000_000_000_001,
+          },
+        ],
+      })
+      await client.waitForMessage(
+        (message) => message.type === 'error' && message.message === 'invalid_message',
+      )
+
+      const rejectedItemResponse = await fetch(
+        `${baseUrl}/v1/lists/${listId}/items/${atomicallyRejectedItemId}`,
+        { headers: { 'x-device-id': testDeviceId } },
+      )
+      expect(rejectedItemResponse.status).toBe(404)
+
+      const acceptedItemId = crypto.randomUUID()
+      const updatedAt = Date.now()
+      client.send({
+        type: 'item_patch',
+        listId,
+        items: [{
+          id: acceptedItemId,
+          listId,
+          name: 'Canonical item',
+          iconName: 'default',
+          category: 'other',
+          deleted: false,
+          createdAt: 1,
+          updatedAt,
+        }],
+      })
+      const canonicalPatch = await client.waitForMessage(
+        (message) => message.type === 'item_patch',
+      )
+      expect(canonicalPatch).toEqual(expect.objectContaining({
+        listId,
+        items: [expect.objectContaining({ id: acceptedItemId, listId, updatedAt })],
+      }))
+      const canonicalItems = z.array(z.object({ createdAt: z.number() })).parse(canonicalPatch.items)
+      expect(canonicalItems[0]?.createdAt).not.toBe(1)
+
+      const persistedListResponse = await fetch(`${baseUrl}/v1/lists/${listId}`, {
+        headers: { 'x-device-id': testDeviceId },
+      })
+      expect(persistedListResponse.status).toBe(200)
+      expect(await persistedListResponse.json()).toEqual(
+        expect.objectContaining({
+          name: 'Validated Patch List',
+          updatedAt: metadataUpdatedAt,
+        }),
+      )
+    } finally {
+      client.socket.close()
+    }
+  })
+
 })

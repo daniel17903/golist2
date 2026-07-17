@@ -57,6 +57,7 @@ export type ApiListDocument = {
 
 export type ApiListUpsertRequest = {
   name: string;
+  updatedAt?: string;
 };
 
 export type ApiListUpsertResponse = {

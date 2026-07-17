@@ -57,9 +57,11 @@ this, every (re)connect triggers one reconciliation pass over **all** locally kn
    keeping the local name.
 6. On `subscribed`, the client also compares the server's `serverListDigest` (the same
    item digest used for `list_digest`/`hash_diff`) against its own local digest for that
-   list. If they match, the client treats the list as already reconciled and skips
-   waiting for/processing the `hash_diff` the server sends right after `subscribed`; if
-   they differ, the client proceeds with the hash-diff exchange as usual.
+   list. If they match, the client finishes list-metadata reconciliation first and
+   then uses the server's immediately following `hash_diff` as the ordered signal
+   to advance the full-sync queue. Incoming socket messages are serialized so a
+   later list cannot become active while metadata work for the current list is
+   still pending. If the digests differ, the normal hash-diff exchange runs.
 
 ### 5. Reconciliation protocol
 
@@ -70,6 +72,9 @@ On subscription and manual resync:
 2. On mismatch, both sides exchange per-item `hash_diff` summaries (`itemId`, `itemHash`, `updatedAt`).
 3. Each side computes missing/stale items and exchanges targeted `item_patch` payloads.
 4. Incoming items are applied only when their `updatedAt` wins; equal timestamps use deterministic hash tie-break.
+   Patch batches are validated before persistence, committed transactionally,
+   and echoed back as canonical server records; the client also rejects any
+   item whose `listId` differs from the enclosing patch.
 5. Incoming list-metadata (rename) patches use the same last-write-wins rule; on an equal
    `updatedAt`, the lexicographically greater name wins (`shouldAcceptListMetadata` in
    `packages/shared/src/domain/sync.ts`), applied identically by
@@ -80,6 +85,8 @@ Protocol details are documented in `docs/websocket-sync-protocol.md` and mirrore
 ## HTTP usage boundaries
 
 - HTTP remains used for list/share-token operations (`PUT /v1/lists/{listId}`, `GET /v1/lists/{listId}`, share-token create/redeem).
+- List PUTs include the local metadata `updatedAt`, so REST bootstrap/share
+  operations cannot bypass rename conflict resolution.
 - Item synchronization does **not** use item HTTP endpoints (`/v1/lists/{listId}/items...`) in frontend sync flow.
 
 ## Failure handling
