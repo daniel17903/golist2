@@ -24,7 +24,7 @@
   "devDependencies": {
     "@types/node": "26.1.1",
     "@types/pg": "8.20.0",
-    "@typescript-eslint/eslint-plugin": "^8.61.1",
+    "@typescript-eslint/eslint-plugin": "^8.64.0",
     "@typescript-eslint/parser": "^8.59.2",
     "eslint": "^10.3.0",
     "globals": "17.6.0",
