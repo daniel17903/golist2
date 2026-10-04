@@ -23,6 +23,33 @@ jobs:
   web-e2e-playwright:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        # memory: in-memory backend repository; postgres: the production
+        # Postgres repository, so the whole stack runs end to end.
+        backend: [memory, postgres]
+    services:
+      postgres:
+        image: postgres:17.6-alpine3.22
+        env:
+          POSTGRES_DB: golist
+          POSTGRES_USER: golist
+          POSTGRES_PASSWORD: golist
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U golist -d golist"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      E2E_BACKEND: ${{ matrix.backend }}
+      PGHOST: localhost
+      PGUSER: golist
+      PGDATABASE: golist
+      PGPASSWORD: golist
+      PGSSLMODE: disable
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7

@@ -52,7 +52,7 @@
 - `npm run db:seed -w apps/backend`
 
 ## CI/CD
-- GitHub Actions `ci.yml` workflow validates `lint`, `typecheck`, `test` and `build` for the web workspace on PRs.
+- GitHub Actions `ci.yml` workflow validates `lint`, `typecheck`, `test` and `build` for the web workspace on PRs, and runs the Playwright E2E suite against both the in-memory and the Postgres backend.
 - GitHub Actions `backend-bootstrap.yml` runs backend `lint` + `typecheck` + `db:migrate` + `test` (against ephemeral Postgres) on PRs that touch `apps/backend/**`.
 - Deploy workflow builds on `main`.
 
@@ -60,7 +60,10 @@
 - Always run `npm run typecheck -w apps/web` for web changes and `npm run typecheck -w apps/backend` for backend changes before commit.
 - Always run `npm run lint -w apps/web` for web changes and `npm run lint -w apps/backend` for backend changes before commit.
 - Run `npm run test -w apps/web` for changes to `apps/web/src/domain/`, `apps/web/src/state/`, or `apps/web/src/storage/`.
-- Run `npm run test -w apps/backend` for backend endpoint/config changes.
+- Run `npm run test -w apps/backend` for backend endpoint/config changes. Repository tests
+  (`postgres-list-repository.test.ts`) only run when `PGHOST`/`DATABASE_URL` is set.
+- Run `npm run test:e2e -w apps/web` for changes to UI flows, the store, sync or backend routes
+  (with `E2E_BACKEND=postgres` too when touching the Postgres repository).
 - Run `npm run db:migrate -w apps/backend` for backend schema/migration changes.
 - Run `npm run build -w apps/web` for changes that touch PWA assets or build config; run `npm run build -w apps/backend` when backend runtime/build config changes.
 
@@ -109,11 +112,32 @@
 
 - Playwright E2E in fresh containers may require both browser binaries and OS deps.
   Run `npx playwright install chromium` and `npx playwright install-deps chromium`
-  before running `npm run test:e2e -w apps/web` (or root alias `npm run test:e2e:web`),
-  which already sets `RUN_PLAYWRIGHT_E2E=1`.
+  before running `npm run test:e2e -w apps/web` (or root alias `npm run test:e2e:web`).
+  If the preinstalled browsers don't match the pinned Playwright version, install into
+  a scratch dir and point `PLAYWRIGHT_BROWSERS_PATH` at it.
   For E2E-related changes, do this setup and run the Playwright E2E command before committing.
-  Do **not** treat a skipped run as sufficient validation: for E2E-related changes the
-  tests must actually execute (the default `npm run test` skips them).
+- The repo root has a hoisted `vite` 7 (pulled in by vitest) while `apps/web` uses vite 8;
+  always start the web dev server through `npm run dev -w apps/web`, never a bare `vite`.
+
+## End-to-end tests (`apps/web/e2e/`)
+- Playwright Test suite (`apps/web/playwright.config.ts`). `npm run test:e2e -w apps/web`
+  starts the real Fastify backend (`e2e/support/backend-server.ts`, port 3100) and the Vite
+  dev server (port 4173, `ENVIRONMENT=production` so the debug log panel doesn't cover
+  toasts), then drives Chromium against them.
+- Backend storage: `E2E_BACKEND=memory` (default, no DB needed) or `E2E_BACKEND=postgres`
+  (production repository; uses the usual `PG*` env vars and runs migrations first). CI runs both.
+- Specs: `lists.spec.ts`, `items.spec.ts`, `sync.spec.ts` (multi-device share/join, realtime
+  propagation, offline reconciliation), `ui.spec.ts` (i18n, language suggestion, stats, legal,
+  back gesture, join errors).
+- Fixtures (`e2e/fixtures.ts`): `app` = primary device (already on `/`), `newDevice()` = extra
+  isolated device (own browser context), `backend` = REST client to assert server state.
+  `GoListApp` (`e2e/support/goListApp.ts`) is the page object; `disconnectBackend()` /
+  `reconnectBackend()` cut a single device off the backend (REST + WebSocket). Tests fail on
+  any uncaught page error. Failing tests get each device's WebSocket frames attached as
+  `device-*-websocket-frames.txt` in `test-results/`.
+- The language-switch suggestion is suppressed by default (it would pop over unrelated tests);
+  opt back in with `test.use({ initOptions: { suppressLanguageSuggestion: false } })`.
+- Add an E2E test for every user-visible behavior change and for every sync bug fix.
 
 ## React performance rules (web app)
 

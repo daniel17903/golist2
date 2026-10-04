@@ -36,4 +36,16 @@ export default tseslint.config(
       ],
     },
   },
+  {
+    // Playwright E2E suite: runs in Node, and Playwright fixtures use `use`
+    // and `{}` destructuring, which the React rules misread.
+    files: ["e2e/**/*.ts", "playwright.config.ts"],
+    languageOptions: {
+      globals: { ...globals.node, ...globals.browser },
+    },
+    rules: {
+      "react-hooks/rules-of-hooks": "off",
+      "no-empty-pattern": "off",
+    },
+  },
 );

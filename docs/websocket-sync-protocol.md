@@ -68,6 +68,12 @@ This document defines the list-scoped realtime sync protocol used by GoList web 
    different names within the same millisecond still converge on one final name
    regardless of which patch arrives first.
 
+   A `list_metadata_patch` that loses only because the stored metadata is
+   already identical (same name and `updatedAt` — the web client sends every
+   rename over REST *and* the socket, and REST can land first) is still
+   broadcast to the other subscribers, since the REST route does not notify
+   them.
+
 8. List-name conflict resolution uses its own persisted metadata timestamp.
    Item activity may advance the aggregate list activity timestamp, but it
    cannot make an unchanged server-side name defeat an offline rename.

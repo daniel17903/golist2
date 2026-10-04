@@ -31,6 +31,7 @@ import { usePullToRefresh } from "./hooks/usePullToRefresh";
 import { useShareList } from "./hooks/useShareList";
 import { useToasts } from "./hooks/useToasts";
 import { calculateListStats } from "./domain/listStats";
+import { useI18n } from "./i18n";
 import { useStore } from "./state/useStore";
 
 type LegalModalType = "imprint" | "privacy";
@@ -46,7 +47,23 @@ const {
 
 const App = () => {
   useKeyboardInset();
-  useAppBootstrap();
+
+  const {
+    undoToasts,
+    appToasts,
+    pushAppToast,
+    showUndoDelete,
+    showUndoRename,
+    removeUndoToast,
+    removeAppToast,
+  } = useToasts();
+
+  const { t } = useI18n();
+  const handleJoinFailed = useCallback(() => {
+    pushAppToast(t("sync.joinFailed"), "error");
+  }, [pushAppToast, t]);
+
+  useAppBootstrap({ onShareLinkJoinFailed: handleJoinFailed });
 
   const {
     lists,
@@ -70,16 +87,6 @@ const App = () => {
   const isListStatsOpen = stack.includes("list-stats");
   const isLegalModalOpen = stack.includes("legal");
   const isEditItemOpen = stack.includes("edit-item");
-
-  const {
-    undoToasts,
-    appToasts,
-    pushAppToast,
-    showUndoDelete,
-    showUndoRename,
-    removeUndoToast,
-    removeAppToast,
-  } = useToasts();
 
   const {
     itemName,
@@ -116,7 +123,7 @@ const App = () => {
     openJoinList,
     cancelJoinList,
     handleJoinList,
-  } = useJoinListDialog({ openPopup, closePopup });
+  } = useJoinListDialog({ openPopup, closePopup, onJoinFailed: handleJoinFailed });
 
   const { exitingItemIds, handleExitComplete, handleToggleItem } = useItemExitAnimation({
     items,

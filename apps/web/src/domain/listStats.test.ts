@@ -60,4 +60,19 @@ describe("calculateListStats", () => {
     expect(stats.lastBoughtAt).toBe(80_000);
     expect(stats.topItems[0]).toMatchObject({ count: 1 });
   });
+
+  it("counts open items whose server-assigned createdAt is after updatedAt", () => {
+    const items: Item[] = [
+      // Synced item: the backend stamps createdAt on receipt, a few ms after
+      // the client's updatedAt.
+      createItem({ id: "1", listId: "a", name: "Milk", createdAt: 1_050, updatedAt: 1_000 }),
+      // Edited shortly after being added — still an open item.
+      createItem({ id: "2", listId: "a", name: "Bread", createdAt: 2_000, updatedAt: 5_000 }),
+    ];
+
+    const stats = calculateListStats(items, "a");
+
+    expect(stats.totalItemsEver).toBe(2);
+    expect(stats.openItems).toBe(2);
+  });
 });

@@ -221,18 +221,24 @@ export class PostgresListRepository implements ListRepository {
       // `@golist/shared/domain/sync`): apply when the incoming change is
       // newer, or — on an equal millisecond timestamp — when it carries a
       // lexicographically greater name. The name comparison is done on raw
-      // UTF-8 bytes (`bytea`) rather than `<`/`>` so the result never depends
-      // on the database collation and always matches the client's plain JS
-      // string comparison, guaranteeing both sides pick the same winner.
+      // UTF-8 bytes (`convert_to`) rather than `<`/`>` so the result never
+      // depends on the database collation and always matches the client's
+      // plain JS string comparison, guaranteeing both sides pick the same
+      // winner. `$1` must be typed as text explicitly: a bare `$1::bytea`
+      // makes Postgres infer the parameter as bytea, and `SET name = $1` then
+      // stores its hex text form ("\x4d696c6b") instead of the name.
       const updateResult = await client.query(
         `UPDATE shared_lists
-            SET name = $1,
+            SET name = $1::text,
                 updated_at = GREATEST(updated_at, $3::timestamptz),
                 metadata_updated_at = $3
           WHERE id = $2
             AND (
               date_trunc('milliseconds', metadata_updated_at) < $3::timestamptz
-              OR (date_trunc('milliseconds', metadata_updated_at) = $3::timestamptz AND name::bytea < $1::bytea)
+              OR (
+                date_trunc('milliseconds', metadata_updated_at) = $3::timestamptz
+                AND convert_to(name, 'UTF8') < convert_to($1::text, 'UTF8')
+              )
             )`,
         [name, listId, updatedAt],
       )

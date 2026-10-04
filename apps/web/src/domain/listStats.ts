@@ -18,14 +18,13 @@ export const QUICK_TOGGLE_WINDOW_MS = 30_000;
 export const calculateListStats = (items: Item[], listId?: string): ListStats => {
   const activeListHistory = items.filter((item) => item.listId === listId);
 
-  const statsHistory = activeListHistory.filter((item) => {
-    const wasToggled = item.updatedAt !== item.createdAt;
-    if (!wasToggled) {
-      return true;
-    }
-
-    return item.updatedAt - item.createdAt > QUICK_TOGGLE_WINDOW_MS;
-  });
+  // Only an item that was checked off shortly after being added counts as a
+  // "quick toggle" (an accidental add). Open items always count — including
+  // synced ones, whose server-assigned `createdAt` can be slightly *later*
+  // than their client-side `updatedAt`.
+  const statsHistory = activeListHistory.filter(
+    (item) => !item.deleted || item.updatedAt - item.createdAt > QUICK_TOGGLE_WINDOW_MS,
+  );
 
   const counts = new Map<string, number>();
   const createdAtByName = new Map<string, number[]>();

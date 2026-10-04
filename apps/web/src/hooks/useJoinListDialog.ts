@@ -8,9 +8,12 @@ const { joinSharedList } = useStore.getState();
 type JoinListDialogOptions = {
   openPopup: (id: PopupId) => void;
   closePopup: (id: PopupId) => void;
+  // Called when redeeming the token fails; the dialog stays open so the user
+  // can correct the token.
+  onJoinFailed: () => void;
 };
 
-export const useJoinListDialog = ({ openPopup, closePopup }: JoinListDialogOptions) => {
+export const useJoinListDialog = ({ openPopup, closePopup, onJoinFailed }: JoinListDialogOptions) => {
   const [joinListValue, setJoinListValue] = useState("");
 
   const openJoinList = useCallback(() => {
@@ -25,10 +28,15 @@ export const useJoinListDialog = ({ openPopup, closePopup }: JoinListDialogOptio
   }, [closePopup]);
 
   const handleJoinList = useCallback(async () => {
-    await joinSharedList(joinListValue);
+    try {
+      await joinSharedList(joinListValue);
+    } catch {
+      onJoinFailed();
+      return;
+    }
     setJoinListValue("");
     closePopup("join-list");
-  }, [joinListValue, closePopup]);
+  }, [joinListValue, closePopup, onJoinFailed]);
 
   return {
     joinListValue,

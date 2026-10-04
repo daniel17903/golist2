@@ -376,9 +376,21 @@ export function registerSyncWebsocketRoute(
               return
             }
 
-            // Stale patch lost the LWW comparison against the stored list.
+            // Stale patch lost the LWW comparison against the stored list —
+            // unless the stored metadata already *is* this patch. Clients send
+            // a rename over REST (PUT /v1/lists/:id) and over the socket with
+            // the same name/updatedAt; when REST lands first the socket patch
+            // is a no-op write, but subscribers still need the broadcast
+            // because the REST route does not notify them.
             if (listResult.outcome === 'ignored') {
-              return
+              const storedList = await listRepository.getList(parsedPayload.listId)
+              const alreadyStored =
+                storedList !== null &&
+                storedList.name === parsedPayload.name &&
+                Date.parse(storedList.updatedAt) === parsedPayload.updatedAt
+              if (!alreadyStored) {
+                return
+              }
             }
 
             // List name/updatedAt aren't part of the item digest today, but
