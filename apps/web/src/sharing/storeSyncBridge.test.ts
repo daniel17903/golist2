@@ -142,4 +142,31 @@ describe("createStoreSyncCallbacks - applyIncomingItems", () => {
     expect(itemsBulkPut).not.toHaveBeenCalled();
     expect(applyAcceptedItems).not.toHaveBeenCalled();
   });
+
+  it("keeps the local createdByDeviceId when the server echo omits it", async () => {
+    const { createStoreSyncCallbacks } = await import("./storeSyncBridge");
+    const list: List = { id: "list-1", name: "List", createdAt: 1, updatedAt: 100 };
+    const local: Item = {
+      id: "item-1",
+      listId: "list-1",
+      name: "Milk",
+      iconName: "default",
+      category: "other",
+      deleted: false,
+      createdByDeviceId: "device-1",
+      createdAt: 100,
+      updatedAt: 100,
+    };
+    const { deps, applyAcceptedItems } = buildDeps([list]);
+    const callbacks = createStoreSyncCallbacks({ ...deps, getItems: () => [local] });
+    // Canonical server echo: server-assigned createdAt, no createdByDeviceId.
+    const echo: Item = { ...local, createdAt: 150, createdByDeviceId: undefined };
+
+    await callbacks.applyIncomingItems("list-1", [echo]);
+
+    const expected = { ...echo, createdByDeviceId: "device-1" };
+    expect(itemsBulkPut).toHaveBeenCalledWith([expected]);
+    expect(applyAcceptedItems).toHaveBeenCalledWith([expected]);
+  });
 });
+

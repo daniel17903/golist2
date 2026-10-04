@@ -97,7 +97,11 @@ const syncListNameImmediately = async (listId: string, listName: string, updated
     listId,
   });
 
-  socketSyncManager.setActiveList(listId);
+  // Now that the backend knows the list, retry the subscription for whatever
+  // list is active *now* — not `listId`: the user (or a share-link join) may
+  // have switched lists during the REST round trip, and re-subscribing to
+  // `listId` would leave the visible list without realtime updates.
+  socketSyncManager.setActiveList(useStore.getState().activeListId);
   markBackendOnline();
 };
 

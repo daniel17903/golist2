@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useStore } from "../state/useStore";
 import { useI18n } from "../i18n";
 
@@ -7,8 +7,15 @@ const { load, addList, joinSharedList, syncAllLists } = useStore.getState();
 
 // One-time app startup work: initial load, default list creation, share-token
 // redemption from the URL, and the periodic background sync.
-export const useAppBootstrap = () => {
+type AppBootstrapOptions = {
+  // Called when the share token from the URL cannot be redeemed.
+  onShareLinkJoinFailed: () => void;
+};
+
+export const useAppBootstrap = ({ onShareLinkJoinFailed }: AppBootstrapOptions) => {
   const { t } = useI18n();
+  const onShareLinkJoinFailedRef = useRef(onShareLinkJoinFailed);
+  useEffect(() => { onShareLinkJoinFailedRef.current = onShareLinkJoinFailed; });
   const isLoaded = useStore((s) => s.isLoaded);
   const listCount = useStore((s) => s.lists.length);
   const backendSharingEnabled = useStore((s) => s.backendSharingEnabled);
@@ -36,6 +43,8 @@ export const useAppBootstrap = () => {
     void (async () => {
       try {
         await joinSharedList(shareTokenFromUrl);
+      } catch {
+        onShareLinkJoinFailedRef.current();
       } finally {
         const cleanedUrl = new URL(window.location.href);
         cleanedUrl.searchParams.delete("shareToken");

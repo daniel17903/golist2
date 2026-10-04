@@ -72,8 +72,16 @@ export const createStoreSyncCallbacks = (deps: StoreSyncBridgeDeps): SocketSyncC
       return;
     }
 
-    await db.items.bulkPut(acceptedItems);
-    deps.applyAcceptedItems(acceptedItems);
+    // The backend does not echo `createdByDeviceId`; keep the locally known
+    // creator so per-device features (language suggestion) keep working for
+    // items this device created.
+    const mergedItems = acceptedItems.map((incoming) => {
+      const createdByDeviceId = incoming.createdByDeviceId ?? localById.get(incoming.id)?.createdByDeviceId;
+      return createdByDeviceId ? { ...incoming, createdByDeviceId } : incoming;
+    });
+
+    await db.items.bulkPut(mergedItems);
+    deps.applyAcceptedItems(mergedItems);
   },
   applyIncomingListMetadata: async (listId, payload) => {
     const currentList = deps.getLists().find((entry) => entry.id === listId);

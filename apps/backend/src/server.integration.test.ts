@@ -377,6 +377,48 @@ describe('backend runtime integration', () => {
     expect(orderTwoResult.name).toBe('Zebra')
   })
 
+  it('broadcasts a websocket rename even when the same rename already arrived over REST', async () => {
+    // The web client sends every rename twice — PUT /v1/lists/:id and a
+    // `list_metadata_patch` with identical name/updatedAt. When the REST call
+    // lands first, the socket patch no longer "wins" LWW, but the other
+    // subscribers have not heard about the rename yet and must still get it.
+    const listId = crypto.randomUUID()
+    const createResponse = await fetch(`${baseUrl}/v1/lists/${listId}`, {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json', 'x-device-id': testDeviceId },
+      body: JSON.stringify({ name: 'Before Rename' }),
+    })
+    expect(createResponse.status).toBe(201)
+
+    const clientA = await openSyncSocket()
+    const clientB = await openSyncSocket()
+
+    try {
+      for (const client of [clientA, clientB]) {
+        client.send({ type: 'hello', deviceId: testDeviceId })
+        await client.waitForMessage((message) => message.type === 'hello_ack')
+        client.send({ type: 'subscribe_list', listId })
+        await client.waitForMessage((message) => message.type === 'subscribed')
+      }
+
+      const renamedAt = Date.now() + 1_000
+      const restRename = await fetch(`${baseUrl}/v1/lists/${listId}`, {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json', 'x-device-id': testDeviceId },
+        body: JSON.stringify({ name: 'After Rename', updatedAt: new Date(renamedAt).toISOString() }),
+      })
+      expect(restRename.status).toBe(200)
+
+      clientB.send({ type: 'list_metadata_patch', listId, name: 'After Rename', updatedAt: renamedAt })
+
+      const patch = await clientA.waitForMessage((message) => message.type === 'list_metadata_patch')
+      expect(patch).toEqual({ type: 'list_metadata_patch', listId, name: 'After Rename', updatedAt: renamedAt })
+    } finally {
+      clientA.socket.close()
+      clientB.socket.close()
+    }
+  })
+
   it('does not rebroadcast websocket item patches that lose conflict resolution', async () => {
     const listId = crypto.randomUUID()
     const createResponse = await fetch(`${baseUrl}/v1/lists/${listId}`, {
