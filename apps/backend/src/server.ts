@@ -27,9 +27,17 @@ function isAllowedOrigin(origin: string): boolean {
   return env.NODE_ENV !== 'production' && LOCAL_DEV_ORIGIN_PATTERN.test(origin)
 }
 
-export function buildServer(deps: { listRepository?: ListRepository } = {}) {
+export type BuildServerOptions = {
+  listRepository?: ListRepository
+  // Test-only: where log lines go (defaults to stdout), or `false` to
+  // silence logging entirely (the web sync simulation harness).
+  logger?: { stream: { write(line: string): void } } | false
+}
+
+export function buildServer(deps: BuildServerOptions = {}) {
   const app = Fastify({
-    logger: {
+    logger: deps.logger === false ? false : {
+      ...(deps.logger ? { stream: deps.logger.stream } : {}),
       // Fastify's built-in logger already logs "incoming request"/"request
       // completed" (with responseTime) for every request, so we rely on it
       // as the single source of request logging instead of duplicating it

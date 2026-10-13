@@ -8,6 +8,14 @@ This document defines the list-scoped realtime sync protocol used by GoList web 
 - Protocol: WebSocket
 - Authentication context: client sends `hello` with `deviceId` first.
 
+## Message ordering
+
+The server handles each socket's messages strictly in arrival order (one at a
+time), even though handlers await the database. A client may therefore send
+`subscribe_list` followed immediately by patches for that list without waiting
+for `subscribed`, and an `unsubscribe_list`/`subscribe_list` pair can never let
+a patch in between be rejected with `not subscribed to list`.
+
 ## Message types
 
 ### Client -> server
@@ -59,7 +67,10 @@ This document defines the list-scoped realtime sync protocol used by GoList web 
    enclosing message. The server validates the complete batch before writing,
    persists the batch in one transaction, and echoes canonical persisted item
    records to every subscribed socket, including the sender. This canonicalizes
-   server-owned fields such as `createdAt`.
+   server-owned fields such as `createdAt`. Items in the batch that *lose*
+   last-write-wins are not broadcast, but the server sends the stored (winning)
+   version back to the sender only (when it differs), so the sender cannot keep
+   showing its losing write until the next reconnect.
 7. `list_metadata_patch` (rename) uses the same last-write-wins-by-`updatedAt` rule. If
    `updatedAt` ties, the lexicographically greater `name` wins deterministically on every
    peer — client and both backend list repositories (Postgres and in-memory) apply the
@@ -72,9 +83,19 @@ This document defines the list-scoped realtime sync protocol used by GoList web 
    already identical (same name and `updatedAt` — the web client sends every
    rename over REST *and* the socket, and REST can land first) is still
    broadcast to the other subscribers, since the REST route does not notify
-   them.
+   them. A `list_metadata_patch` that loses to *different* stored metadata is
+   answered with a `list_metadata_patch` carrying the stored name/`updatedAt`,
+   sent to the sender only.
 
-8. List-name conflict resolution uses its own persisted metadata timestamp.
+8. Clients timestamp a local edit with `max(now, updatedAt of the edited version + 1)`,
+   so an edit always supersedes the version it was based on even when the
+   editing device's clock is behind the device that wrote that version.
+   Incoming items and renames are re-checked against the persisted record
+   inside the client's IndexedDB write transaction, so a local edit persisted
+   while an incoming change is being applied is never overwritten by it.
+   Items use the shared `shouldAcceptItem` rule.
+
+9. List-name conflict resolution uses its own persisted metadata timestamp.
    Item activity may advance the aggregate list activity timestamp, but it
    cannot make an unchanged server-side name defeat an offline rename.
 

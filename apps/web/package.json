@@ -8,9 +8,12 @@
     "build": "vite build",
     "preview": "vite preview",
     "lint": "eslint .",
-    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.e2e.json --noEmit",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.e2e.json --noEmit && tsc -p tsconfig.sim.json --noEmit",
     "test": "vitest run",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:sim": "vitest run --project sim",
+    "test:unit": "vitest run --project unit",
+    "test:sync-fuzz": "vitest run --config vitest.fuzz.config.ts"
   },
   "dependencies": {
     "@golist/shared": "0.1.0",
@@ -29,6 +32,8 @@
     "eslint": "10.3.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.0",
+    "fake-indexeddb": "6.2.5",
+    "fast-check": "4.10.2",
     "globals": "^17.7.0",
     "playwright": "1.61.0",
     "typescript": "^6.0.2",

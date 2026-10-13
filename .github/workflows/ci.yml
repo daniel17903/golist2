@@ -17,8 +17,16 @@ jobs:
       - run: npm ci
       - run: npm run lint -w apps/web
       - run: npm run typecheck -w apps/web
+      # Includes the multi-device sync simulation (apps/web/sim), which runs
+      # the real web sync client against the real backend in-process.
       - run: npm run test -w apps/web
       - run: npm run build -w apps/web
+      # The sync simulation exercises backend code too, so keep the backend
+      # checks on every PR (repository tests skip without a database here;
+      # backend-bootstrap.yml runs them against Postgres).
+      - run: npm run lint -w apps/backend
+      - run: npm run typecheck -w apps/backend
+      - run: npm run test -w apps/backend
 
   web-e2e-playwright:
     runs-on: ubuntu-latest
@@ -77,3 +85,16 @@ jobs:
           echo "Playwright browser install failed after 3 attempts"
           exit 1
       - run: npm run test:e2e -w apps/web
+      # Traces, screenshots, per-device WebSocket frames/console logs and the
+      # backend log, so failures can be diagnosed without a local repro.
+      - name: Upload E2E artifacts
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-${{ matrix.backend }}-artifacts
+          path: |
+            apps/web/test-results/
+            apps/web/playwright-report/
+            apps/web/.e2e-logs/
+          include-hidden-files: true
+          retention-days: 7

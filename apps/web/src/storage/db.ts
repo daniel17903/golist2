@@ -1,4 +1,4 @@
-import Dexie, { type Table } from "dexie";
+import Dexie, { type DexieOptions, type Table } from "dexie";
 import type { AppMetadata, Item, List } from "@golist/shared/domain/types";
 
 export type ListShare = {
@@ -12,8 +12,10 @@ export class GoListDatabase extends Dexie {
   metadata!: Table<AppMetadata, string>;
   listShares!: Table<ListShare, string>;
 
-  constructor() {
-    super("golist");
+  // The sync simulation (apps/web/sim) gives every virtual device its own
+  // database name and IndexedDB factory.
+  constructor(name = "golist", options?: DexieOptions) {
+    super(name, options);
     this.version(1).stores({
       lists: "id, name, updatedAt",
       items: "id, listId, deleted, updatedAt",

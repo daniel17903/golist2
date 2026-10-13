@@ -3,11 +3,25 @@ import type { Item, List } from "@golist/shared/domain/types";
 
 const listsPut = vi.fn(async (): Promise<void> => undefined);
 const itemsBulkPut = vi.fn(async (): Promise<void> => undefined);
+// What `db.lists.get` / `db.items.bulkGet` return; tests mirror the
+// in-memory lists into `storedLists` and can pre-seed `storedItems`.
+let storedLists: List[] = [];
+let storedItems: Item[] = [];
 
 vi.mock("../storage/db", () => ({
   db: {
-    lists: { put: listsPut },
-    items: { bulkPut: itemsBulkPut },
+    transaction: async (...args: unknown[]) => {
+      const callback = args.at(-1);
+      return typeof callback === "function" ? callback() : undefined;
+    },
+    lists: {
+      put: listsPut,
+      get: async (id: string) => storedLists.find((list) => list.id === id),
+    },
+    items: {
+      bulkPut: itemsBulkPut,
+      bulkGet: async (ids: string[]) => ids.map((id) => storedItems.find((item) => item.id === id)),
+    },
   },
 }));
 
@@ -22,6 +36,7 @@ afterEach(() => {
 });
 
 const buildDeps = (lists: List[]) => {
+  storedLists = lists;
   const applyAcceptedItems = vi.fn();
   const applyListMetadata = vi.fn();
   const deps = {
@@ -66,6 +81,20 @@ describe("createStoreSyncCallbacks - applyIncomingListMetadata", () => {
 
     expect(applyListMetadata).not.toHaveBeenCalled();
     expect(listsPut).not.toHaveBeenCalled();
+  });
+
+  it("does not overwrite a newer name already stored by a concurrent local rename", async () => {
+    const { createStoreSyncCallbacks } = await import("./storeSyncBridge");
+    const list: List = { id: "list-1", name: "Old", createdAt: 1, updatedAt: 100 };
+    const { deps, applyListMetadata } = buildDeps([list]);
+    const callbacks = createStoreSyncCallbacks(deps);
+    // In memory the list is still "Old"; IndexedDB already has the local rename.
+    storedLists = [{ ...list, name: "Local newer", updatedAt: 300 }];
+
+    await callbacks.applyIncomingListMetadata("list-1", { name: "Remote older", updatedAt: 200 });
+
+    expect(listsPut).not.toHaveBeenCalled();
+    expect(applyListMetadata).not.toHaveBeenCalled();
   });
 
   it("ignores a same-timestamp patch carrying the same name (no-op)", async () => {
@@ -119,6 +148,33 @@ describe("createStoreSyncCallbacks - applyIncomingListMetadata", () => {
 describe("createStoreSyncCallbacks - applyIncomingItems", () => {
   beforeEach(() => {
     itemsBulkPut.mockClear();
+    storedItems = [];
+  });
+
+  // A local edit can be persisted after the in-memory check passed but
+  // before the incoming write runs; the stored (newer) version must win.
+  it("does not overwrite a newer item already stored by a concurrent local edit", async () => {
+    const { createStoreSyncCallbacks } = await import("./storeSyncBridge");
+    const list: List = { id: "list-1", name: "List", createdAt: 1, updatedAt: 100 };
+    const base: Item = {
+      id: "item-1",
+      listId: "list-1",
+      name: "Milk",
+      iconName: "default",
+      category: "other",
+      deleted: false,
+      createdAt: 100,
+      updatedAt: 100,
+    };
+    const { deps, applyAcceptedItems } = buildDeps([list]);
+    // In memory the item is still at 100; IndexedDB already has the local edit at 300.
+    const callbacks = createStoreSyncCallbacks({ ...deps, getItems: () => [base] });
+    storedItems = [{ ...base, name: "Oat milk", updatedAt: 300 }];
+
+    await callbacks.applyIncomingItems("list-1", [{ ...base, name: "Whole milk", updatedAt: 200 }]);
+
+    expect(itemsBulkPut).not.toHaveBeenCalled();
+    expect(applyAcceptedItems).not.toHaveBeenCalled();
   });
 
   it("rejects an item whose listId does not match the patch list", async () => {
