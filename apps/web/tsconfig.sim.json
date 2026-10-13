@@ -1,0 +1,7 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["node"]
+  },
+  "include": ["sim", "src/vite-env.d.ts", "vitest.config.ts", "vitest.fuzz.config.ts"]
+}

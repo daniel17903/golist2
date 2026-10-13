@@ -22,6 +22,10 @@
     "build:backend": "npm run build -w apps/backend",
     "lint:backend": "npm run lint -w apps/backend",
     "typecheck:backend": "npm run typecheck -w apps/backend",
-    "test:backend": "npm run test -w apps/backend"
+    "test:backend": "npm run test -w apps/backend",
+    "verify": "node scripts/verify.mjs",
+    "verify:changed": "node scripts/verify.mjs --changed",
+    "verify:full": "node scripts/verify.mjs --full",
+    "setup:agent": "scripts/agent-setup.sh"
   }
 }

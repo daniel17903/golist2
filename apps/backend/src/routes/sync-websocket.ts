@@ -1,3 +1,4 @@
+import { buildItemHash } from '@golist/shared/domain/sync'
 import type { Item } from '@golist/shared/domain/types'
 import websocket from '@fastify/websocket'
 import type { RawData, WebSocket } from 'ws'
@@ -221,7 +222,18 @@ export function registerSyncWebsocketRoute(
       const state: ConnectionState = {}
       const socket = toServerSocket(connection)
 
-      socket.on('message', async (raw: RawData) => {
+      // Handle this socket's messages strictly in arrival order. The handler
+      // awaits the repository (e.g. the access check in subscribe_list), so
+      // without this a patch sent right after a subscribe could be processed
+      // before the subscription is registered and be dropped with "not
+      // subscribed to list" (found by the web sync fuzzer, see
+      // apps/web/sim/scenarios/races.sim.test.ts).
+      let messageChain: Promise<void> = Promise.resolve()
+      socket.on('message', (raw: RawData) => {
+        messageChain = messageChain.then(() => handleMessage(raw))
+      })
+
+      const handleMessage = async (raw: RawData) => {
         try {
           const parsedPayload = parseClientMessage(JSON.parse(rawDataToString(raw)))
 
@@ -338,6 +350,27 @@ export function registerSyncWebsocketRoute(
               )
               .filter((index) => index >= 0)
 
+            // A patch that lost last-write-wins is not broadcast, but its
+            // sender must still learn the winning version — otherwise it
+            // keeps showing its own losing write until it reconnects (found
+            // by the web sync fuzzer).
+            const losingIndexes = results
+              .map((result, index) => (result.outcome === 'ignored' ? index : -1))
+              .filter((index) => index >= 0)
+            if (losingIndexes.length > 0) {
+              const winners = await Promise.all(
+                losingIndexes.map(async (index) => {
+                  const stored = await listRepository.getListItem(parsedPayload.listId, parsedPayload.items[index].id)
+                  const winner = stored ? toSyncItem(stored) : null
+                  return winner && buildItemHash(winner) !== buildItemHash(parsedPayload.items[index]) ? winner : null
+                }),
+              )
+              const differing = winners.filter((item): item is Item => item !== null)
+              if (differing.length > 0) {
+                send(socket, { type: 'item_patch', listId: parsedPayload.listId, items: differing })
+              }
+            }
+
             if (acceptedIndexes.length > 0) {
               // The cached digest/summaries snapshot no longer reflects the
               // persisted item set, so drop it and let the next
@@ -389,6 +422,16 @@ export function registerSyncWebsocketRoute(
                 storedList.name === parsedPayload.name &&
                 Date.parse(storedList.updatedAt) === parsedPayload.updatedAt
               if (!alreadyStored) {
+                // Tell the sender which name won so it does not keep its
+                // losing rename (only other subscribers get broadcasts).
+                if (storedList) {
+                  send(socket, {
+                    type: 'list_metadata_patch',
+                    listId: parsedPayload.listId,
+                    name: storedList.name,
+                    updatedAt: Date.parse(storedList.updatedAt),
+                  })
+                }
                 return
               }
             }
@@ -411,7 +454,7 @@ export function registerSyncWebsocketRoute(
           app.log.warn({ err: error }, 'invalid websocket message')
           send(socket, { type: 'error', message: 'invalid_message' })
         }
-      })
+      }
 
       socket.on('close', () => {
         removeFromSubscription(socket, state)

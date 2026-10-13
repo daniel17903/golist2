@@ -13,60 +13,6 @@ type BackendCallLog = {
   outcome: "success" | "error" | "skipped";
 };
 
-let backendCallLogger: ((entry: BackendCallLog) => void) | null = null;
-let activeBackendRequestLogger: ((count: number) => void) | null = null;
-let activeBackendRequestCount = 0;
-
-export const setBackendCallLogger = (logger: ((entry: BackendCallLog) => void) | null) => {
-  backendCallLogger = logger;
-};
-
-export const setActiveBackendRequestLogger = (logger: ((count: number) => void) | null) => {
-  activeBackendRequestLogger = logger;
-  activeBackendRequestLogger?.(activeBackendRequestCount);
-};
-
-const logBackendCall = (entry: BackendCallLog) => {
-  backendCallLogger?.(entry);
-};
-
-const readApiBaseUrl = (): string | null => {
-  if (typeof __API_BASE_URL__ === "string" && __API_BASE_URL__.trim().length > 0) {
-    return __API_BASE_URL__.trim();
-  }
-
-  logBackendCall({
-    endpoint: "configuration",
-    outcome: "skipped",
-    message: "Backend API URL missing. Running in offline-only mode.",
-  });
-  return null;
-};
-
-const readRequestTimeoutMs = () => {
-  if (typeof __API_TIMEOUT_MS__ === "string") {
-    const parsed = Number.parseInt(__API_TIMEOUT_MS__, 10);
-    if (Number.isFinite(parsed) && parsed > 0) {
-      return parsed;
-    }
-  }
-  return 15000;
-};
-
-const apiBaseUrl = readApiBaseUrl();
-const requestTimeoutMs = readRequestTimeoutMs();
-
-export const isBackendSharingEnabled = apiBaseUrl !== null;
-
-const requireApiBaseUrl = () => {
-  if (apiBaseUrl) {
-    return apiBaseUrl;
-  }
-
-  throw new Error("Backend API URL is not configured");
-};
-
-
 const createHeaders = (deviceId: string, options: { includeJsonContentType?: boolean } = {}) => {
   const headers: HeadersInit = {
     "x-device-id": deviceId,
@@ -77,21 +23,6 @@ const createHeaders = (deviceId: string, options: { includeJsonContentType?: boo
   }
 
   return headers;
-};
-
-const assertOk = async (response: Response, context: string) => {
-  if (response.ok) {
-    return;
-  }
-
-  const body = await response.text();
-  const message = `${context} failed: ${response.status} ${body}`;
-  logBackendCall({
-    endpoint: response.url || context,
-    outcome: "error",
-    message,
-  });
-  throw new Error(message);
 };
 
 const readString = (payload: unknown, key: string): string | null => {
@@ -108,50 +39,6 @@ const readBoolean = (payload: unknown, key: string): boolean | null => {
   }
   const value = Reflect.get(payload, key);
   return typeof value === "boolean" ? value : null;
-};
-
-const fetchWithTimeout = async (url: string, options: RequestInit, context: string) => {
-  const startedAt = Date.now();
-  activeBackendRequestCount += 1;
-  activeBackendRequestLogger?.(activeBackendRequestCount);
-  const controller = new AbortController();
-  const timeout = globalThis.setTimeout(() => {
-    controller.abort();
-  }, requestTimeoutMs);
-
-  try {
-    const response = await fetch(url, { ...options, signal: controller.signal });
-    if (!response.ok) {
-      const responseBody = await response.clone().text();
-      logBackendCall({
-        endpoint: url,
-        outcome: "error",
-        message: `${context} failed with ${response.status} in ${Date.now() - startedAt}ms: ${responseBody}`,
-      });
-      return response;
-    }
-
-    logBackendCall({
-      endpoint: url,
-      outcome: "success",
-      message: `${context} completed with ${response.status} in ${Date.now() - startedAt}ms`,
-    });
-    return response;
-  } catch (error) {
-    if (error instanceof DOMException && error.name === "AbortError") {
-      const message = `${context} timed out after ${requestTimeoutMs}ms`;
-      logBackendCall({ endpoint: url, outcome: "error", message });
-      throw new Error(message);
-    }
-
-    const message = `${context} request failed in ${Date.now() - startedAt}ms: no response status/body available`;
-    logBackendCall({ endpoint: url, outcome: "error", message });
-    throw error;
-  } finally {
-    globalThis.clearTimeout(timeout);
-    activeBackendRequestCount = Math.max(0, activeBackendRequestCount - 1);
-    activeBackendRequestLogger?.(activeBackendRequestCount);
-  }
 };
 
 const parseApiListItem = (payload: unknown): ApiListItem => {
@@ -222,71 +109,205 @@ const parseListDocumentResponse = (payload: unknown): ApiListDocument => {
   };
 };
 
-export const sharingApiClient = {
-  async upsertList(params: {
-    deviceId: string;
-    listId: string;
-    body: ApiListUpsertRequest;
-  }): Promise<ApiListUpsertResponse> {
-    const response = await fetchWithTimeout(
-      `${requireApiBaseUrl()}/v1/lists/${params.listId}`,
-      {
-        method: "PUT",
-        headers: createHeaders(params.deviceId, { includeJsonContentType: true }),
-        body: JSON.stringify(params.body),
-      },
-      "list upsert",
-    );
-    await assertOk(response, "list upsert");
-    return parseListUpsertResponse(await response.json());
-  },
-
-  async fetchList(params: { deviceId: string; listId: string }): Promise<ApiListDocument> {
-    const response = await fetchWithTimeout(
-      `${requireApiBaseUrl()}/v1/lists/${params.listId}`,
-      {
-        method: "GET",
-        headers: createHeaders(params.deviceId),
-      },
-      "fetch list",
-    );
-    await assertOk(response, "fetch list");
-    return parseListDocumentResponse(await response.json());
-  },
-
-
-  async redeemShareToken(params: { deviceId: string; shareToken: string }): Promise<ApiShareTokenRedeemResponse> {
-    const response = await fetchWithTimeout(
-      `${requireApiBaseUrl()}/v1/share-tokens/${params.shareToken}/redeem`,
-      {
-        method: "POST",
-        headers: {
-          "x-device-id": params.deviceId,
-        },
-      },
-      "redeem token",
-    );
-    await assertOk(response, "redeem token");
-    return parseShareTokenRedeemResponse(await response.json());
-  },
-
-
-  async createShareToken(params: {
-    deviceId: string;
-    listId: string;
-  }): Promise<ApiShareTokenCreateResponse> {
-    const response = await fetchWithTimeout(
-      `${requireApiBaseUrl()}/v1/lists/${params.listId}/share-tokens`,
-      {
-        method: "POST",
-        headers: createHeaders(params.deviceId),
-      },
-      "share token create",
-    );
-    await assertOk(response, "share token create");
-    return parseShareTokenCreateResponse(await response.json());
-  },
+type SharingApiConfig = {
+  baseUrl: string | null;
+  timeoutMs: number;
+  // Resolved per call by default so tests can swap `globalThis.fetch`.
+  fetch?: typeof fetch;
+  now?: () => number;
 };
+
+// One client per backend "device". The app uses the module-level default
+// instance below; the sync simulation (apps/web/sim) creates one per virtual
+// device with its own fetch so devices can go offline independently.
+export const createSharingApiClient = (config: SharingApiConfig) => {
+  let backendCallLogger: ((entry: BackendCallLog) => void) | null = null;
+  let activeBackendRequestLogger: ((count: number) => void) | null = null;
+  let activeBackendRequestCount = 0;
+  const fetchImpl: typeof fetch = config.fetch ?? ((input, init) => fetch(input, init));
+  const now = config.now ?? (() => Date.now());
+  const timeoutMs = config.timeoutMs;
+  const apiBaseUrl = config.baseUrl;
+
+  const setBackendCallLogger = (logger: ((entry: BackendCallLog) => void) | null) => {
+    backendCallLogger = logger;
+  };
+
+  const setActiveBackendRequestLogger = (logger: ((count: number) => void) | null) => {
+    activeBackendRequestLogger = logger;
+    activeBackendRequestLogger?.(activeBackendRequestCount);
+  };
+
+  const logBackendCall = (entry: BackendCallLog) => {
+    backendCallLogger?.(entry);
+  };
+
+  const requireApiBaseUrl = () => {
+    if (apiBaseUrl) {
+      return apiBaseUrl;
+    }
+
+    throw new Error("Backend API URL is not configured");
+  };
+
+  const assertOk = async (response: Response, context: string) => {
+    if (response.ok) {
+      return;
+    }
+
+    const body = await response.text();
+    const message = `${context} failed: ${response.status} ${body}`;
+    logBackendCall({
+      endpoint: response.url || context,
+      outcome: "error",
+      message,
+    });
+    throw new Error(message);
+  };
+
+  const fetchWithTimeout = async (url: string, options: RequestInit, context: string) => {
+    const startedAt = now();
+    activeBackendRequestCount += 1;
+    activeBackendRequestLogger?.(activeBackendRequestCount);
+    const controller = new AbortController();
+    const timeout = globalThis.setTimeout(() => {
+      controller.abort();
+    }, timeoutMs);
+
+    try {
+      const response = await fetchImpl(url, { ...options, signal: controller.signal });
+      if (!response.ok) {
+        const responseBody = await response.clone().text();
+        logBackendCall({
+          endpoint: url,
+          outcome: "error",
+          message: `${context} failed with ${response.status} in ${now() - startedAt}ms: ${responseBody}`,
+        });
+        return response;
+      }
+
+      logBackendCall({
+        endpoint: url,
+        outcome: "success",
+        message: `${context} completed with ${response.status} in ${now() - startedAt}ms`,
+      });
+      return response;
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        const message = `${context} timed out after ${timeoutMs}ms`;
+        logBackendCall({ endpoint: url, outcome: "error", message });
+        throw new Error(message);
+      }
+
+      const message = `${context} request failed in ${now() - startedAt}ms: no response status/body available`;
+      logBackendCall({ endpoint: url, outcome: "error", message });
+      throw error;
+    } finally {
+      globalThis.clearTimeout(timeout);
+      activeBackendRequestCount = Math.max(0, activeBackendRequestCount - 1);
+      activeBackendRequestLogger?.(activeBackendRequestCount);
+    }
+  };
+
+  const client = {
+    async upsertList(params: {
+      deviceId: string;
+      listId: string;
+      body: ApiListUpsertRequest;
+    }): Promise<ApiListUpsertResponse> {
+      const response = await fetchWithTimeout(
+        `${requireApiBaseUrl()}/v1/lists/${params.listId}`,
+        {
+          method: "PUT",
+          headers: createHeaders(params.deviceId, { includeJsonContentType: true }),
+          body: JSON.stringify(params.body),
+        },
+        "list upsert",
+      );
+      await assertOk(response, "list upsert");
+      return parseListUpsertResponse(await response.json());
+    },
+
+    async fetchList(params: { deviceId: string; listId: string }): Promise<ApiListDocument> {
+      const response = await fetchWithTimeout(
+        `${requireApiBaseUrl()}/v1/lists/${params.listId}`,
+        {
+          method: "GET",
+          headers: createHeaders(params.deviceId),
+        },
+        "fetch list",
+      );
+      await assertOk(response, "fetch list");
+      return parseListDocumentResponse(await response.json());
+    },
+
+
+    async redeemShareToken(params: { deviceId: string; shareToken: string }): Promise<ApiShareTokenRedeemResponse> {
+      const response = await fetchWithTimeout(
+        `${requireApiBaseUrl()}/v1/share-tokens/${params.shareToken}/redeem`,
+        {
+          method: "POST",
+          headers: {
+            "x-device-id": params.deviceId,
+          },
+        },
+        "redeem token",
+      );
+      await assertOk(response, "redeem token");
+      return parseShareTokenRedeemResponse(await response.json());
+    },
+
+
+    async createShareToken(params: {
+      deviceId: string;
+      listId: string;
+    }): Promise<ApiShareTokenCreateResponse> {
+      const response = await fetchWithTimeout(
+        `${requireApiBaseUrl()}/v1/lists/${params.listId}/share-tokens`,
+        {
+          method: "POST",
+          headers: createHeaders(params.deviceId),
+        },
+        "share token create",
+      );
+      await assertOk(response, "share token create");
+      return parseShareTokenCreateResponse(await response.json());
+    },
+  };
+
+  return {
+    client,
+    isBackendSharingEnabled: apiBaseUrl !== null,
+    setBackendCallLogger,
+    setActiveBackendRequestLogger,
+  };
+};
+
+export type SharingApiClient = ReturnType<typeof createSharingApiClient>["client"];
+
+const readApiBaseUrl = (): string | null => {
+  if (typeof __API_BASE_URL__ === "string" && __API_BASE_URL__.trim().length > 0) {
+    return __API_BASE_URL__.trim();
+  }
+  return null;
+};
+
+const readRequestTimeoutMs = () => {
+  if (typeof __API_TIMEOUT_MS__ === "string") {
+    const parsed = Number.parseInt(__API_TIMEOUT_MS__, 10);
+    if (Number.isFinite(parsed) && parsed > 0) {
+      return parsed;
+    }
+  }
+  return 15000;
+};
+
+const defaultApi = createSharingApiClient({ baseUrl: readApiBaseUrl(), timeoutMs: readRequestTimeoutMs() });
+
+export const sharingApiClient = defaultApi.client;
+export const isBackendSharingEnabled = defaultApi.isBackendSharingEnabled;
+export const setBackendCallLogger = defaultApi.setBackendCallLogger;
+export const setActiveBackendRequestLogger = defaultApi.setActiveBackendRequestLogger;
 
 export const extractShareToken = (value: string): string | null => {
   const trimmed = value.trim();

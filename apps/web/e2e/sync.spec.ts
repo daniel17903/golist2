@@ -1,25 +1,6 @@
 import { expect, test } from "./fixtures";
 import { backendUrl } from "./support/backendApi";
-import type { GoListApp } from "./support/goListApp";
-
-const shareTokenPattern = /\?shareToken=([0-9a-f-]{36})$/;
-
-// Device A shares its active list; returns the copied share link.
-const shareActiveList = async (app: GoListApp) => {
-  await app.waitForRealtimeSync();
-  await app.page.getByRole("button", { name: "Share list" }).click();
-  await expect(app.page.getByText("Share link copied to clipboard.")).toBeVisible();
-  const link = (await app.copiedTexts()).at(-1);
-  expect(link).toMatch(shareTokenPattern);
-  return link!;
-};
-
-// Opens the share link on a fresh device and waits until it shows the list.
-const openSharedLink = async (device: GoListApp, link: string, listName: string) => {
-  await device.page.goto(new URL(link).search ? `/${new URL(link).search}` : link);
-  await expect(device.listTitle).toHaveText(listName);
-  await device.waitForRealtimeSync();
-};
+import { openSharedLink, shareActiveList, shareTokenOf } from "./support/multiDevice";
 
 test.describe("sharing and realtime sync", () => {
   test("share button copies a share link for the active list", async ({ app }) => {
@@ -27,7 +8,7 @@ test.describe("sharing and realtime sync", () => {
     expect(link.startsWith(app.page.url().replace(/\/$/, ""))).toBe(true);
 
     // The token grants a fresh device access to the list.
-    const token = shareTokenPattern.exec(link)![1];
+    const token = shareTokenOf(link);
     const listId = await app.activeListId();
     const response = await fetch(`${backendUrl}/v1/share-tokens/${token}/redeem`, {
       method: "POST",
@@ -56,7 +37,7 @@ test.describe("sharing and realtime sync", () => {
   test("joins via the join dialog using a pasted link or a bare token", async ({ app, newDevice }) => {
     await app.addItem("bread");
     const link = await shareActiveList(app);
-    const token = shareTokenPattern.exec(link)![1];
+    const token = shareTokenOf(link);
 
     const viaLink = await newDevice();
     await viaLink.goto();

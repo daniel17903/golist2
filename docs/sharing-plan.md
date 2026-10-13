@@ -114,6 +114,13 @@ The API contract is maintained in `apps/api-spec/openapi.yaml` (and related file
 4. Add backup/restore runbook for Postgres data.
 5. Add deployment docs for VPS/container platform.
 6. **GitHub Actions update**: add release-gate workflow requiring backend test/build, contract tests, and smoke tests before deploy.
+7. ✅ Sync verification tooling (see `docs/testing-plan.md`): an in-process multi-device sync
+   simulation (`apps/web/sim`) runs the real web sync client against the real backend in CI's web
+   `validate` job, which now also runs backend lint/typecheck/test; an in-memory vs Postgres
+   repository differential test runs in the backend workflow; a randomized sync fuzzer runs on
+   demand only. Its first runs found and fixed: per-socket message reordering on the server,
+   losing patches not reported to their sender, local edits overwritten by in-flight incoming
+   changes, and edits from devices with a slow clock being dropped as stale.
 
 ### Phase 6 — Documentation governance (ongoing)
 1. Keep `docs/sharing-plan.md` current whenever implementation sequencing or architecture decisions change.

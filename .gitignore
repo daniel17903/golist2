@@ -7,3 +7,8 @@ dist/
 # Playwright E2E output
 apps/web/test-results/
 apps/web/playwright-report/
+
+# Backend log written by the Playwright E2E backend
+apps/web/.e2e-logs/
+# Throwaway exploration specs (see AGENTS.md testing playbook)
+apps/web/e2e/scratch/

@@ -14,6 +14,49 @@ export type SocketSyncCallbacks = {
   onError: (message: string) => void;
 };
 
+// The subset of the browser WebSocket API the manager uses, so the sync
+// simulation (apps/web/sim) can hand in sockets whose network it controls.
+export type SyncSocket = {
+  readonly readyState: number;
+  send(data: string): void;
+  close(): void;
+  addEventListener(type: 'open' | 'close' | 'error', listener: () => void): void;
+  addEventListener(type: 'message', listener: (event: { data: unknown }) => void): void;
+};
+
+type Timers = {
+  setTimeout: (callback: () => void, ms: number) => number;
+  clearTimeout: (handle: number) => void;
+};
+
+export type SocketSyncManagerOptions = {
+  // Returns the sync endpoint, or null when backend sharing is disabled.
+  resolveUrl?: () => string | null;
+  createSocket?: (url: string) => SyncSocket;
+  timers?: Timers;
+  // Registers the reconnect-now trigger (the browser `online` event).
+  onOnline?: (listener: () => void) => void;
+  // [first three attempts, afterwards] — production uses 3s then 10s.
+  reconnectDelaysMs?: [number, number];
+  fullSyncStepTimeoutMs?: number;
+};
+
+// WebSocket.readyState values; not read from the global so the manager works
+// with any SyncSocket implementation.
+const SOCKET_CONNECTING = 0;
+const SOCKET_OPEN = 1;
+
+const browserTimers: Timers = {
+  setTimeout: (callback, ms) => window.setTimeout(callback, ms),
+  clearTimeout: (handle) => window.clearTimeout(handle),
+};
+
+const registerBrowserOnlineListener = (listener: () => void) => {
+  if (typeof window !== 'undefined') {
+    window.addEventListener('online', listener);
+  }
+};
+
 type OutboundPatch = { listId: string; item: Item };
 type OutboundListMetadataPatch = { listId: string; name: string; updatedAt: number };
 
@@ -130,8 +173,8 @@ const parseServerMessage = (value: unknown): ServerMessage | null => {
 // long so a single unresponsive list cannot stall the remaining lists.
 const FULL_SYNC_STEP_TIMEOUT_MS = 8000;
 
-class SocketSyncManager {
-  private socket: WebSocket | null = null;
+export class SocketSyncManager {
+  private socket: SyncSocket | null = null;
   private callbacks: SocketSyncCallbacks | null = null;
   private subscribedListId: string | null = null;
   private desiredListId: string | null = null;
@@ -154,21 +197,37 @@ class SocketSyncManager {
   // matches the local item digest for a list, so the eager `hash_diff` the
   // server sends right after `subscribed` is skipped instead of reprocessed.
   private skipNextHashDiffForListId: string | null = null;
-  private readonly messageQueue: Array<{ socket: WebSocket; payload: string }> = [];
+  private readonly messageQueue: Array<{ socket: SyncSocket; payload: unknown }> = [];
   private isHandlingMessage = false;
+  private disposed = false;
+  private readonly resolveUrl: () => string | null;
+  private readonly createSocket: (url: string) => SyncSocket;
+  private readonly timers: Timers;
+  private readonly onOnline: (listener: () => void) => void;
+  private readonly reconnectDelaysMs: [number, number];
+  private readonly fullSyncStepTimeoutMs: number;
+
+  constructor(options: SocketSyncManagerOptions = {}) {
+    this.resolveUrl = options.resolveUrl ?? createWebSocketUrl;
+    this.createSocket = options.createSocket ?? ((url) => new WebSocket(url));
+    this.timers = options.timers ?? browserTimers;
+    this.onOnline = options.onOnline ?? registerBrowserOnlineListener;
+    this.reconnectDelaysMs = options.reconnectDelaysMs ?? [3000, 10000];
+    this.fullSyncStepTimeoutMs = options.fullSyncStepTimeoutMs ?? FULL_SYNC_STEP_TIMEOUT_MS;
+  }
 
   init(deviceId: string, callbacks: SocketSyncCallbacks) {
     this.deviceId = deviceId;
     this.callbacks = callbacks;
 
-    if (!this.onlineListenerRegistered && typeof window !== 'undefined') {
-      window.addEventListener('online', () => {
-        if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+    if (!this.onlineListenerRegistered) {
+      this.onOnline(() => {
+        if (this.socket && this.socket.readyState === SOCKET_OPEN) {
           return;
         }
 
         if (this.reconnectTimer !== null) {
-          window.clearTimeout(this.reconnectTimer);
+          this.timers.clearTimeout(this.reconnectTimer);
           this.reconnectTimer = null;
         }
 
@@ -209,7 +268,7 @@ class SocketSyncManager {
     this.isSubscribedReady = false;
     this.consecutiveForbiddenCount = 0;
 
-    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
+    if (!this.socket || this.socket.readyState !== SOCKET_OPEN) {
       this.connect();
       return;
     }
@@ -252,22 +311,22 @@ class SocketSyncManager {
     });
 
     if (this.forcedReconnectTimeout !== null) {
-      window.clearTimeout(this.forcedReconnectTimeout);
+      this.timers.clearTimeout(this.forcedReconnectTimeout);
     }
 
-    this.forcedReconnectTimeout = window.setTimeout(() => {
+    this.forcedReconnectTimeout = this.timers.setTimeout(() => {
       this.finishForcedReconnect('failed');
     }, 8000);
 
     if (this.reconnectTimer !== null) {
-      window.clearTimeout(this.reconnectTimer);
+      this.timers.clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
     }
 
     this.reconnectAttempts = 0;
     this.isSubscribedReady = false;
 
-    if (this.socket && (this.socket.readyState === WebSocket.OPEN || this.socket.readyState === WebSocket.CONNECTING)) {
+    if (this.socket && (this.socket.readyState === SOCKET_OPEN || this.socket.readyState === SOCKET_CONNECTING)) {
       this.forceReconnectPending = true;
       this.socket.close();
       return this.forcedReconnectPromise;
@@ -277,23 +336,40 @@ class SocketSyncManager {
     return this.forcedReconnectPromise;
   }
 
+  // Stops the manager for good (closes the socket, cancels timers). Used
+  // when a simulated device "restarts" with a fresh store and manager.
+  dispose() {
+    this.disposed = true;
+    for (const timer of [this.reconnectTimer, this.fullSyncStepTimer, this.forcedReconnectTimeout]) {
+      if (timer !== null) {
+        this.timers.clearTimeout(timer);
+      }
+    }
+    this.reconnectTimer = null;
+    this.fullSyncStepTimer = null;
+    this.forcedReconnectTimeout = null;
+    const socket = this.socket;
+    this.socket = null;
+    socket?.close();
+  }
+
   private connect() {
-    if (!this.deviceId) {
+    if (!this.deviceId || this.disposed) {
       return;
     }
 
-    const url = createWebSocketUrl();
+    const url = this.resolveUrl();
     if (!url) {
       return;
     }
 
-    if (this.socket && (this.socket.readyState === WebSocket.OPEN || this.socket.readyState === WebSocket.CONNECTING)) {
+    if (this.socket && (this.socket.readyState === SOCKET_OPEN || this.socket.readyState === SOCKET_CONNECTING)) {
       return;
     }
 
-    let socket: WebSocket;
+    let socket: SyncSocket;
     try {
-      socket = new WebSocket(url);
+      socket = this.createSocket(url);
     } catch {
       this.callbacks?.onConnectionState('offline');
       this.scheduleReconnect();
@@ -308,7 +384,7 @@ class SocketSyncManager {
       }
 
       if (this.reconnectTimer !== null) {
-        window.clearTimeout(this.reconnectTimer);
+        this.timers.clearTimeout(this.reconnectTimer);
         this.reconnectTimer = null;
       }
       this.reconnectAttempts = 0;
@@ -378,7 +454,7 @@ class SocketSyncManager {
 
   private finishForcedReconnect(result: 'success' | 'failed') {
     if (this.forcedReconnectTimeout !== null) {
-      window.clearTimeout(this.forcedReconnectTimeout);
+      this.timers.clearTimeout(this.forcedReconnectTimeout);
       this.forcedReconnectTimeout = null;
     }
 
@@ -391,7 +467,7 @@ class SocketSyncManager {
     }
   }
 
-  private enqueueMessage(socket: WebSocket, payload: string) {
+  private enqueueMessage(socket: SyncSocket, payload: unknown) {
     this.messageQueue.push({ socket, payload });
     if (!this.isHandlingMessage) {
       void this.drainMessageQueue();
@@ -419,14 +495,14 @@ class SocketSyncManager {
   }
 
   private scheduleReconnect() {
-    if (this.reconnectTimer !== null) {
+    if (this.reconnectTimer !== null || this.disposed) {
       return;
     }
 
-    const delay = this.reconnectAttempts < 3 ? 3000 : 10000;
+    const delay = this.reconnectAttempts < 3 ? this.reconnectDelaysMs[0] : this.reconnectDelaysMs[1];
     this.reconnectAttempts += 1;
 
-    this.reconnectTimer = window.setTimeout(() => {
+    this.reconnectTimer = this.timers.setTimeout(() => {
       this.reconnectTimer = null;
       this.connect();
     }, delay);
@@ -679,7 +755,7 @@ class SocketSyncManager {
   }
 
   private advanceFullSync() {
-    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
+    if (!this.socket || this.socket.readyState !== SOCKET_OPEN) {
       return;
     }
 
@@ -724,15 +800,15 @@ class SocketSyncManager {
 
   private armFullSyncStepTimer(listId: string) {
     this.clearFullSyncStepTimer();
-    this.fullSyncStepTimer = window.setTimeout(() => {
+    this.fullSyncStepTimer = this.timers.setTimeout(() => {
       this.fullSyncStepTimer = null;
       this.onListExchangeComplete(listId);
-    }, FULL_SYNC_STEP_TIMEOUT_MS);
+    }, this.fullSyncStepTimeoutMs);
   }
 
   private clearFullSyncStepTimer() {
     if (this.fullSyncStepTimer !== null) {
-      window.clearTimeout(this.fullSyncStepTimer);
+      this.timers.clearTimeout(this.fullSyncStepTimer);
       this.fullSyncStepTimer = null;
     }
   }
@@ -757,7 +833,7 @@ class SocketSyncManager {
   }
 
   private flushQueue() {
-    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
+    if (!this.socket || this.socket.readyState !== SOCKET_OPEN) {
       return;
     }
 
@@ -788,7 +864,7 @@ class SocketSyncManager {
   }
 
   private send(payload: Record<string, unknown>) {
-    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
+    if (!this.socket || this.socket.readyState !== SOCKET_OPEN) {
       return;
     }
 

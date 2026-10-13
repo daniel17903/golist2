@@ -4,6 +4,8 @@
 - `apps/web/` contains the existing React + TypeScript + Vite PWA.
 - `apps/backend/` contains a Fastify + TypeScript backend scaffold with env validation, a `/health` endpoint, and local Docker Compose config (`apps/backend/docker-compose.yml`).
 - `packages/shared/` contains shared domain code that can be reused by web and backend (currently shared types).
+- `apps/web/sim/` is the in-process multi-device sync simulation (real web store + sync client against the real backend); see `apps/web/sim/README.md`.
+- `scripts/` holds repo tooling: `agent-setup.sh` (container setup, also run by the Claude Code SessionStart hook in `.claude/`), `local-postgres.sh` (throwaway local database), `verify.mjs` (runs the right checks).
 - Root `package.json` is a workspace manifest; run workspace commands with `-w apps/web` or `-w apps/backend`, or use root aliases like `npm run dev:web` and `npm run dev:backend`.
 
 ## Project snapshot (web app)
@@ -19,6 +21,7 @@
 
 ## Quickstart
 - Requires Node `>= 24` (see `engines` in the root `package.json`).
+- Fresh (agent) container: `scripts/agent-setup.sh` installs deps and sets up the Playwright browser (prints `export` lines to eval when not run from the SessionStart hook).
 - `npm install`
 - `npm run dev:web` (runs web app dev server from root, default http://localhost:5173)
 - Direct web command equivalent: `npm run dev -w apps/web`
@@ -42,26 +45,31 @@
 - Suggestions must remain list-scoped and prioritize frequency then recency.
 
 ## Development commands
+- `npm run verify` — lint + typecheck + unit/sim tests for web and backend (~30s); `npm run verify:changed` picks only what the changed files need; `npm run verify:full` adds the build and Playwright E2E. Prints a pass/fail summary.
 - `npm install`
 - `npm run dev:web`
 - `npm run lint -w apps/web`
 - `npm run typecheck -w apps/web`
 - `npm run build -w apps/web`
-- `npm run test -w apps/web`
+- `npm run test -w apps/web` (unit tests + sync simulation scenarios; `test:unit` / `test:sim` run one of them)
+- `npm run test:sync-fuzz -w apps/web` — randomized multi-device sync fuzzing, **on demand only** (not in CI, not scheduled)
+- `eval "$(scripts/local-postgres.sh)"` — start a throwaway local Postgres and export `PG*` (enables repository + differential tests and `E2E_BACKEND=postgres`)
 - `npm run db:migrate -w apps/backend`
 - `npm run db:seed -w apps/backend`
 
 ## CI/CD
-- GitHub Actions `ci.yml` workflow validates `lint`, `typecheck`, `test` and `build` for the web workspace on PRs, and runs the Playwright E2E suite against both the in-memory and the Postgres backend.
+- GitHub Actions `ci.yml` workflow validates `lint`, `typecheck`, `test` (incl. the sync simulation) and `build` for the web workspace plus backend `lint`/`typecheck`/`test` on PRs, and runs the Playwright E2E suite against both the in-memory and the Postgres backend. Failed E2E runs upload traces, per-device WebSocket frames/console logs and the backend log as the `e2e-<backend>-artifacts` artifact.
 - GitHub Actions `backend-bootstrap.yml` runs backend `lint` + `typecheck` + `db:migrate` + `test` (against ephemeral Postgres) on PRs that touch `apps/backend/**`.
 - Deploy workflow builds on `main`.
 
 ## Testing expectations
 - Always run `npm run typecheck -w apps/web` for web changes and `npm run typecheck -w apps/backend` for backend changes before commit.
 - Always run `npm run lint -w apps/web` for web changes and `npm run lint -w apps/backend` for backend changes before commit.
-- Run `npm run test -w apps/web` for changes to `apps/web/src/domain/`, `apps/web/src/state/`, or `apps/web/src/storage/`.
+- Run `npm run test -w apps/web` for changes to `apps/web/src/domain/`, `apps/web/src/state/`, `apps/web/src/storage/`, `apps/web/src/sharing/`, `packages/shared/` or backend sync routes/repositories (it includes the sync simulation, which runs the backend in-process).
+- For sync changes, consider an explicit fuzz run (`npm run test:sync-fuzz -w apps/web`, e.g. `FUZZ_RUNS=300 FUZZ_DEVICES=4`); see the testing playbook below.
 - Run `npm run test -w apps/backend` for backend endpoint/config changes. Repository tests
-  (`postgres-list-repository.test.ts`) only run when `PGHOST`/`DATABASE_URL` is set.
+  (`postgres-list-repository.test.ts`, `repository-differential.test.ts`) only run when `PGHOST`/`DATABASE_URL`
+  is set — use `eval "$(scripts/local-postgres.sh)"` locally.
 - Run `npm run test:e2e -w apps/web` for changes to UI flows, the store, sync or backend routes
   (with `E2E_BACKEND=postgres` too when touching the Postgres repository).
 - Run `npm run db:migrate -w apps/backend` for backend schema/migration changes.
@@ -110,12 +118,12 @@
 - The PWA service worker can cache aggressively; use hard refresh or clear site data
   when debugging PWA changes.
 
-- Playwright E2E in fresh containers may require both browser binaries and OS deps.
-  Run `npx playwright install chromium` and `npx playwright install-deps chromium`
-  before running `npm run test:e2e -w apps/web` (or root alias `npm run test:e2e:web`).
-  If the preinstalled browsers don't match the pinned Playwright version, install into
-  a scratch dir and point `PLAYWRIGHT_BROWSERS_PATH` at it.
-  For E2E-related changes, do this setup and run the Playwright E2E command before committing.
+- Playwright E2E in fresh containers: run `scripts/agent-setup.sh` (automatic in Claude Code
+  cloud sessions via the SessionStart hook). When the preinstalled Chromium build differs from
+  the one the pinned Playwright expects, it exports `PLAYWRIGHT_CHROMIUM_EXECUTABLE`, which
+  `playwright.config.ts` uses. Without any browser: `npx playwright install chromium` and
+  `npx playwright install-deps chromium`.
+  For E2E-related changes, run the Playwright E2E command before committing.
 - The repo root has a hoisted `vite` 7 (pulled in by vitest) while `apps/web` uses vite 8;
   always start the web dev server through `npm run dev -w apps/web`, never a bare `vite`.
 
@@ -127,17 +135,49 @@
 - Backend storage: `E2E_BACKEND=memory` (default, no DB needed) or `E2E_BACKEND=postgres`
   (production repository; uses the usual `PG*` env vars and runs migrations first). CI runs both.
 - Specs: `lists.spec.ts`, `items.spec.ts`, `sync.spec.ts` (multi-device share/join, realtime
-  propagation, offline reconciliation), `ui.spec.ts` (i18n, language suggestion, stats, legal,
-  back gesture, join errors).
+  propagation, offline reconciliation), `sync-conflicts.spec.ts` (concurrent offline edits, three
+  devices, slow network), `ui.spec.ts` (i18n, language suggestion, stats, legal, back gesture,
+  join errors).
 - Fixtures (`e2e/fixtures.ts`): `app` = primary device (already on `/`), `newDevice()` = extra
   isolated device (own browser context), `backend` = REST client to assert server state.
   `GoListApp` (`e2e/support/goListApp.ts`) is the page object; `disconnectBackend()` /
-  `reconnectBackend()` cut a single device off the backend (REST + WebSocket). Tests fail on
-  any uncaught page error. Failing tests get each device's WebSocket frames attached as
-  `device-*-websocket-frames.txt` in `test-results/`.
+  `reconnectBackend()` cut a single device off the backend (REST + WebSocket) and
+  `setBackendLatency(ms)` slows it down. `e2e/support/multiDevice.ts` has `shareAcross()` (share the
+  active list with N new devices) and `expectDevicesConverged()` (all devices + backend agree).
+  Tests fail on any uncaught page error. Failing tests get each device's WebSocket frames
+  (`device-*-websocket-frames.txt`), browser console (`device-*-console.txt`) and the backend log
+  lines written during the test (`backend-log.jsonl`) attached in `test-results/`; the full backend
+  log is `apps/web/.e2e-logs/backend.log`.
+- Throwaway exploration specs go in `e2e/scratch/` (gitignored); run them with
+  `npx playwright test e2e/scratch/foo.spec.ts`.
 - The language-switch suggestion is suppressed by default (it would pop over unrelated tests);
   opt back in with `test.use({ initOptions: { suppressLanguageSuggestion: false } })`.
 - Add an E2E test for every user-visible behavior change and for every sync bug fix.
+
+## Testing playbook (for agents)
+
+Pick the fastest layer that can show the behavior:
+
+| What you are testing | Layer | Where | Speed |
+| --- | --- | --- | --- |
+| Pure logic (sorting, parsing, conflict rules) | vitest unit / fast-check property | `apps/web/src/**/*.test.ts` | ms |
+| Sync between devices: offline, conflicts, races, restarts, reconnects | sync simulation | `apps/web/sim/scenarios/` | ~0.1–0.5s per test |
+| Backend routes / WebSocket protocol | backend vitest | `apps/backend/src/*.test.ts` | ms |
+| In-memory vs Postgres repository behaviour | differential property test | `apps/backend/src/repositories/repository-differential.test.ts` (needs Postgres) | seconds |
+| UI flows in a real browser (IndexedDB, gestures, dialogs) | Playwright | `apps/web/e2e/` | seconds per test |
+
+Workflow:
+1. **Reproduce first.** Write a failing test at the lowest layer that shows the bug, and check
+   it fails for the right reason before you fix anything. For sync bugs that is almost always
+   a sim scenario (`apps/web/sim/README.md`).
+2. **Fix, then prove it.** Run `npm run verify:changed` (or `npm run verify`). For UI or sync
+   changes, also run E2E (`npm run test:e2e -w apps/web`).
+3. **Hunting for unknown sync bugs:** run the fuzzer explicitly, e.g.
+   `FUZZ_RUNS=300 FUZZ_DEVICES=4 FUZZ_COMMANDS=40 npm run test:sync-fuzz -w apps/web` with a few
+   seeds. It shrinks failures to a minimal command list; turn that into a scenario test. Never
+   wire the fuzzer into CI or a schedule; it runs only when someone asks for it.
+4. **Reading failures:** sim failures print server + device state and recent frames. E2E failures
+   attach frames, console and backend log (`test-results/`, or the CI artifact).
 
 ## React performance rules (web app)
 

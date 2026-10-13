@@ -24,7 +24,11 @@ export class GoListApp {
   // Only the app's sync sockets (/v1/ws), not Vite's HMR socket.
   readonly sockets: ObservedSocket[] = [];
   readonly pageErrors: Error[] = [];
+  // Browser console output, attached to failing tests.
+  readonly consoleMessages: string[] = [];
   private backendReachable = true;
+  // Added to every REST call and every WebSocket frame (both directions).
+  private backendLatencyMs = 0;
   private readonly openRoutes = new Set<WebSocketRoute>();
 
   constructor(readonly page: Page) {
@@ -41,6 +45,9 @@ export class GoListApp {
       });
     });
     page.on("pageerror", (error) => this.pageErrors.push(error));
+    page.on("console", (message) => {
+      this.consoleMessages.push(`[${new Date().toISOString()}] ${message.type()}: ${message.text()}`);
+    });
   }
 
   static async install(page: Page, options: InitOptions = {}) {
@@ -83,6 +90,7 @@ export class GoListApp {
   // without touching the other devices or the backend itself.
   private async installBackendSwitch() {
     await this.page.route(`${backendUrl}/**`, async (route) => {
+      await this.latency();
       if (this.backendReachable) {
         await route.fallback();
       } else {
@@ -96,6 +104,16 @@ export class GoListApp {
       }
       const server = ws.connectToServer();
       this.openRoutes.add(ws);
+      // Forward frames explicitly (in order, per direction) so a test can
+      // slow this device's connection down with setBackendLatency().
+      let toServer = Promise.resolve();
+      let toPage = Promise.resolve();
+      ws.onMessage((message) => {
+        toServer = toServer.then(() => this.latency()).then(() => server.send(message)).catch(() => undefined);
+      });
+      server.onMessage((message) => {
+        toPage = toPage.then(() => this.latency()).then(() => ws.send(message)).catch(() => undefined);
+      });
       // Registering onClose disables Playwright's automatic close forwarding,
       // so forward closes in both directions explicitly.
       ws.onClose((code, reason) => {
@@ -107,6 +125,17 @@ export class GoListApp {
         void ws.close({ code, reason });
       });
     });
+  }
+
+  private async latency() {
+    if (this.backendLatencyMs > 0) {
+      await new Promise((resolve) => setTimeout(resolve, this.backendLatencyMs));
+    }
+  }
+
+  // Simulates a slow network for this device only (REST and WebSocket).
+  setBackendLatency(ms: number) {
+    this.backendLatencyMs = ms;
   }
 
   async disconnectBackend() {
@@ -296,6 +325,21 @@ export class GoListApp {
     const card = this.itemCard(name);
     await card.click();
     await expect(card).toHaveCount(0);
+  }
+
+  // Long-press editor: change name and/or quantity of an item.
+  async editItem(name: string, changes: { name?: string; quantity?: string }) {
+    await this.longPress(name);
+    const dialog = this.page.getByRole("dialog");
+    await expect(dialog.getByRole("heading", { name: "Edit item" })).toBeVisible();
+    if (changes.name !== undefined) {
+      await dialog.getByLabel("Name").fill(changes.name);
+    }
+    if (changes.quantity !== undefined) {
+      await dialog.getByLabel("Quantity").fill(changes.quantity);
+    }
+    await dialog.getByRole("button", { name: "Save" }).click();
+    await expect(dialog).toHaveCount(0);
   }
 
   async longPress(name: string) {

@@ -377,6 +377,81 @@ describe('backend runtime integration', () => {
     expect(orderTwoResult.name).toBe('Zebra')
   })
 
+  it('processes a socket\'s messages in order, so a patch right after subscribe_list is not dropped', async () => {
+    // subscribe_list awaits an access check before registering the
+    // subscription; messages sent right behind it must wait for that instead
+    // of failing with "not subscribed to list".
+    const listId = crypto.randomUUID()
+    const createResponse = await fetch(`${baseUrl}/v1/lists/${listId}`, {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json', 'x-device-id': testDeviceId },
+      body: JSON.stringify({ name: 'Ordered' }),
+    })
+    expect(createResponse.status).toBe(201)
+
+    const client = await openSyncSocket()
+    try {
+      const itemId = crypto.randomUUID()
+      const now = Date.now()
+      // No awaits in between: all frames are in flight at once.
+      client.send({ type: 'hello', deviceId: testDeviceId })
+      client.send({ type: 'subscribe_list', listId })
+      client.send({ type: 'unsubscribe_list', listId })
+      client.send({ type: 'subscribe_list', listId })
+      client.send({
+        type: 'item_patch',
+        listId,
+        items: [
+          { id: itemId, listId, name: 'Milk', iconName: 'milk', category: 'dairy', deleted: false, createdAt: now, updatedAt: now },
+        ],
+      })
+      client.send({ type: 'list_metadata_patch', listId, name: 'Renamed', updatedAt: now + 1 })
+
+      await client.waitForMessage(
+        (message) => message.type === 'item_patch' && JSON.stringify(message.items).includes(itemId),
+      )
+      expect(client.messages.filter((message) => message.type === 'error')).toEqual([])
+      const list = await fetch(`${baseUrl}/v1/lists/${listId}`, { headers: { 'x-device-id': testDeviceId } })
+      expect(await list.json()).toMatchObject({ name: 'Renamed' })
+    } finally {
+      client.socket.close()
+    }
+  })
+
+  it('sends the winning version back to the sender of a losing patch', async () => {
+    const listId = crypto.randomUUID()
+    const createResponse = await fetch(`${baseUrl}/v1/lists/${listId}`, {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json', 'x-device-id': testDeviceId },
+      body: JSON.stringify({ name: 'Winner name', updatedAt: new Date(5_000).toISOString() }),
+    })
+    expect(createResponse.status).toBe(201)
+
+    const client = await openSyncSocket()
+    try {
+      client.send({ type: 'hello', deviceId: testDeviceId })
+      client.send({ type: 'subscribe_list', listId })
+      await client.waitForMessage((message) => message.type === 'subscribed')
+
+      const itemId = crypto.randomUUID()
+      const item = { id: itemId, listId, name: 'Milk', iconName: 'milk', category: 'dairy', deleted: false, createdAt: 1, updatedAt: 2_000 }
+      client.send({ type: 'item_patch', listId, items: [item] })
+      await client.waitForMessage((message) => message.type === 'item_patch')
+      client.messages.length = 0
+
+      // Older than what the server has: loses, and the sender gets the winner.
+      client.send({ type: 'item_patch', listId, items: [{ ...item, name: 'Stale', updatedAt: 1_000 }] })
+      const echoed = await client.waitForMessage((message) => message.type === 'item_patch')
+      expect(echoed.items).toEqual([expect.objectContaining({ id: itemId, name: 'Milk', updatedAt: 2_000 })])
+
+      client.send({ type: 'list_metadata_patch', listId, name: 'Stale name', updatedAt: 1_000 })
+      const metadata = await client.waitForMessage((message) => message.type === 'list_metadata_patch')
+      expect(metadata).toEqual({ type: 'list_metadata_patch', listId, name: 'Winner name', updatedAt: 5_000 })
+    } finally {
+      client.socket.close()
+    }
+  })
+
   it('broadcasts a websocket rename even when the same rename already arrived over REST', async () => {
     // The web client sends every rename twice — PUT /v1/lists/:id and a
     // `list_metadata_patch` with identical name/updatedAt. When the REST call

@@ -24,6 +24,12 @@ The frontend reads backend sync configuration at build time (in `apps/web/vite.c
 
 For list/item mutations, the app writes to IndexedDB and updates Zustand state first.
 
+A local edit (item edit, check-off, recategorization, list rename) gets
+`updatedAt = max(now, updatedAt of the edited version + 1)`: it must win
+last-write-wins against the version it was based on even when this device's
+clock is behind the device that wrote that version (otherwise the server
+would drop the edit as stale).
+
 ### 2. WebSocket lifecycle
 
 - One `SocketSyncManager` is initialized after app metadata/device context is loaded.
@@ -71,7 +77,11 @@ On subscription and manual resync:
    unsolicited right after acknowledging a subscription).
 2. On mismatch, both sides exchange per-item `hash_diff` summaries (`itemId`, `itemHash`, `updatedAt`).
 3. Each side computes missing/stale items and exchanges targeted `item_patch` payloads.
-4. Incoming items are applied only when their `updatedAt` wins; equal timestamps use deterministic hash tie-break.
+4. Incoming items are applied only when their `updatedAt` wins; equal timestamps use deterministic hash tie-break
+   (`shouldAcceptItem` in `packages/shared/src/domain/sync.ts`). The check is repeated against the
+   stored IndexedDB record inside the write transaction, and the in-memory store again only replaces
+   items the incoming version beats — a local edit persisted while an incoming change is in flight
+   must not be overwritten by it. Incoming renames are handled the same way.
    Patch batches are validated before persistence, committed transactionally,
    and echoed back as canonical server records; the client also rejects any
    item whose `listId` differs from the enclosing patch.
