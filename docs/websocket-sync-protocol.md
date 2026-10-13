@@ -16,6 +16,12 @@ time), even though handlers await the database. A client may therefore send
 for `subscribed`, and an `unsubscribe_list`/`subscribe_list` pair can never let
 a patch in between be rejected with `not subscribed to list`.
 
+Messages that reached the server before the client disconnected are still
+processed (a rename sent right before the app closes is stored and broadcast
+to the other subscribers), including writes queued behind a `subscribe_list`
+that was still in progress. Only replies to the gone socket are dropped, and
+the gone socket is never registered for broadcasts.
+
 ## Message types
 
 ### Client -> server
