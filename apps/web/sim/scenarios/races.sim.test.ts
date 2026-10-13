@@ -151,6 +151,8 @@ describe("disconnecting right after a write", () => {
     expect(b.listName()).toBe("Groceries");
   });
 
+  // Sanity check only: unlike renames, item edits are also repaired by the
+  // hash_diff exchange after reconnect, so this passes even without the fix.
   it("delivers an item edit sent right before the app restarts", async () => {
     sim = await SyncSim.start();
     const { listId, devices: [a, b] } = await sim.sharedList(2);

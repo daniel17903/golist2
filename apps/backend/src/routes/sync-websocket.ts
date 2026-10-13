@@ -8,6 +8,14 @@ import { z } from 'zod'
 import { type ListRepository, type ListItemRecord } from '../repositories/list-repository.js'
 import { ListSyncCache } from '../sync/list-sync-cache.js'
 
+declare module 'fastify' {
+  interface FastifyInstance {
+    // Number of sockets currently registered for broadcasts on a list.
+    // Introspection for tests (dead-socket leak checks).
+    syncSubscriberCount: (listId: string) => number
+  }
+}
+
 type ClientMessage =
   | { type: 'hello'; deviceId: string }
   | { type: 'subscribe_list'; listId: string }
@@ -160,6 +168,7 @@ export function registerSyncWebsocketRoute(
   listSyncCache: ListSyncCache = new ListSyncCache(),
 ) {
   const subscribers = new Map<string, Set<ServerSocket>>()
+  app.decorate('syncSubscriberCount', (listId: string) => subscribers.get(listId)?.size ?? 0)
 
   const loadSnapshot = (listId: string) =>
     listSyncCache.getSnapshot(listId, async () => (await listRepository.listItems(listId)).map(toSyncItem))

@@ -1,5 +1,4 @@
 import crypto from 'node:crypto'
-import { createRequire } from 'node:module'
 
 import { buildItemHash } from '@golist/shared/domain/sync'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
@@ -9,12 +8,6 @@ import { buildServer } from './server.js'
 import { InMemoryListRepository } from './test/in-memory-list-repository.js'
 
 const testDeviceId = '11111111-1111-4111-8111-111111111111'
-
-// The `ws` copy @fastify/websocket uses for server-side sockets (a nested
-// dependency, not importable by name from here).
-const requireFromHere = createRequire(import.meta.url)
-const wsModule: typeof import('ws') = createRequire(requireFromHere.resolve('@fastify/websocket'))('ws')
-const ServerWebSocket = wsModule.WebSocket
 
 let baseUrl = ''
 let app: ReturnType<typeof buildServer>
@@ -598,19 +591,6 @@ describe('backend runtime integration', () => {
       throw new Error('Failed to resolve server address for scoped test app')
     }
     const scopedBaseUrl = `http://127.0.0.1:${address.port}`
-    // Record each socket's state at the moment the server sends to it.
-    const originalSend = ServerWebSocket.prototype.send
-    let sendsToClosedSockets = 0
-    const sendSpy = vi.spyOn(ServerWebSocket.prototype, 'send').mockImplementation(function (
-      this: InstanceType<typeof ServerWebSocket>,
-      ...args: Parameters<typeof originalSend>
-    ) {
-      if (this.readyState !== ServerWebSocket.OPEN) {
-        sendsToClosedSockets += 1
-      }
-      return originalSend.apply(this, args)
-    })
-
     try {
       const listId = crypto.randomUUID()
       const createResponse = await fetch(`${scopedBaseUrl}/v1/lists/${listId}`, {
@@ -625,6 +605,8 @@ describe('backend runtime integration', () => {
       leaving.send({ type: 'subscribe_list', listId })
       leaving.socket.close()
       await new Promise((resolve) => setTimeout(resolve, 250))
+      // The subscribe finished after the close: nothing may be registered.
+      expect(scopedApp.syncSubscriberCount(listId)).toBe(0)
 
       const staying = await openSyncSocket(scopedBaseUrl)
       try {
@@ -638,13 +620,13 @@ describe('backend runtime integration', () => {
           items: [{ id: crypto.randomUUID(), listId, name: 'Milk', iconName: 'milk', category: 'dairy', deleted: false, createdAt: now, updatedAt: now }],
         })
         await staying.waitForMessage((message) => message.type === 'item_patch')
+        // Only the live socket is registered.
+        expect(scopedApp.syncSubscriberCount(listId)).toBe(1)
       } finally {
         staying.socket.close()
       }
-
-      expect(sendsToClosedSockets).toBe(0)
+      await vi.waitFor(() => expect(scopedApp.syncSubscriberCount(listId)).toBe(0))
     } finally {
-      sendSpy.mockRestore()
       await scopedApp.close()
     }
   })
@@ -677,6 +659,12 @@ describe('backend runtime integration', () => {
       })
       expect(createResponse.status).toBe(201)
 
+      // Another device, already subscribed, must receive the broadcasts.
+      const observer = await openSyncSocket(scopedBaseUrl)
+      observer.send({ type: 'hello', deviceId: testDeviceId })
+      observer.send({ type: 'subscribe_list', listId })
+      await observer.waitForMessage((message) => message.type === 'subscribed')
+
       const client = await openSyncSocket(scopedBaseUrl)
       const now = Date.now()
       const item = (name: string) => ({
@@ -698,6 +686,13 @@ describe('backend runtime integration', () => {
         },
         { timeout: 3_000, interval: 50 },
       )
+      await observer.waitForMessage(
+        (message) => message.type === 'item_patch' && JSON.stringify(message.items).includes(bread.id),
+      )
+      await observer.waitForMessage(
+        (message) => message.type === 'list_metadata_patch' && message.name === 'After',
+      )
+      observer.socket.close()
     } finally {
       await scopedApp.close()
     }
