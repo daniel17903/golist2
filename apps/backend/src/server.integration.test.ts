@@ -1,4 +1,5 @@
 import crypto from 'node:crypto'
+import { createRequire } from 'node:module'
 
 import { buildItemHash } from '@golist/shared/domain/sync'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
@@ -8,6 +9,12 @@ import { buildServer } from './server.js'
 import { InMemoryListRepository } from './test/in-memory-list-repository.js'
 
 const testDeviceId = '11111111-1111-4111-8111-111111111111'
+
+// The `ws` copy @fastify/websocket uses for server-side sockets (a nested
+// dependency, not importable by name from here).
+const requireFromHere = createRequire(import.meta.url)
+const wsModule: typeof import('ws') = createRequire(requireFromHere.resolve('@fastify/websocket'))('ws')
+const ServerWebSocket = wsModule.WebSocket
 
 let baseUrl = ''
 let app: ReturnType<typeof buildServer>
@@ -571,6 +578,74 @@ describe('backend runtime integration', () => {
     } finally {
       clientA.socket.close()
       clientB.socket.close()
+    }
+  })
+
+  it('does not keep a socket that closed while its subscribe_list was awaiting the database', async () => {
+    // A slow access check (real I/O with Postgres) leaves a window in which
+    // the client can disconnect; the socket must not be registered after
+    // that, or every later broadcast for the list goes to a dead socket.
+    const repository = new InMemoryListRepository()
+    const hasListAccess = repository.hasListAccess.bind(repository)
+    vi.spyOn(repository, 'hasListAccess').mockImplementation(async (listId, deviceId) => {
+      await new Promise((resolve) => setTimeout(resolve, 100))
+      return hasListAccess(listId, deviceId)
+    })
+    const scopedApp = buildServer({ listRepository: repository, logger: false })
+    await scopedApp.listen({ host: '127.0.0.1', port: 0 })
+    const address = scopedApp.server.address()
+    if (!address || typeof address === 'string') {
+      throw new Error('Failed to resolve server address for scoped test app')
+    }
+    const scopedBaseUrl = `http://127.0.0.1:${address.port}`
+    // Record each socket's state at the moment the server sends to it.
+    const originalSend = ServerWebSocket.prototype.send
+    let sendsToClosedSockets = 0
+    const sendSpy = vi.spyOn(ServerWebSocket.prototype, 'send').mockImplementation(function (
+      this: InstanceType<typeof ServerWebSocket>,
+      ...args: Parameters<typeof originalSend>
+    ) {
+      if (this.readyState !== ServerWebSocket.OPEN) {
+        sendsToClosedSockets += 1
+      }
+      return originalSend.apply(this, args)
+    })
+
+    try {
+      const listId = crypto.randomUUID()
+      const createResponse = await fetch(`${scopedBaseUrl}/v1/lists/${listId}`, {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json', 'x-device-id': testDeviceId },
+        body: JSON.stringify({ name: 'Closing' }),
+      })
+      expect(createResponse.status).toBe(201)
+
+      const leaving = await openSyncSocket(scopedBaseUrl)
+      leaving.send({ type: 'hello', deviceId: testDeviceId })
+      leaving.send({ type: 'subscribe_list', listId })
+      leaving.socket.close()
+      await new Promise((resolve) => setTimeout(resolve, 250))
+
+      const staying = await openSyncSocket(scopedBaseUrl)
+      try {
+        staying.send({ type: 'hello', deviceId: testDeviceId })
+        staying.send({ type: 'subscribe_list', listId })
+        await staying.waitForMessage((message) => message.type === 'subscribed')
+        const now = Date.now()
+        staying.send({
+          type: 'item_patch',
+          listId,
+          items: [{ id: crypto.randomUUID(), listId, name: 'Milk', iconName: 'milk', category: 'dairy', deleted: false, createdAt: now, updatedAt: now }],
+        })
+        await staying.waitForMessage((message) => message.type === 'item_patch')
+      } finally {
+        staying.socket.close()
+      }
+
+      expect(sendsToClosedSockets).toBe(0)
+    } finally {
+      sendSpy.mockRestore()
+      await scopedApp.close()
     }
   })
 

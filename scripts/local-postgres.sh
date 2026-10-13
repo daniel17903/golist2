@@ -9,10 +9,26 @@
 # Stop it with: scripts/local-postgres.sh stop
 set -euo pipefail
 
-data_dir="${GOLIST_PGDATA:-${TMPDIR:-/tmp}/golist-pg}"
-port="${GOLIST_PGPORT:-55432}"
-bin_dir="$(dirname "$(command -v pg_ctl 2>/dev/null || ls /usr/lib/postgresql/*/bin/pg_ctl | sort -V | tail -n 1)")"
 log() { echo "[local-postgres] $*" >&2; }
+
+port="${GOLIST_PGPORT:-55432}"
+# One cluster per port, so a changed GOLIST_PGPORT never reuses a cluster
+# that listens elsewhere. As root, Postgres runs as the `postgres` user, which
+# must be able to traverse every parent directory — a private $TMPDIR (mode
+# 0700, as in sandboxes) would break initdb, so root always uses /tmp.
+if [[ "$(id -u)" == "0" ]]; then
+  default_parent=/tmp
+else
+  default_parent="${TMPDIR:-/tmp}"
+fi
+data_dir="${GOLIST_PGDATA:-$default_parent/golist-pg-$port}"
+
+pg_ctl_path="$(command -v pg_ctl 2>/dev/null || ls /usr/lib/postgresql/*/bin/pg_ctl 2>/dev/null | sort -V | tail -n 1 || true)"
+if [[ -z "$pg_ctl_path" ]]; then
+  log "Postgres server binaries (pg_ctl, initdb) not found; install postgresql or set PGHOST/DATABASE_URL to an existing database"
+  exit 1
+fi
+bin_dir="$(dirname "$pg_ctl_path")"
 
 # Postgres refuses to run as root; run its commands as the postgres user then.
 run_pg() {
@@ -30,7 +46,13 @@ fi
 
 if [[ ! -f "$data_dir/PG_VERSION" ]]; then
   mkdir -p "$data_dir"
-  [[ "$(id -u)" == "0" ]] && chown postgres "$data_dir"
+  if [[ "$(id -u)" == "0" ]]; then
+    chown postgres "$data_dir"
+    if ! su postgres -s /bin/bash -c "test -w $(printf '%q' "$data_dir")"; then
+      log "the postgres user cannot write to $data_dir (check parent directory permissions or set GOLIST_PGDATA)"
+      exit 1
+    fi
+  fi
   log "initializing cluster in $data_dir"
   run_pg "$bin_dir/initdb" -D "$data_dir" -U golist --auth=trust >/dev/null
 fi

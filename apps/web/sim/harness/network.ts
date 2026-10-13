@@ -67,6 +67,11 @@ export class DeviceNetwork {
     this.onlineListeners.push(listener);
   };
 
+  // Drops listeners of sync managers that were disposed (device restart).
+  clearOnlineListeners() {
+    this.onlineListeners.length = 0;
+  }
+
   goOffline() {
     this.online = false;
     this.record("--", "network offline");

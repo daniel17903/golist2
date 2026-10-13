@@ -38,7 +38,9 @@ const itemInput = fc.record({
 })
 
 const operationArb: fc.Arbitrary<Operation> = fc.oneof(
-  fc.record({ kind: fc.constant('putList' as const), device: fc.nat({ max: DEVICE_SLOTS - 1 }), name: fc.constantFrom('List', 'Groceries', 'groceries', 'Ünïcode'), at: fc.option(at, { nil: undefined }) }),
+  // Mostly explicit timestamps: a putList without one stamps "now", far after
+  // the fixed timestamps used here, which makes later renames lose.
+  fc.record({ kind: fc.constant('putList' as const), device: fc.nat({ max: DEVICE_SLOTS - 1 }), name: fc.constantFrom('List', 'Groceries', 'groceries', 'Ünïcode'), at: fc.option(at, { nil: undefined, freq: 8 }) }),
   fc.record({ kind: fc.constant('upsertItems' as const), device: fc.nat({ max: DEVICE_SLOTS - 1 }), items: fc.array(itemInput, { minLength: 1, maxLength: 3 }) }),
   fc.record({ kind: fc.constant('upsertItem' as const), device: fc.nat({ max: DEVICE_SLOTS - 1 }), slot: fc.nat({ max: ITEM_SLOTS - 1 }), name, deleted: fc.boolean(), at }),
   fc.record({ kind: fc.constant('share' as const), device: fc.nat({ max: DEVICE_SLOTS - 1 }), redeemer: fc.nat({ max: DEVICE_SLOTS - 1 }) }),

@@ -64,15 +64,22 @@ const checksForChanges = (files) => {
       }
     } else if (file.startsWith("apps/web/")) {
       add("lintWeb", "typecheckWeb");
-      if (/apps\/web\/(src|sim)\//.test(file)) {
+      if (/apps\/web\/(src|sim)\/|apps\/web\/(package\.json|vitest[^/]*\.config\.ts|tsconfig[^/]*\.json)$/.test(file)) {
         add("testWeb");
       }
-      if (/apps\/web\/src\/(components|hooks|state|sharing|storage|App\.tsx)/.test(file) || file.startsWith("apps/web/e2e/")) {
+      if (
+        /apps\/web\/src\/(components|hooks|state|sharing|storage|App\.tsx)/.test(file) ||
+        file.startsWith("apps/web/e2e/") ||
+        /apps\/web\/(package\.json|playwright\.config\.ts|vite\.config\.ts)$/.test(file)
+      ) {
         add("e2eWeb");
       }
       if (/apps\/web\/(public\/|vite\.config\.ts|index\.html)/.test(file)) {
         add("buildWeb");
       }
+    } else if (file.startsWith("scripts/") || file.startsWith(".github/") || file.startsWith(".claude/")) {
+      // Tooling and CI: re-run the standard checks they drive.
+      add(...defaultChecks);
     } else if (file === "package.json" || file === "package-lock.json") {
       add(...defaultChecks, "buildWeb", "buildBackend");
     }

@@ -110,6 +110,7 @@ export class SimDevice {
 
   shutdown() {
     this.sync?.dispose();
+    this.network.clearOnlineListeners();
     this.timers.clearAll();
     this.db?.close();
     this.sync = null;

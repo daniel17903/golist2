@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { SyncSim, delay } from "../harness";
+import { SyncSim, delay, waitUntil } from "../harness";
 
 // Races between a local edit and an incoming remote change for the same
 // record. The network frame filter runs right before the frame reaches the
@@ -45,7 +45,9 @@ describe("local edit racing an incoming change", () => {
       if (frame.type === "item_patch" && !localEdit) {
         localEdit = b.editItem("milk", "oat milk");
       }
-      return true;
+      // Drop the server's echo of b's own edit: it would otherwise repair a
+      // wrongly overwritten local edit and hide the race.
+      return !(frame.type === "item_patch" && JSON.stringify(frame).includes("oat milk"));
     };
 
     await a.editItem("milk", "whole milk");
@@ -53,17 +55,20 @@ describe("local edit racing an incoming change", () => {
     await localEdit;
     await sim.waitForConvergence(listId);
 
-    expect(a.visibleItemNames()).toEqual(["oat milk"]);
+    expect(b.visibleItemNames()).toEqual(["oat milk"]);
     expect((await b.persistedItems(listId)).map((item) => item.name)).toEqual(["oat milk"]);
+    expect(a.visibleItemNames()).toEqual(["oat milk"]);
   });
 });
 
-describe("server message ordering", () => {
+describe("rename during the post-reconnect full sync", () => {
   // Regression (found by the sync fuzzer, shrunk from seed 99): a rename made
-  // while the device was mid full-sync pass reached the server over REST,
-  // but its WebSocket list_metadata_patch was processed concurrently with a
-  // re-subscribe and dropped ("not subscribed to list"). REST does not
-  // notify subscribers, so the other device never saw the rename.
+  // while the device was mid full-sync pass must reach the other device.
+  // The server-side cause (per-socket message reordering, which dropped the
+  // list_metadata_patch with "not subscribed to list") needs a slow access
+  // check to reproduce and is guarded by the backend integration test
+  // "processes a socket's messages in order…"; with the in-memory
+  // repository this end-to-end scenario guards the client-side handling.
   it("broadcasts a rename made right after reconnecting while other lists are reconciled", async () => {
     sim = await SyncSim.start();
     const { listId, devices: [a, b] } = await sim.sharedList(2);
@@ -83,5 +88,40 @@ describe("server message ordering", () => {
 
     await sim.waitForConvergence(listId);
     expect(a.listName()).toBe("Groceries");
+  });
+});
+
+describe("losing writes", () => {
+  // The server answers a patch that lost last-write-wins with the winning
+  // version, sent to the sender only. Without that, a device that wrote on
+  // top of a stale view (here: it missed a broadcast and its clock is behind)
+  // keeps showing its losing write until it reconnects.
+  it("a device whose edit loses is sent the winning version", async () => {
+    sim = await SyncSim.start();
+    const { listId, devices: [a, b] } = await sim.sharedList(2);
+    await a.addItem("milk");
+    await sim.waitForConvergence(listId);
+
+    // b misses a's newer edit...
+    let dropped = false;
+    b.network.allowIncoming = (frame) => {
+      if (!dropped && frame.type === "item_patch" && JSON.stringify(frame).includes("whole milk")) {
+        dropped = true;
+        return false;
+      }
+      return true;
+    };
+    sim.clock.advance(1_000); // a's edit is clearly newer than anything b writes below
+    await a.editItem("milk", "whole milk");
+    await waitUntil(() => dropped);
+
+    // ...and edits its stale copy with a clock that is behind.
+    const now = sim.clock.peek();
+    sim.clock.set(b.item("milk")!.updatedAt + 1);
+    await b.editItem("milk", "oat milk");
+    sim.clock.set(now);
+
+    await sim.waitForConvergence(listId);
+    expect(b.visibleItemNames()).toEqual(["whole milk"]);
   });
 });

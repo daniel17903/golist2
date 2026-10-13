@@ -165,6 +165,10 @@ export function registerSyncWebsocketRoute(
     listSyncCache.getSnapshot(listId, async () => (await listRepository.listItems(listId)).map(toSyncItem))
 
   const send = (socket: ServerSocket, message: ServerMessage) => {
+    // A closing/closed socket only buffers data that is never delivered.
+    if (socket.readyState !== socket.OPEN) {
+      return
+    }
     socket.send(JSON.stringify(message))
   }
 
@@ -229,11 +233,22 @@ export function registerSyncWebsocketRoute(
       // subscribed to list" (found by the web sync fuzzer, see
       // apps/web/sim/scenarios/races.sim.test.ts).
       let messageChain: Promise<void> = Promise.resolve()
+      // Messages still queued when the client disconnects are skipped, and a
+      // subscribe that was awaiting the database when the socket closed must
+      // not register it: the close handler may already have run, so the dead
+      // socket would otherwise stay in `subscribers` and receive every
+      // broadcast for that list. `readyState` also covers the closing
+      // handshake, before the 'close' event fires.
+      let closed = false
+      const isGone = () => closed || socket.readyState !== socket.OPEN
       socket.on('message', (raw: RawData) => {
         messageChain = messageChain.then(() => handleMessage(raw))
       })
 
       const handleMessage = async (raw: RawData) => {
+        if (isGone()) {
+          return
+        }
         try {
           const parsedPayload = parseClientMessage(JSON.parse(rawDataToString(raw)))
 
@@ -258,6 +273,9 @@ export function registerSyncWebsocketRoute(
 
           if (parsedPayload.type === 'subscribe_list') {
             const hasAccess = await listRepository.hasListAccess(parsedPayload.listId, state.deviceId)
+            if (isGone()) {
+              return
+            }
             if (!hasAccess) {
               send(socket, { type: 'error', message: 'forbidden' })
               return
@@ -457,6 +475,7 @@ export function registerSyncWebsocketRoute(
       }
 
       socket.on('close', () => {
+        closed = true
         removeFromSubscription(socket, state)
       })
     })

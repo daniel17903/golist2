@@ -48,10 +48,12 @@ export const buildItemSummaries = (items: readonly SyncItemSnapshot[]): SyncItem
     .sort((left, right) => left.itemId.localeCompare(right.itemId));
 
 /**
- * Last-write-wins rule for items, shared by the web client and both backend
- * list repositories: the newer `updatedAt` wins; on a tie the greater item
- * hash wins, so every peer picks the same version regardless of arrival
- * order. An identical version (same hash) is accepted, which keeps
+ * Last-write-wins rule for items as applied by the web client: the newer
+ * `updatedAt` wins; on a tie the greater item hash wins, so every peer picks
+ * the same version regardless of arrival order. Both backend list
+ * repositories implement the same comparison (with a strict `>` on the hash,
+ * so re-sending an identical version is reported as `ignored`); keep them in
+ * sync. An identical version (same hash) is accepted here, which keeps
  * re-applying it idempotent.
  */
 export const shouldAcceptItem = (incoming: SyncItemSnapshot, current: SyncItemSnapshot): boolean => {
