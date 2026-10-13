@@ -18,8 +18,9 @@ a patch in between be rejected with `not subscribed to list`.
 
 Messages that reached the server before the client disconnected are still
 processed (a rename sent right before the app closes is stored and broadcast
-to the other subscribers); only replies to the gone socket are dropped, and a
-`subscribe_list` that completes after the socket closed does not register it.
+to the other subscribers), including writes queued behind a `subscribe_list`
+that was still in progress. Only replies to the gone socket are dropped, and
+the gone socket is never registered for broadcasts.
 
 ## Message types
 

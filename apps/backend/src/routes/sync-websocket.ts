@@ -172,7 +172,9 @@ export function registerSyncWebsocketRoute(
     socket.send(JSON.stringify(message))
   }
 
-  const removeFromSubscription = (socket: ServerSocket, state: ConnectionState) => {
+  // Stops broadcasts to the socket; the connection's logical subscription
+  // (`state.subscribedListId`) is left alone.
+  const detachFromBroadcasts = (socket: ServerSocket, state: ConnectionState) => {
     if (!state.subscribedListId) {
       return
     }
@@ -181,6 +183,10 @@ export function registerSyncWebsocketRoute(
     if (listSockets && listSockets.size === 0) {
       subscribers.delete(state.subscribedListId)
     }
+  }
+
+  const removeFromSubscription = (socket: ServerSocket, state: ConnectionState) => {
+    detachFromBroadcasts(socket, state)
     state.subscribedListId = undefined
   }
 
@@ -242,6 +248,8 @@ export function registerSyncWebsocketRoute(
       // Messages that arrived before the close are still processed: they are
       // writes the client already sent (e.g. a rename right before the app
       // closes) and must still be stored and broadcast to the other devices.
+      // The close only detaches the socket from broadcasts; its logical
+      // subscription stays so queued patches pass the subscription check.
       // Replies to the gone socket are dropped by `send()`.
       let closed = false
       const isGone = () => closed || socket.readyState !== socket.OPEN
@@ -274,9 +282,6 @@ export function registerSyncWebsocketRoute(
 
           if (parsedPayload.type === 'subscribe_list') {
             const hasAccess = await listRepository.hasListAccess(parsedPayload.listId, state.deviceId)
-            if (isGone()) {
-              return
-            }
             if (!hasAccess) {
               send(socket, { type: 'error', message: 'forbidden' })
               return
@@ -284,6 +289,11 @@ export function registerSyncWebsocketRoute(
 
             removeFromSubscription(socket, state)
             state.subscribedListId = parsedPayload.listId
+            if (isGone()) {
+              // Track the subscription so writes queued behind it are still
+              // applied, but never register a gone socket for broadcasts.
+              return
+            }
             const listSockets = subscribers.get(parsedPayload.listId) ?? new Set<ServerSocket>()
             listSockets.add(socket)
             subscribers.set(parsedPayload.listId, listSockets)
@@ -477,7 +487,9 @@ export function registerSyncWebsocketRoute(
 
       socket.on('close', () => {
         closed = true
-        removeFromSubscription(socket, state)
+        // Keep `state.subscribedListId`: writes still queued in
+        // `messageChain` for that list must be applied after the close.
+        detachFromBroadcasts(socket, state)
       })
     })
   })

@@ -649,6 +649,60 @@ describe('backend runtime integration', () => {
     }
   })
 
+  it('applies writes queued behind a slow subscribe even when the client disconnects right after sending them', async () => {
+    // The client sends subscribe + patches and closes at once. The close
+    // arrives while subscribe_list still awaits the access check; the queued
+    // patches reached the server and must still be stored (and broadcast),
+    // not rejected with "not subscribed to list".
+    const repository = new InMemoryListRepository()
+    const hasListAccess = repository.hasListAccess.bind(repository)
+    vi.spyOn(repository, 'hasListAccess').mockImplementation(async (listId, deviceId) => {
+      await new Promise((resolve) => setTimeout(resolve, 100))
+      return hasListAccess(listId, deviceId)
+    })
+    const scopedApp = buildServer({ listRepository: repository, logger: false })
+    await scopedApp.listen({ host: '127.0.0.1', port: 0 })
+    const address = scopedApp.server.address()
+    if (!address || typeof address === 'string') {
+      throw new Error('Failed to resolve server address for scoped test app')
+    }
+    const scopedBaseUrl = `http://127.0.0.1:${address.port}`
+
+    try {
+      const listId = crypto.randomUUID()
+      const createResponse = await fetch(`${scopedBaseUrl}/v1/lists/${listId}`, {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json', 'x-device-id': testDeviceId },
+        body: JSON.stringify({ name: 'Before', updatedAt: new Date(1_000).toISOString() }),
+      })
+      expect(createResponse.status).toBe(201)
+
+      const client = await openSyncSocket(scopedBaseUrl)
+      const now = Date.now()
+      const item = (name: string) => ({
+        id: crypto.randomUUID(), listId, name, iconName: 'default', category: 'other', deleted: false, createdAt: now, updatedAt: now,
+      })
+      const milk = item('Milk')
+      const bread = item('Bread')
+      client.send({ type: 'hello', deviceId: testDeviceId })
+      client.send({ type: 'subscribe_list', listId })
+      client.send({ type: 'item_patch', listId, items: [milk] })
+      client.send({ type: 'item_patch', listId, items: [bread] })
+      client.send({ type: 'list_metadata_patch', listId, name: 'After', updatedAt: 2_000 })
+      client.socket.close()
+
+      await vi.waitFor(
+        async () => {
+          expect((await repository.listItems(listId)).map((stored) => stored.name).sort()).toEqual(['Bread', 'Milk'])
+          expect((await repository.getList(listId))?.name).toBe('After')
+        },
+        { timeout: 3_000, interval: 50 },
+      )
+    } finally {
+      await scopedApp.close()
+    }
+  })
+
   it('caches the list digest snapshot so repeated list_digest checks do not re-query the repository', async () => {
     const repository = new InMemoryListRepository()
     const scopedApp = buildServer({ listRepository: repository })
