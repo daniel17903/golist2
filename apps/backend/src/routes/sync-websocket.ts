@@ -233,12 +233,16 @@ export function registerSyncWebsocketRoute(
       // subscribed to list" (found by the web sync fuzzer, see
       // apps/web/sim/scenarios/races.sim.test.ts).
       let messageChain: Promise<void> = Promise.resolve()
-      // Messages still queued when the client disconnects are skipped, and a
-      // subscribe that was awaiting the database when the socket closed must
-      // not register it: the close handler may already have run, so the dead
-      // socket would otherwise stay in `subscribers` and receive every
+      // A subscribe that was awaiting the database when the socket closed
+      // must not register it: the close handler may already have run, so the
+      // dead socket would otherwise stay in `subscribers` and receive every
       // broadcast for that list. `readyState` also covers the closing
       // handshake, before the 'close' event fires.
+      //
+      // Messages that arrived before the close are still processed: they are
+      // writes the client already sent (e.g. a rename right before the app
+      // closes) and must still be stored and broadcast to the other devices.
+      // Replies to the gone socket are dropped by `send()`.
       let closed = false
       const isGone = () => closed || socket.readyState !== socket.OPEN
       socket.on('message', (raw: RawData) => {
@@ -246,9 +250,6 @@ export function registerSyncWebsocketRoute(
       })
 
       const handleMessage = async (raw: RawData) => {
-        if (isGone()) {
-          return
-        }
         try {
           const parsedPayload = parseClientMessage(JSON.parse(rawDataToString(raw)))
 
