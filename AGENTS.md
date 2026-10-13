@@ -45,7 +45,7 @@
 - Suggestions must remain list-scoped and prioritize frequency then recency.
 
 ## Development commands
-- `npm run verify` — lint + typecheck + unit/sim tests for web and backend (~30s); `npm run verify:changed` picks only what the changed files need; `npm run verify:full` adds the build and Playwright E2E. Prints a pass/fail summary.
+- `npm run verify` — lint + typecheck + unit/sim tests for web and backend (~30s); `npm run verify:changed` picks only what the changed files need; `npm run verify:full` adds the web + backend builds and Playwright E2E. Prints a pass/fail summary.
 - `npm install`
 - `npm run dev:web`
 - `npm run lint -w apps/web`

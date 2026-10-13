@@ -336,6 +336,22 @@ export class SocketSyncManager {
     return this.forcedReconnectPromise;
   }
 
+  // True once the socket is open, the list the UI wants is subscribed and
+  // acknowledged, and no full-sync pass is pending — i.e. the manager is
+  // idle and receiving realtime updates. Used by the sync simulation to
+  // tell "converged" from "not connected yet".
+  isSettled(): boolean {
+    return (
+      this.socket !== null &&
+      this.socket.readyState === SOCKET_OPEN &&
+      this.desiredListId !== null &&
+      this.subscribedListId === this.desiredListId &&
+      this.isSubscribedReady &&
+      !this.fullSyncPending &&
+      this.fullSyncQueue.length === 0
+    );
+  }
+
   // Stops the manager for good (closes the socket, cancels timers). Used
   // when a simulated device "restarts" with a fresh store and manager.
   dispose() {

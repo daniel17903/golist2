@@ -62,11 +62,13 @@ export class SimDevice {
     return this.currentStore !== null;
   }
 
-  // Booted far enough to sync: the store starts its sync manager only after
-  // hydrating every list from IndexedDB, and the socket is open. Before
-  // that a device can look "in sync" just because it has not loaded yet.
+  // Booted and settled: the store starts its sync manager only after
+  // hydrating every list from IndexedDB, and the manager must have its
+  // active list subscribed (acknowledged) with no full-sync pass pending.
+  // Before that a device can look "in sync" just because it has not loaded
+  // or subscribed yet.
   get isSyncing(): boolean {
-    return this.isRunning && this.state.backendConnection === "online" && this.network.openSocketCount() > 0;
+    return this.isRunning && this.state.backendConnection === "online" && (this.sync?.isSettled() ?? false);
   }
 
   get store(): GoListStore {
@@ -123,9 +125,9 @@ export class SimDevice {
     this.network.goOnline();
   }
 
-  // Resolves once the device has an open, subscribed sync socket.
+  // Resolves once the device has an open, subscribed, settled sync socket.
   async waitUntilOnline(timeoutMs = 10_000) {
-    await waitUntil(() => this.state.backendConnection === "online" && this.network.openSocketCount() > 0, {
+    await waitUntil(() => this.isSyncing, {
       timeoutMs,
       describe: () => `device ${this.name} did not come online\n${this.describe()}`,
     });

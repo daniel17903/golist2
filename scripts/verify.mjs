@@ -25,6 +25,7 @@ const checks = {
   lintBackend: { label: "backend lint", cmd: ["npm", "run", "lint", "-w", "apps/backend"] },
   typecheckBackend: { label: "backend typecheck", cmd: ["npm", "run", "typecheck", "-w", "apps/backend"] },
   testBackend: { label: "backend tests", cmd: ["npm", "run", "test", "-w", "apps/backend"] },
+  buildBackend: { label: "backend build", cmd: ["npm", "run", "build", "-w", "apps/backend"] },
 };
 
 const order = Object.keys(checks);
@@ -51,9 +52,13 @@ const checksForChanges = (files) => {
   for (const file of files) {
     if (file.startsWith("packages/shared/")) {
       // Shared code is consumed by both apps and by the sync protocol.
-      add(...defaultChecks, "e2eWeb");
+      add(...defaultChecks, "buildBackend", "e2eWeb");
     } else if (file.startsWith("apps/backend/")) {
       add("lintBackend", "typecheckBackend", "testBackend", "testWeb");
+      // Runtime code and build/packaging config must still compile to dist.
+      if (/apps\/backend\/(src\/|package\.json|tsconfig[^/]*\.json|Dockerfile)/.test(file) && !/\.test\.ts$/.test(file)) {
+        add("buildBackend");
+      }
       if (/src\/(routes|repositories|sync)\//.test(file)) {
         add("e2eWeb");
       }
@@ -69,7 +74,7 @@ const checksForChanges = (files) => {
         add("buildWeb");
       }
     } else if (file === "package.json" || file === "package-lock.json") {
-      add(...defaultChecks, "buildWeb");
+      add(...defaultChecks, "buildWeb", "buildBackend");
     }
   }
   return order.filter((name) => selected.has(name));
@@ -77,7 +82,7 @@ const checksForChanges = (files) => {
 
 let selected;
 if (mode === "full") {
-  selected = [...defaultChecks, "buildWeb", "e2eWeb"];
+  selected = [...defaultChecks, "buildWeb", "buildBackend", "e2eWeb"];
 } else if (mode === "changed") {
   const files = changedFiles();
   console.log(`[verify] ${files.length} changed file(s) vs ${baseRef}`);

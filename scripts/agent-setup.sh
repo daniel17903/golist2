@@ -54,7 +54,11 @@ expected_rev="$(node -e '
 if [[ -n "$expected_rev" && ( -d "$browsers_dir/chromium_headless_shell-$expected_rev" || -d "$browsers_dir/chromium-$expected_rev" ) ]]; then
   log "Playwright Chromium $expected_rev is installed"
 else
+  # Prefer a full Chromium build, fall back to a headless-shell-only install.
   fallback="$(ls -d "$browsers_dir"/chromium-*/chrome-linux*/chrome 2>/dev/null | sort -V | tail -n 1 || true)"
+  if [[ -z "$fallback" ]]; then
+    fallback="$(ls -d "$browsers_dir"/chromium_headless_shell-*/chrome-*/chrome-headless-shell 2>/dev/null | sort -V | tail -n 1 || true)"
+  fi
   if [[ -n "$fallback" ]]; then
     log "Playwright wants Chromium $expected_rev; using preinstalled $fallback"
     emit_env PLAYWRIGHT_CHROMIUM_EXECUTABLE "$fallback"

@@ -6,7 +6,9 @@ import { SimServer } from "./server";
 import { waitUntil } from "./timers";
 
 export type ConvergenceOptions = {
-  // Defaults to every running, online device that knows the list.
+  // Defaults to every running, online device. A device that does not have
+  // the list counts as not converged — pass `devices` explicitly to leave
+  // out devices that never joined it or deleted it on purpose.
   devices?: SimDevice[];
   timeoutMs?: number;
 };
@@ -70,7 +72,7 @@ export class SyncSim {
   async waitForConvergence(listId: string, options: ConvergenceOptions = {}) {
     const pick = () =>
       options.devices ??
-      this.devices.filter((device) => device.network.online && device.isRunning && device.hasList(listId));
+      this.devices.filter((device) => device.network.online && device.isRunning);
     await waitUntil(
       async () => {
         const server = await this.server.listSnapshot(listId);
@@ -78,7 +80,8 @@ export class SyncSim {
           return false;
         }
         const serverDigest = buildListDigest(server.items);
-        return pick().every((device) => {
+        const devices = pick();
+        return devices.length > 0 && devices.every((device) => {
           const snapshot = device.isSyncing ? device.snapshot(listId) : null;
           return snapshot !== null && snapshot.name === server.name && snapshot.digest === serverDigest;
         });
