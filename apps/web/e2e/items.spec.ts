@@ -3,8 +3,8 @@ import { expect, test } from "./fixtures";
 
 type GridAnimation = { name: string; kind: "enter" | "move" };
 
-// Records every Web Animation started on an item card ("enter" = pop-in with
-// an opacity fade, "move" = gliding to a new grid slot), so tests can assert
+// Records every Web Animation started on an item card ("move" = gliding to a
+// new grid slot via translate, "enter" = the pop-in), so tests can assert
 // on animations without racing their ~250ms duration.
 const recordGridAnimations = async (page: Page) => {
   await page.evaluate(() => {
@@ -15,7 +15,7 @@ const recordGridAnimations = async (page: Page) => {
       if (this instanceof HTMLElement && this.dataset.itemId) {
         log.push({
           name: this.querySelector(".item-name")?.textContent ?? "",
-          kind: JSON.stringify(keyframes).includes("opacity") ? "enter" : "move",
+          kind: JSON.stringify(keyframes).includes("translate") ? "move" : "enter",
         });
       }
       return originalAnimate.call(this, keyframes, options);

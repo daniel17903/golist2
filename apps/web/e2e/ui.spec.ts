@@ -180,6 +180,7 @@ test.describe("joining failures", () => {
 test.describe("drawer edge swipe on a touch device", () => {
   test.use({ hasTouch: true });
 
+  // Returns a function that lifts the finger (for swipes left in progress).
   const edgeSwipe = async (app: GoListApp, toX: number, options: { release: boolean }) => {
     const cdp = await app.page.context().newCDPSession(app.page);
     const touch = (type: "touchStart" | "touchMove" | "touchEnd", x?: number) =>
@@ -194,10 +195,11 @@ test.describe("drawer edge swipe on a touch device", () => {
     if (options.release) {
       await touch("touchEnd");
     }
+    return () => touch("touchEnd");
   };
 
   test("the drawer and backdrop follow the finger while swiping it open", async ({ app }) => {
-    await edgeSwipe(app, 165, { release: false });
+    const finishSwipe = await edgeSwipe(app, 165, { release: false });
 
     // Half-way in: the drawer is on screen and the backdrop half faded in.
     await expect(app.drawer).toBeVisible();
@@ -213,6 +215,7 @@ test.describe("drawer edge swipe on a touch device", () => {
     expect(backdropOpacity).toBeGreaterThan(0.2);
     expect(backdropOpacity).toBeLessThan(0.8);
     await expect(app.page.locator(".drawer.drawer--open")).toHaveCount(0);
+    await finishSwipe();
   });
 
   test("releasing past the threshold opens the drawer", async ({ app }) => {

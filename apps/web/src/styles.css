@@ -277,6 +277,8 @@ body {
 }
 
 .list-grid {
+  /* Offset parent for the cards, see hooks/useGridLayoutAnimation.ts. */
+  position: relative;
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(var(--item-size), var(--item-size)));
   gap: 6px;
@@ -396,7 +398,6 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .item-card,
   .item-card--exit {
     animation: none;
   }

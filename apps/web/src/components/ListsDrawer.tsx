@@ -21,7 +21,14 @@ type ListsDrawerProps = {
 
 type DragMode = "opening" | "closing";
 
-type DragState = { pointerId: number; startX: number; mode: DragMode; drawerWidth: number };
+type DragState = {
+  pointerId: number;
+  startX: number;
+  mode: DragMode;
+  drawerWidth: number;
+  // Last offset written during the drag; null until the finger moves.
+  offset: number | null;
+};
 
 const noItems: Item[] = [];
 
@@ -130,7 +137,7 @@ const ListsDrawer = memo(function ListsDrawer({
 
   const handleDragStart = (event: PointerEvent<HTMLElement>, mode: DragMode) => {
     if (event.pointerType !== "touch" && event.pointerType !== "pen") {return;}
-    dragStateRef.current = { pointerId: event.pointerId, startX: event.clientX, mode, drawerWidth: getDrawerWidth() };
+    dragStateRef.current = { pointerId: event.pointerId, startX: event.clientX, mode, drawerWidth: getDrawerWidth(), offset: null };
     setIsDragging(true);
     event.currentTarget.setPointerCapture(event.pointerId);
   };
@@ -144,12 +151,11 @@ const ListsDrawer = memo(function ListsDrawer({
 
     if (dragState.mode === "opening") {
       const clampedDelta = Math.min(drawerWidth, Math.max(0, deltaX));
-      applyDragOffset(-drawerWidth + clampedDelta, drawerWidth);
-      return;
+      dragState.offset = -drawerWidth + clampedDelta;
+    } else {
+      dragState.offset = Math.max(-drawerWidth, Math.min(0, deltaX));
     }
-
-    const clampedDelta = Math.max(-drawerWidth, Math.min(0, deltaX));
-    applyDragOffset(clampedDelta, drawerWidth);
+    applyDragOffset(dragState.offset, drawerWidth);
   };
 
   const handleDragEnd = (event: PointerEvent<HTMLElement>) => {
@@ -159,12 +165,19 @@ const ListsDrawer = memo(function ListsDrawer({
     const deltaX = event.clientX - dragState.startX;
     const threshold = dragState.drawerWidth * 0.35;
 
-    if (dragState.mode === "opening") {
-      if (deltaX > threshold) {
-        onOpen();
-      }
-    } else if (-deltaX > threshold) {
+    const endsOpen = dragState.mode === "opening" ? deltaX > threshold : -deltaX <= threshold;
+    if (endsOpen && dragState.mode === "opening") {
+      onOpen();
+    } else if (!endsOpen && dragState.mode === "closing") {
       onClose();
+    }
+
+    // Ending closed while already sitting in the closed position (an edge
+    // tap without movement, or a drag released fully closed) starts no
+    // transform transition, so no transitionend would clear `isShown`.
+    const offset = dragState.offset ?? (dragState.mode === "opening" ? -dragState.drawerWidth : 0);
+    if (!endsOpen && offset <= -dragState.drawerWidth) {
+      setIsShown(false);
     }
 
     // Dropping the inline styles in the same task as the class change lets
