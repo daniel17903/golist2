@@ -1,4 +1,28 @@
+import type { Page } from "@playwright/test";
 import { expect, test } from "./fixtures";
+
+type GridAnimation = { name: string; kind: "enter" | "move" };
+
+// Records every Web Animation started on an item card ("move" = gliding to a
+// new grid slot via translate, "enter" = the pop-in), so tests can assert
+// on animations without racing their ~250ms duration.
+const recordGridAnimations = async (page: Page) => {
+  await page.evaluate(() => {
+    const log: Array<{ name: string; kind: string }> = [];
+    Reflect.set(window, "__gridAnimations", log);
+    const originalAnimate = Element.prototype.animate;
+    Element.prototype.animate = function (this: Element, keyframes, options) {
+      if (this instanceof HTMLElement && this.dataset.itemId) {
+        log.push({
+          name: this.querySelector(".item-name")?.textContent ?? "",
+          kind: JSON.stringify(keyframes).includes("translate") ? "move" : "enter",
+        });
+      }
+      return originalAnimate.call(this, keyframes, options);
+    };
+  });
+  return async (): Promise<GridAnimation[]> => page.evaluate(() => Reflect.get(window, "__gridAnimations"));
+};
 
 test.describe("items", () => {
   test("adds an item, parses the quantity and syncs it to the backend", async ({ app, backend }) => {
@@ -207,5 +231,51 @@ test.describe("items", () => {
     await dialog.getByRole("button", { name: "Save" }).click();
     await expect(app.itemCards).toHaveCount(1);
     await expect(app.itemCards.first().locator(".item-name")).not.toHaveText(/^\s*$/);
+  });
+
+  test.describe("grid animations", () => {
+    test("new cards pop in and the remaining cards glide into place after a check-off", async ({ app }) => {
+      for (const name of ["apples", "bananas", "bread"]) {
+        await app.addItem(name);
+      }
+      const gridAnimations = await recordGridAnimations(app.page);
+
+      await app.addItem("milk");
+      await expect.poll(gridAnimations).toEqual([{ name: "milk", kind: "enter" }]);
+
+      await app.checkOff("apples");
+      await expect
+        .poll(async () => (await gridAnimations()).filter((entry) => entry.kind === "move").map((entry) => entry.name))
+        .toEqual(["bananas", "bread", "milk"]);
+      expect(await app.itemNames()).toEqual(["bananas", "bread", "milk"]);
+    });
+
+    test("switching lists does not animate the grid", async ({ app }) => {
+      await app.addItem("apples");
+      await app.createList("Hardware store");
+      await app.addItem("nails");
+      const gridAnimations = await recordGridAnimations(app.page);
+
+      await app.selectList("Shopping list");
+      await expect(app.itemCard("apples")).toBeVisible();
+      await app.selectList("Hardware store");
+      await expect(app.itemCard("nails")).toBeVisible();
+      expect(await gridAnimations()).toEqual([]);
+    });
+
+    test.describe("with reduced motion", () => {
+      test.use({ contextOptions: { reducedMotion: "reduce" } });
+
+      test("the grid does not animate", async ({ app }) => {
+        await app.addItem("apples");
+        await app.addItem("bananas");
+        const gridAnimations = await recordGridAnimations(app.page);
+
+        await app.addItem("bread");
+        await app.checkOff("apples");
+        expect(await app.itemNames()).toEqual(["bananas", "bread"]);
+        expect(await gridAnimations()).toEqual([]);
+      });
+    });
   });
 });

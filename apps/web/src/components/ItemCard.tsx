@@ -28,6 +28,7 @@ const ItemCard = memo(function ItemCard({
   return (
     <button
       type="button"
+      data-item-id={item.id}
       className={`item-card ${isPressing ? "item-card--pressing" : ""} ${isExiting ? "item-card--exit" : ""}`.trim()}
       onPointerDown={() => onPointerDown(item.id, item.name, item.quantityOrUnit)}
       onPointerUp={() => onPointerUp(item.id)}

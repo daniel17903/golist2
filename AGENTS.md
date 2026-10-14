@@ -36,6 +36,8 @@
 - **i18n**: en/de/es with locale auto-detection and a one-time language-switch suggestion based on recently added item names.
 - **Undo toasts** for item deletion and list rename (max 3 stacked, 5s timeout).
 - **Pull-to-refresh** forces a WebSocket reconnect; the pull distance is written straight to the DOM to avoid per-frame re-renders.
+- **Item grid animations**: `apps/web/src/hooks/useGridLayoutAnimation.ts` (FLIP via the Web Animations API) glides cards into new slots and pops in new cards; skipped on first render, on list switches and with reduced motion. A checked-off card leaves the grid as soon as its exit animation ends, without waiting for the IndexedDB write.
+- **Drawer swipe**: like pull-to-refresh, drag frames write the drawer transform and backdrop opacity straight to the DOM. The drawer only subscribes to `items` (for its "last updated" labels) while it is shown.
 - **Back-gesture trap**: a history sentinel keeps the Android/Firefox back gesture inside the PWA and closes the topmost popup instead. Do not touch `apps/web/src/hooks/useBackGestureTrap.ts` without reading its comments — the behavior encodes hard-won Firefox/Fenix quirks.
 - **Popup layering**: all overlays register in `apps/web/src/hooks/usePopupStack.ts`; the stack order is the open order and drives both "is any popup open" checks and back-gesture close order. New modals must open/close through the popup stack.
 

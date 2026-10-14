@@ -5,6 +5,12 @@ import type { Item } from "@golist/shared/domain/types";
 // (hidden tab, interrupted animation, card removed from the DOM).
 const EXIT_ANIMATION_FALLBACK_MS = 400;
 
+const withoutId = (ids: Set<string>, itemId: string) => {
+  const next = new Set(ids);
+  next.delete(itemId);
+  return next;
+};
+
 type ItemExitAnimationOptions = {
   items: Item[];
   toggleItem: (itemId: string) => Promise<void>;
@@ -12,9 +18,12 @@ type ItemExitAnimationOptions = {
 };
 
 // Plays the card exit animation before an item is toggled away, with a timer
-// fallback so the item is still removed when animationend never fires.
+// fallback so the item is still removed when animationend never fires. Once
+// the animation is done the card is hidden right away (`removedItemIds`), so
+// the grid reflows without waiting for the IndexedDB write behind the toggle.
 export const useItemExitAnimation = ({ items, toggleItem, onItemDeleted }: ItemExitAnimationOptions) => {
   const [exitingItemIds, setExitingItemIds] = useState<Set<string>>(new Set());
+  const [removedItemIds, setRemovedItemIds] = useState<Set<string>>(new Set());
 
   const itemsRef = useRef(items);
   useEffect(() => { itemsRef.current = items; });
@@ -41,15 +50,16 @@ export const useItemExitAnimation = ({ items, toggleItem, onItemDeleted }: ItemE
     window.clearTimeout(fallbackTimeout);
     exitTimeoutsRef.current.delete(itemId);
     const deletedItem = itemsRef.current.find((item) => item.id === itemId);
-    await toggleItem(itemId);
+    setRemovedItemIds((current) => new Set(current).add(itemId));
+    setExitingItemIds((current) => withoutId(current, itemId));
+    try {
+      await toggleItem(itemId);
+    } finally {
+      setRemovedItemIds((current) => withoutId(current, itemId));
+    }
     if (deletedItem) {
       onItemDeletedRef.current(deletedItem);
     }
-    setExitingItemIds((current) => {
-      const next = new Set(current);
-      next.delete(itemId);
-      return next;
-    });
   }, [toggleItem]);
 
   const handleToggleItem = useCallback(async (itemId: string) => {
@@ -69,5 +79,5 @@ export const useItemExitAnimation = ({ items, toggleItem, onItemDeleted }: ItemE
     setExitingItemIds((current) => new Set(current).add(itemId));
   }, [toggleItem, handleExitComplete]);
 
-  return { exitingItemIds, handleExitComplete, handleToggleItem };
+  return { exitingItemIds, removedItemIds, handleExitComplete, handleToggleItem };
 };
