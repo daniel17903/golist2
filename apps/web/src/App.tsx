@@ -97,7 +97,7 @@ const App = () => {
     closeAddDialog,
     handleAddItem,
     handleAddSuggestion,
-  } = useAddItemDialog({ openPopup, closePopup });
+  } = useAddItemDialog({ isOpen: isAddDialogOpen, openPopup, closePopup });
 
   const {
     editItemName,
@@ -125,7 +125,7 @@ const App = () => {
     handleJoinList,
   } = useJoinListDialog({ openPopup, closePopup, onJoinFailed: handleJoinFailed });
 
-  const { exitingItemIds, handleExitComplete, handleToggleItem } = useItemExitAnimation({
+  const { exitingItemIds, removedItemIds, handleExitComplete, handleToggleItem } = useItemExitAnimation({
     items,
     toggleItem,
     onItemDeleted: showUndoDelete,
@@ -155,28 +155,17 @@ const App = () => {
 
   useBackGestureTrap({ isPopupOpenRef, closeTopPopup });
 
-  const listStats = useMemo(() => calculateListStats(items, activeListId), [items, activeListId]);
+  const visibleListItems = useMemo(
+    () => (removedItemIds.size > 0 ? listItems.filter((item) => !removedItemIds.has(item.id)) : listItems),
+    [listItems, removedItemIds],
+  );
 
-  const listMetaById = useMemo(() => {
-    const updatedAtByList = new Map<string, number>();
-
-    for (const list of lists) {
-      updatedAtByList.set(list.id, list.updatedAt);
-    }
-
-    for (const item of items) {
-      updatedAtByList.set(item.listId, Math.max(updatedAtByList.get(item.listId) ?? 0, item.updatedAt));
-    }
-
-    return Object.fromEntries(
-      lists.map((list) => [
-        list.id,
-        {
-          lastUpdatedAt: updatedAtByList.get(list.id) ?? list.updatedAt,
-        },
-      ]),
-    );
-  }, [lists, items]);
+  // Walks the item history of every list, so it is only computed while the
+  // stats modal is actually showing.
+  const listStats = useMemo(
+    () => (isListStatsOpen ? calculateListStats(items, activeListId) : null),
+    [isListStatsOpen, items, activeListId],
+  );
 
   const activeListRef = useRef(activeList);
   useEffect(() => { activeListRef.current = activeList; });
@@ -295,7 +284,7 @@ const App = () => {
         onSaveRename={handleSaveRename}
       />
 
-      {isListStatsOpen && (
+      {listStats && (
         <Suspense fallback={null}>
           <ListStatsModal
             isOpen
@@ -309,7 +298,8 @@ const App = () => {
       )}
 
       <ItemGrid
-        items={listItems}
+        items={visibleListItems}
+        listId={activeListId}
         exitingItemIds={exitingItemIds}
         onExitComplete={handleExitComplete}
         longPressTriggeredRef={longPressTriggeredRef}
@@ -343,7 +333,6 @@ const App = () => {
         isOpen={isDrawerOpen}
         lists={lists}
         activeListId={activeListId}
-        listMetaById={listMetaById}
         onClose={handleCloseDrawer}
         onOpen={handleOpenDrawer}
         onSelectList={handleSelectList}

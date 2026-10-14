@@ -1,4 +1,5 @@
 import { expect, test } from "./fixtures";
+import type { GoListApp } from "./support/goListApp";
 
 test.describe("settings and i18n", () => {
   test("switching the language in settings translates the UI and persists", async ({ app }) => {
@@ -173,5 +174,56 @@ test.describe("joining failures", () => {
     await expect(app.page.getByText(/Shared list could not be loaded/)).toBeVisible();
     await expect(app.listTitle).toHaveText("Shopping list");
     await expect.poll(() => app.page.url()).not.toContain("shareToken");
+  });
+});
+
+test.describe("drawer edge swipe on a touch device", () => {
+  test.use({ hasTouch: true });
+
+  const edgeSwipe = async (app: GoListApp, toX: number, options: { release: boolean }) => {
+    const cdp = await app.page.context().newCDPSession(app.page);
+    const touch = (type: "touchStart" | "touchMove" | "touchEnd", x?: number) =>
+      cdp.send("Input.dispatchTouchEvent", {
+        type,
+        touchPoints: x === undefined ? [] : [{ x, y: 400 }],
+      });
+    await touch("touchStart", 5);
+    for (let x = 25; x <= toX; x += 20) {
+      await touch("touchMove", x);
+    }
+    if (options.release) {
+      await touch("touchEnd");
+    }
+  };
+
+  test("the drawer and backdrop follow the finger while swiping it open", async ({ app }) => {
+    await edgeSwipe(app, 165, { release: false });
+
+    // Half-way in: the drawer is on screen and the backdrop half faded in.
+    await expect(app.drawer).toBeVisible();
+    const drawerBox = await app.drawer.boundingBox();
+    if (!drawerBox) {
+      throw new Error("drawer has no bounding box");
+    }
+    expect(drawerBox.x).toBeGreaterThan(-drawerBox.width);
+    expect(drawerBox.x).toBeLessThan(0);
+    const backdropOpacity = Number(
+      await app.page.locator(".drawer-backdrop").evaluate((element) => getComputedStyle(element).opacity),
+    );
+    expect(backdropOpacity).toBeGreaterThan(0.2);
+    expect(backdropOpacity).toBeLessThan(0.8);
+    await expect(app.page.locator(".drawer.drawer--open")).toHaveCount(0);
+  });
+
+  test("releasing past the threshold opens the drawer", async ({ app }) => {
+    await edgeSwipe(app, 305, { release: true });
+    await expect(app.page.locator(".drawer.drawer--open")).toBeVisible();
+    await expect(app.drawerListNames()).toHaveText(["Shopping list"]);
+  });
+
+  test("releasing early lets the drawer slide back closed", async ({ app }) => {
+    await edgeSwipe(app, 65, { release: true });
+    await expect(app.drawer).toBeHidden();
+    await expect(app.page.locator(".drawer.drawer--open")).toHaveCount(0);
   });
 });

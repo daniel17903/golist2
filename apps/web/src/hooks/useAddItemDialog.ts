@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
+import type { Item } from "@golist/shared/domain/types";
 import { parseItemInput } from "../domain/inputParser";
 import { useStore } from "../state/useStore";
 import { useI18n } from "../i18n";
@@ -10,13 +11,18 @@ const { addItem } = useStore.getState();
 const MAX_SUGGESTIONS = 12;
 
 type AddItemDialogOptions = {
+  isOpen: boolean;
   openPopup: (id: PopupId) => void;
   closePopup: (id: PopupId) => void;
 };
 
-export const useAddItemDialog = ({ openPopup, closePopup }: AddItemDialogOptions) => {
+const noItems: Item[] = [];
+
+export const useAddItemDialog = ({ isOpen, openPopup, closePopup }: AddItemDialogOptions) => {
   const { locale } = useI18n();
-  const items = useStore((s) => s.items);
+  // Suggestions walk the whole item history, so they are only derived (and
+  // only follow item changes) while the dialog is open.
+  const items = useStore((s) => (isOpen ? s.items : noItems));
   const activeListId = useStore((s) => s.activeListId);
   const [itemName, setItemName] = useState("");
 

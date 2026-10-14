@@ -1,17 +1,13 @@
-import { memo, useMemo, useRef, useState, type PointerEvent } from "react";
-import type { List } from "@golist/shared/domain/types";
+import { memo, useMemo, useRef, useState, type PointerEvent, type TransitionEvent } from "react";
+import type { Item, List } from "@golist/shared/domain/types";
 import { formatRelativeElapsedTime } from "../domain/relativeTime";
 import { useI18n } from "../i18n";
-
-type ListMeta = {
-  lastUpdatedAt: number;
-};
+import { useStore } from "../state/useStore";
 
 type ListsDrawerProps = {
   isOpen: boolean;
   lists: List[];
   activeListId: string | null | undefined;
-  listMetaById: Record<string, ListMeta>;
   onClose: () => void;
   onOpen: () => void;
   onSelectList: (listId: string) => void;
@@ -25,6 +21,10 @@ type ListsDrawerProps = {
 
 type DragMode = "opening" | "closing";
 
+type DragState = { pointerId: number; startX: number; mode: DragMode; drawerWidth: number };
+
+const noItems: Item[] = [];
+
 const EDGE_SWIPE_WIDTH = 28;
 
 const getCurrentTimestamp = () => Date.now();
@@ -33,7 +33,6 @@ const ListsDrawer = memo(function ListsDrawer({
   isOpen,
   lists,
   activeListId,
-  listMetaById,
   onClose,
   onOpen,
   onSelectList,
@@ -46,11 +45,40 @@ const ListsDrawer = memo(function ListsDrawer({
 }: ListsDrawerProps) {
   const { t, locale } = useI18n();
   const drawerRef = useRef<HTMLElement | null>(null);
-  const dragStateRef = useRef<{ pointerId: number; startX: number; mode: DragMode } | null>(null);
-  const [dragOffset, setDragOffset] = useState<number | null>(null);
+  const backdropRef = useRef<HTMLDivElement | null>(null);
+  const dragStateRef = useRef<DragState | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [confirmDeleteListId, setConfirmDeleteListId] = useState<string | null>(null);
 
+  // "Shown" spans from the moment the drawer starts appearing (open or being
+  // dragged in) until its slide-out transition has finished. Only while shown
+  // does the drawer follow item changes for its "last updated" labels, so a
+  // closed drawer neither re-renders nor walks the item history on every edit.
+  const [isShown, setIsShown] = useState(isOpen);
+  if ((isOpen || isDragging) && !isShown) {
+    setIsShown(true);
+  }
+  const items = useStore((s) => (isShown ? s.items : noItems));
+
+  const lastUpdatedAtByList = useMemo(() => {
+    const updatedAtByList = new Map<string, number>();
+    for (const list of lists) {
+      updatedAtByList.set(list.id, list.updatedAt);
+    }
+    for (const item of items) {
+      const current = updatedAtByList.get(item.listId);
+      if (current !== undefined && item.updatedAt > current) {
+        updatedAtByList.set(item.listId, item.updatedAt);
+      }
+    }
+    return updatedAtByList;
+  }, [lists, items]);
+
+  const handleTransitionEnd = (event: TransitionEvent<HTMLElement>) => {
+    if (event.target === event.currentTarget && event.propertyName === "transform" && !isOpen && !isDragging) {
+      setIsShown(false);
+    }
+  };
 
   const relativeTimeFormatter = useMemo(
     () =>
@@ -80,9 +108,29 @@ const ListsDrawer = memo(function ListsDrawer({
     [lists, confirmDeleteListId],
   );
 
+  // Drag frames are written straight to the DOM (like pull-to-refresh) so the
+  // drawer follows the finger without re-rendering on every pointermove.
+  const applyDragOffset = (offset: number, drawerWidth: number) => {
+    if (drawerRef.current) {
+      drawerRef.current.style.transform = `translateX(${offset}px)`;
+    }
+    if (backdropRef.current) {
+      backdropRef.current.style.opacity = String(1 + offset / drawerWidth);
+    }
+  };
+
+  const clearDragStyles = () => {
+    if (drawerRef.current) {
+      drawerRef.current.style.transform = "";
+    }
+    if (backdropRef.current) {
+      backdropRef.current.style.opacity = "";
+    }
+  };
+
   const handleDragStart = (event: PointerEvent<HTMLElement>, mode: DragMode) => {
     if (event.pointerType !== "touch" && event.pointerType !== "pen") {return;}
-    dragStateRef.current = { pointerId: event.pointerId, startX: event.clientX, mode };
+    dragStateRef.current = { pointerId: event.pointerId, startX: event.clientX, mode, drawerWidth: getDrawerWidth() };
     setIsDragging(true);
     event.currentTarget.setPointerCapture(event.pointerId);
   };
@@ -91,26 +139,25 @@ const ListsDrawer = memo(function ListsDrawer({
     const dragState = dragStateRef.current;
     if (!dragState || dragState.pointerId !== event.pointerId) {return;}
 
-    const drawerWidth = getDrawerWidth();
+    const { drawerWidth } = dragState;
     const deltaX = event.clientX - dragState.startX;
 
     if (dragState.mode === "opening") {
       const clampedDelta = Math.min(drawerWidth, Math.max(0, deltaX));
-      setDragOffset(-drawerWidth + clampedDelta);
+      applyDragOffset(-drawerWidth + clampedDelta, drawerWidth);
       return;
     }
 
     const clampedDelta = Math.max(-drawerWidth, Math.min(0, deltaX));
-    setDragOffset(clampedDelta);
+    applyDragOffset(clampedDelta, drawerWidth);
   };
 
   const handleDragEnd = (event: PointerEvent<HTMLElement>) => {
     const dragState = dragStateRef.current;
     if (!dragState || dragState.pointerId !== event.pointerId) {return;}
 
-    const drawerWidth = getDrawerWidth();
     const deltaX = event.clientX - dragState.startX;
-    const threshold = drawerWidth * 0.35;
+    const threshold = dragState.drawerWidth * 0.35;
 
     if (dragState.mode === "opening") {
       if (deltaX > threshold) {
@@ -120,15 +167,15 @@ const ListsDrawer = memo(function ListsDrawer({
       onClose();
     }
 
+    // Dropping the inline styles in the same task as the class change lets
+    // the CSS transitions carry on from wherever the finger let go.
+    clearDragStyles();
     setIsDragging(false);
-    setDragOffset(null);
     dragStateRef.current = null;
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
   };
-
-  const drawerStyle = dragOffset === null ? undefined : { transform: `translateX(${dragOffset}px)` };
 
   return (
     <>
@@ -145,8 +192,13 @@ const ListsDrawer = memo(function ListsDrawer({
           onPointerCancel={handleDragEnd}
         />
       ) : null}
-      <div className={`drawer-overlay ${isOpen ? "drawer-overlay--open" : ""}`}>
+      <div
+        className={`drawer-overlay ${isOpen ? "drawer-overlay--open" : ""} ${
+          isDragging ? "drawer-overlay--dragging" : ""
+        }`}
+      >
         <div
+          ref={backdropRef}
           className="drawer-backdrop"
           role="button"
           tabIndex={-1}
@@ -160,12 +212,12 @@ const ListsDrawer = memo(function ListsDrawer({
         <aside
           ref={drawerRef}
           className={`drawer ${isOpen ? "drawer--open" : ""} ${isDragging ? "drawer--dragging" : ""}`}
-          style={drawerStyle}
           aria-hidden={!isOpen}
           onPointerDown={(event) => handleDragStart(event, "closing")}
           onPointerMove={handleDragMove}
           onPointerUp={handleDragEnd}
           onPointerCancel={handleDragEnd}
+          onTransitionEnd={handleTransitionEnd}
         >
           <div className="drawer__header">
             <span>GoList</span>
@@ -174,7 +226,6 @@ const ListsDrawer = memo(function ListsDrawer({
             <p className="drawer__title">{t("drawer.myLists")}</p>
             <div className="drawer__list">
               {lists.map((list) => {
-                const listMeta = listMetaById[list.id] ?? { lastUpdatedAt: list.updatedAt };
                 const isConfirmingDelete = confirmDeleteListId === list.id;
 
                 return (
@@ -198,7 +249,7 @@ const ListsDrawer = memo(function ListsDrawer({
                         <span className="drawer__item-label">{list.name}</span>
                         <span className="drawer__item-meta">
                           {t("drawer.openUpdated", {
-                            updated: formatLastUpdated(listMeta.lastUpdatedAt),
+                            updated: formatLastUpdated(lastUpdatedAtByList.get(list.id) ?? list.updatedAt),
                           })}
                         </span>
                       </span>

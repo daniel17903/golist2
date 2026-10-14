@@ -1,7 +1,7 @@
 # Frontend Performance Improvement Plan
 
 Status: Complete
-Last updated: 2026-03-23
+Last updated: 2026-10-14
 
 ## Completed
 
@@ -147,3 +147,19 @@ was implemented.
 | ~~P3~~ | ~~Vendor chunk splitting~~ | ~~Low~~ | ~~Done~~ |
 | ~~P3~~ | ~~Extend PWA precache patterns~~ | ~~Low~~ | ~~Done~~ |
 | ~~P3~~ | ~~Delete unused `RenameListModal`~~ | ~~Trivial~~ | ~~Done~~ |
+
+## Follow-up: UI smoothness (2026-10)
+
+- **Grid layout animation** (`hooks/useGridLayoutAnimation.ts`): remaining cards
+  glide into place after an add/check-off/re-sort instead of jumping; new cards
+  pop in. A checked-off card is removed from the grid right after its exit
+  animation (`removedItemIds` in `useItemExitAnimation`), not after the Dexie write.
+- **Drawer swipe** (`components/ListsDrawer.tsx`): drag frames write `transform` and
+  backdrop `opacity` directly to the DOM (no re-render per pointermove, width
+  measured once per drag). Fixed the drawer being invisible during the edge-swipe
+  open gesture and the backdrop lingering ~0.5s after closing.
+- **Only compute what is shown**: list stats are computed only while the stats
+  modal is open, add-dialog suggestions only while the dialog is open, and the
+  drawer's "last updated" metadata only while the drawer is shown. Each of these
+  walks the full item history, which previously happened on every item change.
+
