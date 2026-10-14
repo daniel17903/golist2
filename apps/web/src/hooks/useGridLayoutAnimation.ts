@@ -71,7 +71,9 @@ export const useGridLayoutAnimation = (
 
       let deltaX = previous.left - position.left;
       let deltaY = previous.top - position.top;
-      if (deltaX === 0 && deltaY === 0) {
+      // A card being checked off is gone within its 220ms poof; a glide on top
+      // of its shrinking, rotating transform would only look off-axis.
+      if ((deltaX === 0 && deltaY === 0) || card.classList.contains("item-card--exit")) {
         continue;
       }
 
@@ -86,8 +88,8 @@ export const useGridLayoutAnimation = (
         runningMove.cancel();
       }
 
-      // Additive, so the glide stacks on top of the card's own CSS transform
-      // (the check-off "poof", the press feedback) instead of replacing it.
+      // Additive, so the press feedback (scale) keeps showing during a glide
+      // instead of being replaced by it.
       const move = card.animate(
         [{ transform: `translate(${deltaX}px, ${deltaY}px)` }, { transform: "translate(0, 0)" }],
         { duration: MOVE_DURATION_MS, easing: "ease-out", composite: "add" },
