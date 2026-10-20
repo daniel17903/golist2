@@ -52,8 +52,7 @@ export default defineConfig({
       },
     },
     {
-      // Via npm so the workspace-local vite (not the hoisted copy used by
-      // vitest at the repo root) serves the app.
+      // Via npm so the web workspace's own dev script serves the app.
       command: `npm run dev -- --host 127.0.0.1 --port ${webPort} --strictPort`,
       url: webUrl,
       reuseExistingServer: !isCI,

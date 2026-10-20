@@ -1,10 +1,22 @@
 version: 2
 updates:
+  # One grouped PR per week for npm dev dependencies and one for production
+  # dependencies; major bumps arrive as separate PRs so breaking changes can be
+  # handled on their own.
   - package-ecosystem: npm
     directory: "/"
     schedule:
       interval: weekly
     open-pull-requests-limit: 10
+    groups:
+      npm-dev-dependencies:
+        dependency-type: development
+        update-types:
+          - minor
+      npm-production-dependencies:
+        dependency-type: production
+        update-types:
+          - minor
     ignore:
       - dependency-name: "*"
         update-types:
@@ -15,6 +27,12 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 10
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+        update-types:
+          - minor
     ignore:
       - dependency-name: "*"
         update-types:

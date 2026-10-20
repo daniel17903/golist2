@@ -103,8 +103,15 @@
   `playwright.config.ts` uses. Without any browser: `npx playwright install chromium` and
   `npx playwright install-deps chromium`.
   For E2E-related changes, run the Playwright E2E command before committing.
-- The repo root has a hoisted `vite` 7 (pulled in by vitest) while `apps/web` uses vite 8;
-  always start the web dev server through `npm run dev -w apps/web`, never a bare `vite`.
+- Shared tooling (`vite`, `eslint`, `typescript`, `vitest`) resolves to a single hoisted copy
+  at the repo root. Keep the version specs identical across workspaces; otherwise npm satisfies
+  plugin peer dependencies with a different major at the root (this once left vite 7 / eslint 9
+  / TypeScript 5.9 hoisted next to the workspace versions). After a bump, check with
+  `npm ls vite eslint typescript` and run `npm dedupe` if a second copy shows up. Every
+  workspace import must be a declared dependency (e.g. `@eslint/js` for `apps/web`), not
+  something that happens to be hoisted.
+- TypeScript 7 (the native compiler) has no JS API yet and typescript-eslint supports only
+  `<6.1`, so stay on TypeScript 6 until typescript-eslint supports 7.
 
 ## End-to-end tests (`apps/web/e2e/`)
 - Playwright Test suite (`apps/web/playwright.config.ts`). `npm run test:e2e -w apps/web`
