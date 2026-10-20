@@ -6,7 +6,7 @@
 - `packages/shared/` contains shared domain code that can be reused by web and backend (currently shared types).
 - `apps/web/sim/` is the in-process multi-device sync simulation (real web store + sync client against the real backend); see `apps/web/sim/README.md`.
 - `scripts/` holds repo tooling: `agent-setup.sh` (container setup, also run by the Claude Code SessionStart hook in `.claude/`), `local-postgres.sh` (throwaway local database), `verify.mjs` (runs the right checks).
-- `.claude/hooks/` holds Claude Code hooks: `session-start.sh` (runs `agent-setup.sh` in cloud sessions) and `pre-push-verify.sh` (a PreToolUse hook that blocks `git push` until `npm run verify:changed` passes; branch deletions are not checked).
+- `.claude/hooks/` holds Claude Code hooks: `session-start.sh` (runs `agent-setup.sh` in cloud sessions) and `pre-push-verify.sh` (a PreToolUse hook that blocks `git push` until `npm run verify:changed` passes; push detection in `is-git-push.mjs`, tested by `node --test .claude/hooks/is-git-push.test.mjs`). The hook is **not registered in `.claude/settings.json` yet**, so it does not run.
 - Root `package.json` is a workspace manifest; run workspace commands with `-w apps/web` or `-w apps/backend`, or use root aliases like `npm run dev:web` and `npm run dev:backend`.
 
 ## Project snapshot (web app)
@@ -268,8 +268,8 @@ in `docs/frontend-performance-plan.md`. Follow them for every web-app change.
 - **Descriptive PR titles.** The title is a short sentence describing the change ("Broadcast REST list renames to
   WebSocket subscribers"), never the branch name (#324 was titled "Claude/api category icon defaults mtnba0").
 - Fill in `.github/pull_request_template.md` (Summary / Changes / Tests / Follow-up issues).
-- `git push` from Claude Code runs `npm run verify:changed` first (`.claude/hooks/pre-push-verify.sh`) and is blocked
-  if it fails; fix the failures rather than working around the hook.
+- Run `npm run verify:changed` yourself before every push and fix what it reports. `.claude/hooks/pre-push-verify.sh`
+  will enforce this once it is registered in `.claude/settings.json`; until then nothing checks it for you.
 
 ## Documentation maintenance
 - Keep `docs/sharing-plan.md` up to date when backend sharing architecture, sequencing, or CI expectations change.
