@@ -86,36 +86,9 @@
 - PWA manifest configured in `apps/web/vite.config.ts`.
 
 ## Item icons (`apps/web/public/icons/`)
-- All item icons are **512×512 SVGs** with the Adobe Illustrator export header
-  (`<svg version="1.1" ... width="512px" height="512px" viewBox="0 0 512 512" ...>`).
-  Match this header and the `512x512` size exactly for new icons.
-- **Visual style**: black, hand-drawn line-art (outline drawings, not filled
-  silhouettes). Every file defines a `.st0` CSS class:
-  `fill:none; stroke:#000000; stroke-width:30; stroke-linecap:round;
-  stroke-linejoin:round; stroke-miterlimit:10;`.
-  The stock icons render their outlines as filled double-contour `<path>`s, but
-  authoring new icons as **stroked paths using `class="st0"`** produces a
-  visually consistent result and is far easier to hand-author. Use a thinner
-  companion class (e.g. `.st1` with `stroke-width:18`) for fine details like
-  feathery fronds so they don't read as chunky as the main `30`px outline.
-- **NEVER verify an icon's appearance yourself** — there is no SVG renderer
-  available locally (`rsvg-convert`, `inkscape`, `sharp`, `cairosvg` are all
-  absent), and you must not spin up a browser/screenshot to judge whether an
-  icon "looks right". Author the SVG, then **ask the user to confirm it looks
-  correct**. Only the user judges visual correctness.
-- Adding the SVG file alone does **not** wire the icon to any item. You **must**
-  also add the icon to `packages/shared/src/domain/item-category-mapping.ts` so
-  item names resolve to it. That file has one `CategoryEntry[]` array per
-  supported language (`categoryEntriesDe`, `categoryEntriesEn`,
-  `categoryEntriesEs`). Add an entry — `{ assetFileName, matchingNames, category }`
-  with `assetFileName` set to the new SVG's base filename — to **every** language
-  array, keeping the `category` the same across all languages and translating
-  only the `matchingNames` (e.g. fennel → de `fenchel`, en `fennel`, es `hinojo`,
-  all `fruitsVegetables`). If you are unsure which `category` to use or which item
-  names should map to the icon, **ask the user** instead of guessing.
-- After editing the mapping, run `npm run typecheck -w apps/web` (the web app
-  consumes the shared package; `packages/shared` has no standalone typecheck
-  script).
+- 512×512 black line-art SVGs; an icon only appears once it is mapped for de/en/es in
+  `packages/shared/src/domain/item-category-mapping.ts`. Never judge an icon's look yourself — ask the user.
+- Follow the `add-item-icon` skill (`.claude/skills/add-item-icon/SKILL.md`) for the SVG template, mapping and collision rules.
 
 ## Storage/migrations
 - Dexie schema lives in `apps/web/src/storage/db.ts`. Keep migrations backward-compatible.
@@ -186,75 +159,21 @@ Workflow:
    attach frames, console and backend log (`test-results/`, or the CI artifact).
 
 ## React performance rules (web app)
+Full rules with examples: the `react-performance` skill (`.claude/skills/react-performance/SKILL.md`);
+background in `docs/frontend-performance-plan.md`. Checklist for every change in `apps/web/src/components/`,
+`apps/web/src/hooks/` or `App.tsx`:
+1. New component receives props from a parent? → wrap with `memo(function Name…)`.
+2. Passing a function as a prop? → `useCallback`, a state setter or a module-scope function — never an
+   inline arrow to a memoized child.
+3. New Zustand subscription? → a slice selector, never bare `useStore()`; actions via `useStore.getState()`.
+4. New `useEffect`? → no high-frequency values in the deps; read them through refs synced in an effect.
+5. New modal/overlay? → open and close it through `usePopupStack`.
 
-These rules exist to prevent regressions against the (completed) work tracked
-in `docs/frontend-performance-plan.md`. Follow them for every web-app change.
-
-### Component memoization
-- All components in `apps/web/src/components/` that receive props from `App`
-  are wrapped with `React.memo` — including modals, even though they return
-  `null` while closed. **New components** that receive props from a parent
-  must also be wrapped with `React.memo` using a named function:
-  ```tsx
-  const MyComponent = memo(function MyComponent(props: Props) { ... });
-  ```
-- Never remove an existing `React.memo` wrapper without an explicit reason.
-
-### Callback stability
-- **Never pass inline arrow functions** as props to memoized children. Every
-  callback prop must be a stable reference — either a `useCallback` result, a
-  state setter from `useState`, or a module-scope function.
-  ```tsx
-  // Bad — new identity every render, defeats React.memo
-  <AppHeader onOpenStats={() => setIsListStatsOpen(true)} />
-
-  // Good — stable reference
-  const handleOpenStats = useCallback(() => setIsListStatsOpen(true), []);
-  <AppHeader onOpenStats={handleOpenStats} />
-  ```
-- Inline arrows are acceptable **only** inside elements that are not memoized
-  components (e.g. plain `<button>`, `<div>`), or in `.map()` callbacks that
-  produce plain elements.
-- Helper functions declared inside a component that are passed as props or
-  appear in `useEffect`/`useCallback` dependency arrays must themselves be
-  wrapped with `useCallback`.
-
-### Zustand selectors
-- **Never subscribe to the whole store** with a bare `useStore()` call. Always
-  use a fine-grained selector: `useStore((s) => s.specificSlice)`.
-- Store actions are stable (created once in `create()`). Extract them at module
-  scope via `useStore.getState()` — do not select them inside components.
-- See `apps/web/src/hooks/useAppState.ts` (selectors) and
-  `apps/web/src/hooks/useAddItemDialog.ts` (module-scope action extraction)
-  for the established pattern.
-
-### Refs for frequently-changing values
-- When a `useCallback` or `useEffect` needs to read a value that changes often
-  (e.g. `items`, `exitingItemIds`, `activeList`), store it in a ref synced via
-  a no-deps `useEffect` instead of adding it to the dependency array:
-  ```tsx
-  const itemsRef = useRef(items);
-  useEffect(() => { itemsRef.current = items; });
-  ```
-- **Never assign to `.current` directly in the render body** — the
-  `react-hooks/refs` lint rule will reject it. Always use `useEffect`.
-
-### useEffect dependency hygiene
-- Avoid putting rapidly-changing values (e.g. animation frame positions, pull
-  distances) in `useEffect` dependency arrays. Use refs instead to prevent
-  effect teardown/re-registration on every frame.
-
-### General checklist for new UI code
-1. New component receives props from a parent? → wrap with `React.memo`.
-2. Passing a function as a prop? → ensure it is wrapped in `useCallback` (or
-   is a state setter / module-scope constant).
-3. Adding a new Zustand subscription? → use a selector, not the whole store.
-4. Adding a `useEffect`? → verify no high-frequency values in the dep array.
-5. Adding a modal/overlay? → open and close it through `usePopupStack` so the
-   back gesture and "popup open" checks keep working.
-6. `docs/frontend-performance-plan.md` (status: complete) documents why these
-   rules exist and what was measured.
-
+## Project skills (`.claude/skills/`)
+- `add-item-icon` — add or change an item icon and its de/en/es name mapping.
+- `fix-sync-bug` — reproduce a sync bug in the sim, fix, fuzz, add E2E, update sync docs.
+- `react-performance` — memoization/selector/ref rules for web components and hooks.
+- `steward` — driving a PR to green: CI checks, artifacts, merging `main`, lockfiles, review threads.
 
 ## Documentation maintenance
 - Keep `docs/sharing-plan.md` up to date when backend sharing architecture, sequencing, or CI expectations change.
