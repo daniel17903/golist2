@@ -1,4 +1,38 @@
 {
+  "permissions": {
+    "allow": [
+      "Bash(npm run verify*)",
+      "Bash(node scripts/verify.mjs*)",
+      "Bash(npm run lint -w apps/web)",
+      "Bash(npm run typecheck -w apps/web)",
+      "Bash(npm run test -w apps/web)",
+      "Bash(npm run test:unit -w apps/web)",
+      "Bash(npm run test:sim -w apps/web)",
+      "Bash(npm run build -w apps/web)",
+      "Bash(npm run lint -w apps/backend)",
+      "Bash(npm run typecheck -w apps/backend)",
+      "Bash(npm run test -w apps/backend)",
+      "Bash(npm run build -w apps/backend)",
+      "Bash(npm run lint:web)",
+      "Bash(npm run typecheck:web)",
+      "Bash(npm run test:web)",
+      "Bash(npm run build:web)",
+      "Bash(npm run lint:backend)",
+      "Bash(npm run typecheck:backend)",
+      "Bash(npm run test:backend)",
+      "Bash(npm run build:backend)",
+      "Bash(node --test .claude/hooks/is-git-push.test.mjs)",
+      "Bash(git status *)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Bash(git show *)",
+      "Bash(git branch)",
+      "Bash(git branch --show-current)",
+      "Bash(git branch -a)",
+      "Bash(git branch -r)",
+      "Bash(git branch --list *)"
+    ]
+  },
   "hooks": {
     "SessionStart": [
       {
@@ -6,6 +40,18 @@
           {
             "type": "command",
             "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/session-start.sh"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/pre-push-verify.sh",
+            "timeout": 1800
           }
         ]
       }
