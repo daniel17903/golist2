@@ -15,6 +15,25 @@ describe("isIosBrowserTab", () => {
     expect(isIosBrowserTab(iphoneSafari)).toBe(true);
   });
 
+  it("detects other iOS browsers and in-app browsers", () => {
+    expect(
+      isIosBrowserTab({
+        ...iphoneSafari,
+        userAgent:
+          "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/130.0.0.0 Mobile/15E148 Safari/604.1",
+        standalone: undefined,
+      }),
+    ).toBe(true);
+    expect(
+      isIosBrowserTab({
+        ...iphoneSafari,
+        userAgent:
+          "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 Instagram 350.0.0",
+        standalone: undefined,
+      }),
+    ).toBe(true);
+  });
+
   it("detects iPadOS, which reports a Mac user agent", () => {
     expect(
       isIosBrowserTab({

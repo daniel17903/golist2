@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useStore } from "../state/useStore";
 import type { PopupId } from "./usePopupStack";
 
@@ -27,12 +27,21 @@ export const useJoinListDialog = ({ openPopup, closePopup, onJoinFailed }: JoinL
     closePopup("join-list");
   }, [closePopup]);
 
+  // Ignores repeated taps while a join is still in flight.
+  const isJoiningRef = useRef(false);
+
   const joinWithValue = useCallback(async (value: string) => {
+    if (isJoiningRef.current) {
+      return;
+    }
+    isJoiningRef.current = true;
     try {
       await joinSharedList(value);
     } catch {
       onJoinFailed();
       return;
+    } finally {
+      isJoiningRef.current = false;
     }
     setJoinListValue("");
     closePopup("join-list");

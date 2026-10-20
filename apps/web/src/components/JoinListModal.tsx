@@ -26,7 +26,7 @@ const JoinListModal = memo(function JoinListModal({
   onPasteJoin,
 }: JoinListModalProps) {
   const { t } = useI18n();
-  const [pasteFailed, setPasteFailed] = useState(false);
+  const [pasteError, setPasteError] = useState<"unreadable" | "noLink" | null>(null);
 
   if (!isOpen) {return null;}
 
@@ -43,17 +43,19 @@ const JoinListModal = memo(function JoinListModal({
 
   const handlePaste = () => {
     void (async () => {
-      let pasted = "";
+      let pasted: string;
       try {
         pasted = await navigator.clipboard.readText();
       } catch {
-        // Permission denied or nothing readable; handled below.
-      }
-      if (!extractShareToken(pasted)) {
-        setPasteFailed(true);
+        // Permission denied or the iOS "Paste" prompt was dismissed.
+        setPasteError("unreadable");
         return;
       }
-      setPasteFailed(false);
+      if (!extractShareToken(pasted)) {
+        setPasteError("noLink");
+        return;
+      }
+      setPasteError(null);
       onPasteJoin(pasted);
     })();
   };
@@ -79,7 +81,10 @@ const JoinListModal = memo(function JoinListModal({
         <input
           id="join-list-token"
           value={normalizedValue}
-          onChange={(event) => onChange(event.target.value)}
+          onChange={(event) => {
+            setPasteError(null);
+            onChange(event.target.value);
+          }}
           placeholder={t("modal.shareTokenPlaceholder")}
           autoFocus
         />
@@ -89,7 +94,11 @@ const JoinListModal = memo(function JoinListModal({
           <button type="button" className="text-button" onClick={handlePaste}>
             {t("joinList.paste")}
           </button>
-          {pasteFailed ? <p className="join-list__paste-error" role="alert">{t("joinList.pasteFailed")}</p> : null}
+          {pasteError ? (
+            <p className="join-list__paste-error" role="alert">
+              {pasteError === "noLink" ? t("joinList.pasteFailed") : t("joinList.pasteUnreadable")}
+            </p>
+          ) : null}
         </div>
       ) : null}
     </Modal>

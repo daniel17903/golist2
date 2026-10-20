@@ -32,7 +32,12 @@ const InviteLandingModal = memo(function InviteLandingModal({
             {t("inviteLanding.joinHere")}
           </button>
           <button type="button" className="primary-button" onClick={onCopy}>
-            {isCopied ? t("inviteLanding.copied") : t("inviteLanding.copy")}
+            {isCopied ? (
+              <>
+                {t("inviteLanding.copied")}
+                <span aria-hidden="true"> ✓</span>
+              </>
+            ) : t("inviteLanding.copy")}
           </button>
         </>
       }
@@ -44,6 +49,9 @@ const InviteLandingModal = memo(function InviteLandingModal({
         <li>{t("inviteLanding.stepPaste", { joinList: t("drawer.joinList"), paste: t("joinList.paste") })}</li>
       </ol>
       <p className="invite-landing__note">{t("inviteLanding.notInstalled")}</p>
+      <p className="visually-hidden" role="status">
+        {isCopied ? t("inviteLanding.copiedAnnouncement") : ""}
+      </p>
     </Modal>
   );
 });

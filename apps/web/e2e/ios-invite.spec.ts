@@ -34,7 +34,8 @@ test.describe("invite links on iOS", () => {
     await expect(safari.listTitle).toHaveText("Shopping list");
 
     await landing.getByRole("button", { name: "Copy invite" }).click();
-    await expect(landing.getByRole("button", { name: "Copied ✓" })).toBeVisible();
+    await expect(landing.getByRole("button", { name: "Copied" })).toBeVisible();
+    await expect(landing.getByRole("status")).toHaveText("Invite copied. Now open GoList from your home screen.");
     expect((await safari.copiedTexts()).at(-1)).toBe(link);
 
     // The home-screen app has separate storage and clipboard mocks per
@@ -60,6 +61,37 @@ test.describe("invite links on iOS", () => {
     await safari.page.getByRole("dialog").getByRole("button", { name: "Use in browser" }).click();
     await expect(safari.page.getByRole("dialog")).toHaveCount(0);
     await expect(safari.listTitle).toHaveText("Family groceries");
+  });
+
+  test("a malformed share link on iOS reports the failure instead of offering a broken invite", async ({ newDevice }) => {
+    const safari = await newDevice(iphone);
+    await safari.goto("/?shareToken=0b6f2c1e-4b8a");
+    await expect(safari.page.getByText(/Shared list could not be loaded/)).toBeVisible();
+    await expect(safari.page.getByRole("dialog")).toHaveCount(0);
+    await expect.poll(() => safari.page.url()).not.toContain("shareToken");
+  });
+
+  test("using an unknown invite in the browser reports the failure", async ({ newDevice }) => {
+    const safari = await newDevice(iphone);
+    await safari.goto("/?shareToken=0b6f2c1e-4b8a-4f3e-9c2d-7a1b2c3d4e5f");
+    await safari.page.getByRole("dialog").getByRole("button", { name: "Use in browser" }).click();
+    await expect(safari.page.getByText(/Shared list could not be loaded/)).toBeVisible();
+    await expect(safari.listTitle).toHaveText("Shopping list");
+  });
+
+  test("tells the user when copying the invite fails", async ({ app, newDevice }) => {
+    const link = await shareActiveList(app);
+
+    const safari = await newDevice(iphone);
+    await safari.page.addInitScript(() => {
+      Object.defineProperty(window.navigator, "clipboard", {
+        configurable: true,
+        value: { writeText: () => Promise.reject(new Error("denied")), readText: () => Promise.resolve("") },
+      });
+    });
+    await safari.goto(`/${new URL(link).search}`);
+    await safari.page.getByRole("dialog").getByRole("button", { name: "Copy invite" }).click();
+    await expect(safari.page.getByText("The invite could not be copied.")).toBeVisible();
   });
 
   test("dismissing the iOS invite screen does not join", async ({ app, newDevice }) => {
@@ -108,5 +140,25 @@ test.describe("join dialog paste button", () => {
     await dialog.getByRole("button", { name: "Paste from clipboard" }).click();
     await expect(dialog.getByRole("alert")).toHaveText("No invite link found in the clipboard.");
     await expect(dialog.getByRole("button", { name: "Join", exact: true })).toBeDisabled();
+
+    // Typing clears the hint.
+    await dialog.getByRole("textbox", { name: "Share token or link" }).fill("0b6f2c1e");
+    await expect(dialog.getByRole("alert")).toHaveCount(0);
+  });
+
+  test("explains when the clipboard cannot be read", async ({ app }) => {
+    await app.page.evaluate(() => {
+      Object.defineProperty(window.navigator, "clipboard", {
+        configurable: true,
+        value: { readText: () => Promise.reject(new DOMException("denied", "NotAllowedError")) },
+      });
+    });
+    await app.openDrawer();
+    await app.drawer.getByRole("button", { name: "Join list" }).click();
+    const dialog = app.page.getByRole("dialog");
+    await dialog.getByRole("button", { name: "Paste from clipboard" }).click();
+    await expect(dialog.getByRole("alert")).toHaveText(
+      "The clipboard could not be read. Paste the link into the field instead.",
+    );
   });
 });

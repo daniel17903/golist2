@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { useStore } from "../state/useStore";
 import { useI18n } from "../i18n";
 import { isIosBrowserTab, readDisplayEnvironment } from "../domain/iosBrowserTab";
+import { extractShareToken } from "../sharing/apiClient";
 
 // Store actions are stable references — select them once at module scope.
 const { load, addList, joinSharedList, syncAllLists } = useStore.getState();
@@ -54,7 +55,13 @@ export const useAppBootstrap = ({ onShareLinkJoinFailed, onIosShareLink }: AppBo
     };
 
     if (isIosBrowserTab(readDisplayEnvironment())) {
-      onIosShareLinkRef.current(shareTokenFromUrl);
+      // Validate up front: a mangled link must not be offered for copying.
+      const shareToken = extractShareToken(shareTokenFromUrl);
+      if (shareToken) {
+        onIosShareLinkRef.current(shareToken);
+      } else {
+        onShareLinkJoinFailedRef.current();
+      }
       removeShareTokenFromUrl();
       return;
     }
