@@ -96,7 +96,7 @@ the end of the item name win, then the longest. Consequences:
 ## 4. Verify
 
 ```bash
-npx vitest run apps/web/src/domain/iconAssets.test.ts   # SVG exists + no name→icon/category collisions
+npm run test:unit -w apps/web -- src/domain/iconAssets.test.ts   # SVG exists + no name→icon/category collisions
 npm run typecheck -w apps/web                           # packages/shared has no own typecheck
 npm run lint -w apps/web
 ```

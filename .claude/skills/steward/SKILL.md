@@ -41,7 +41,7 @@ diff needs). For Postgres: `eval "$(scripts/local-postgres.sh)"`, then
   per-device `device-*-websocket-frames.txt` and `device-*-console.txt`,
   `backend-log.jsonl` for the test), `playwright-report/`, and the full
   backend log in `.e2e-logs/backend.log`. Reproduce locally with
-  `npx playwright test e2e/<spec>.ts -g "<test name>"`.
+  `npm run test:e2e -w apps/web -- e2e/<spec>.ts -g "<test name>"`.
 - Red only on `postgres`? Suspect the Postgres repository; run it locally with
   `scripts/local-postgres.sh`.
 - Sync-flavored failures: use the `fix-sync-bug` skill (reproduce in the sim
@@ -97,4 +97,5 @@ diff needs). For Postgres: `eval "$(scripts/local-postgres.sh)"`, then
 CI green on the latest head (both E2E backends), no conflict with `main`,
 every review thread replied to and resolved (or explicitly left to the
 maintainer), docs updated where AGENTS.md "Documentation maintenance" requires
-it. Don't merge the PR yourself — the maintainer merges.
+it. Don't merge the PR yourself — the maintainer or the assigned reviewer merges
+(squash).

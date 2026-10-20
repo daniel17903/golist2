@@ -51,7 +51,7 @@ several past bugs were "memory right, IndexedDB wrong" or the reverse.
 Run it and **check it fails for the right reason**:
 
 ```bash
-npx vitest run --project sim apps/web/sim/scenarios/races.sim.test.ts -t "rename sent right before"
+npm run test:sim -w apps/web -- sim/scenarios/races.sim.test.ts -t "rename sent right before"
 ```
 
 A scenario that fails because of a typo or a timing assumption proves
