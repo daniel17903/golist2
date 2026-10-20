@@ -196,7 +196,7 @@ export const createSharingApiClient = (config: SharingApiConfig) => {
       if (error instanceof DOMException && error.name === "AbortError") {
         const message = `${context} timed out after ${timeoutMs}ms`;
         logBackendCall({ endpoint: url, outcome: "error", message });
-        throw new Error(message);
+        throw new Error(message, { cause: error });
       }
 
       const message = `${context} request failed in ${now() - startedAt}ms: no response status/body available`;

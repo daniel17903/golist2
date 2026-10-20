@@ -224,7 +224,9 @@ const runScenario = async (deviceCount: number, commands: Command[]) => {
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    throw new Error(`${message}\n\ncommands (${deviceCount} devices):\n${describeCommands(commands)}`);
+    throw new Error(`${message}\n\ncommands (${deviceCount} devices):\n${describeCommands(commands)}`, {
+      cause: error,
+    });
   } finally {
     await sim.dispose();
   }

@@ -8,7 +8,6 @@ console.info(`[web-build] Configured API_BASE_URL=${apiBaseUrl || "<offline-only
 
 export default defineConfig({
   build: {
-    minify: "esbuild",
     rollupOptions: {
       output: {
         manualChunks(id) {
