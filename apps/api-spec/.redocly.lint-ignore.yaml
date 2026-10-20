@@ -1,0 +1,14 @@
+# This file instructs Redocly's linter to ignore the rules contained for specific parts of your API.
+# See https://redocly.com/docs/cli/ for more information.
+# - /health has no client errors (it takes no input), only 200/503.
+# - /v1/ws answers a successful request with 101 Switching Protocols, never 2xx.
+# - The WebSocket message schemas are only referenced from the `x-websocket-messages`
+#   extension, which no-unused-components does not follow.
+openapi.yaml:
+  operation-4xx-response:
+    - '#/paths/~1health/get/responses'
+  operation-2xx-response:
+    - '#/paths/~1v1~1ws/get/responses'
+  no-unused-components:
+    - '#/components/schemas/WebSocketClientMessage'
+    - '#/components/schemas/WebSocketServerMessage'

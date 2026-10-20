@@ -178,6 +178,9 @@ The API contract is maintained in `apps/api-spec/openapi.yaml` (and related file
 - Implemented endpoints match `apps/api-spec/openapi.yaml`.
 - Contract tests pass against running backend container.
 - CI enforces contract tests for API changes.
+- Enforced in CI: `apps/backend/src/openapi-spec.test.ts` compares the registered Fastify routes with the spec's
+  paths, the contract tests validate every response against the spec's schemas, the spec is linted
+  (`npm run lint -w apps/api-spec`), and the openclaw CLI tests check its requests against the spec's paths.
 
 ### Milestone C: End-to-end sharing flow
 - Device A can create and share a list.

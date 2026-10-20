@@ -1,14 +1,31 @@
 import crypto from 'node:crypto'
 
-import { describe, expect, it } from 'vitest'
+import { type InjectOptions } from 'fastify'
+import { afterEach, describe, expect, it } from 'vitest'
 import { z } from 'zod'
 
-import { buildServer } from './server.js'
+import { buildServer, type BuildServerOptions } from './server.js'
 import { InMemoryListRepository } from './test/in-memory-list-repository.js'
+import { checkResponsesAgainstSpec } from './test/openapi-spec.js'
+
+// Every response in these tests must also match apps/api-spec/openapi.yaml.
+let specViolations: string[][] = []
+
+function buildSpecCheckedServer(options: BuildServerOptions) {
+  const app = buildServer(options)
+  specViolations.push(checkResponsesAgainstSpec(app).violations)
+  return app
+}
+
+afterEach(() => {
+  const violations = specViolations.flat()
+  specViolations = []
+  expect(violations).toEqual([])
+})
 
 describe('sharing API contract basics', () => {
   it('allows a client to create a new list using a self-generated list id via PUT', async () => {
-    const app = buildServer({ listRepository: new InMemoryListRepository() })
+    const app = buildSpecCheckedServer({ listRepository: new InMemoryListRepository() })
     const listId = crypto.randomUUID()
 
     const createResponse = await app.inject({
@@ -39,7 +56,7 @@ describe('sharing API contract basics', () => {
   })
 
   it('creates a list and returns listId', async () => {
-    const app = buildServer({ listRepository: new InMemoryListRepository() })
+    const app = buildSpecCheckedServer({ listRepository: new InMemoryListRepository() })
 
     const response = await app.inject({
       method: 'PUT',
@@ -55,7 +72,7 @@ describe('sharing API contract basics', () => {
   })
 
   it('rejects putting an existing list without required X-Device-Id header', async () => {
-    const app = buildServer({ listRepository: new InMemoryListRepository() })
+    const app = buildSpecCheckedServer({ listRepository: new InMemoryListRepository() })
 
     await app.inject({
       method: 'PUT',
@@ -76,7 +93,7 @@ describe('sharing API contract basics', () => {
   })
 
   it('requires X-Device-Id header for protected routes', async () => {
-    const app = buildServer({ listRepository: new InMemoryListRepository() })
+    const app = buildSpecCheckedServer({ listRepository: new InMemoryListRepository() })
 
     const response = await app.inject({ method: 'GET', url: '/v1/lists/11111111-1111-4111-8111-111111111111' })
 
@@ -87,7 +104,7 @@ describe('sharing API contract basics', () => {
 
   it('forbids devices without list access on protected routes', async () => {
     const repository = new InMemoryListRepository()
-    const app = buildServer({ listRepository: repository })
+    const app = buildSpecCheckedServer({ listRepository: repository })
 
     await app.inject({
       method: 'PUT',
@@ -109,7 +126,7 @@ describe('sharing API contract basics', () => {
 
   it('allows list item updates for the list creator without a redemption record', async () => {
     const repository = new InMemoryListRepository()
-    const app = buildServer({ listRepository: repository })
+    const app = buildSpecCheckedServer({ listRepository: repository })
 
     await app.inject({
       method: 'PUT',
@@ -140,7 +157,7 @@ describe('sharing API contract basics', () => {
 
   it('accepts item updatedAt values with explicit UTC offsets', async () => {
     const repository = new InMemoryListRepository()
-    const app = buildServer({ listRepository: repository })
+    const app = buildSpecCheckedServer({ listRepository: repository })
 
     await app.inject({
       method: 'PUT',
@@ -169,7 +186,7 @@ describe('sharing API contract basics', () => {
 
   it('auto-assigns category from item name when category is omitted and defaults language to en', async () => {
     const repository = new InMemoryListRepository()
-    const app = buildServer({ listRepository: repository })
+    const app = buildSpecCheckedServer({ listRepository: repository })
 
     await app.inject({
       method: 'PUT',
@@ -209,7 +226,7 @@ describe('sharing API contract basics', () => {
 
   it('auto-assigns category using the provided language when category is omitted', async () => {
     const repository = new InMemoryListRepository()
-    const app = buildServer({ listRepository: repository })
+    const app = buildSpecCheckedServer({ listRepository: repository })
 
     await app.inject({
       method: 'PUT',
@@ -250,7 +267,7 @@ describe('sharing API contract basics', () => {
 
   it('infers the language from existing list items when category and language are omitted', async () => {
     const repository = new InMemoryListRepository()
-    const app = buildServer({ listRepository: repository })
+    const app = buildSpecCheckedServer({ listRepository: repository })
 
     await app.inject({
       method: 'PUT',
@@ -302,7 +319,7 @@ describe('sharing API contract basics', () => {
 
   it('allows redeem route before token redemption and records redemption', async () => {
     const repository = new InMemoryListRepository()
-    const app = buildServer({ listRepository: repository })
+    const app = buildSpecCheckedServer({ listRepository: repository })
 
     await app.inject({
       method: 'PUT',
@@ -332,7 +349,7 @@ describe('sharing API contract basics', () => {
 
   it('creates a secondary share token only for redeemed devices', async () => {
     const repository = new InMemoryListRepository()
-    const app = buildServer({ listRepository: repository })
+    const app = buildSpecCheckedServer({ listRepository: repository })
 
     await app.inject({
       method: 'PUT',
@@ -378,7 +395,7 @@ describe('sharing API contract basics', () => {
 
   it('forbids creating a secondary share token for non-redeemed devices', async () => {
     const repository = new InMemoryListRepository()
-    const app = buildServer({ listRepository: repository })
+    const app = buildSpecCheckedServer({ listRepository: repository })
 
     await app.inject({
       method: 'PUT',
@@ -400,7 +417,7 @@ describe('sharing API contract basics', () => {
 
   it('accepts repeated redemption calls for the same device and token', async () => {
     const repository = new InMemoryListRepository()
-    const app = buildServer({ listRepository: repository })
+    const app = buildSpecCheckedServer({ listRepository: repository })
 
     await app.inject({
       method: 'PUT',
@@ -438,7 +455,7 @@ describe('sharing API contract basics', () => {
   })
 
   it('keeps list metadata version independent from newer item activity', async () => {
-    const app = buildServer({ listRepository: new InMemoryListRepository() })
+    const app = buildSpecCheckedServer({ listRepository: new InMemoryListRepository() })
     const listId = '77777777-7777-4777-8777-777777777777'
     const itemId = '88888888-8888-4888-8888-888888888888'
     const deviceId = '99999999-9999-4999-8999-999999999999'
@@ -485,4 +502,76 @@ describe('sharing API contract basics', () => {
     await app.close()
   })
 
+
+  // Every response status documented in openapi.yaml that the tests above do
+  // not produce, so a changed status code or body is caught by the spec check.
+  it('matches openapi.yaml for the remaining documented responses', async () => {
+    const repository = new InMemoryListRepository()
+    const app = buildSpecCheckedServer({ listRepository: repository, logger: false })
+    const creator = { 'x-device-id': '11111111-1111-4111-8111-111111111111' }
+    const otherDevice = { 'x-device-id': '22222222-2222-4222-8222-222222222222' }
+    const listId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+    const otherListId = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc'
+    const itemId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
+    const item = { name: 'Milk', deleted: false, updatedAt: '2026-01-01T00:00:00.000Z' }
+    const statusOf = async (options: InjectOptions) => (await app.inject(options)).statusCode
+
+    expect(await statusOf({ method: 'GET', url: '/health' })).toBe(200)
+    repository.ping = async () => {
+      throw new Error('database down')
+    }
+    expect(await statusOf({ method: 'GET', url: '/health' })).toBe(503)
+
+    expect(await statusOf({ method: 'PUT', url: `/v1/lists/${listId}`, headers: creator, payload: { name: 'A' } })).toBe(201)
+    expect(await statusOf({ method: 'PUT', url: `/v1/lists/${listId}`, headers: creator, payload: { name: 'B' } })).toBe(200)
+    expect(await statusOf({ method: 'PUT', url: `/v1/lists/${otherListId}`, headers: creator, payload: { name: 'C' } })).toBe(201)
+    expect(await statusOf({ method: 'PUT', url: `/v1/lists/${listId}`, headers: otherDevice, payload: { name: 'D' } })).toBe(403)
+    expect(await statusOf({ method: 'PUT', url: `/v1/lists/${listId}`, headers: creator, payload: { name: '' } })).toBe(400)
+
+    const itemUrl = `/v1/lists/${listId}/items/${itemId}`
+    expect(await statusOf({ method: 'GET', url: itemUrl, headers: creator })).toBe(404)
+    expect(await statusOf({ method: 'PUT', url: itemUrl, headers: creator, payload: item })).toBe(201)
+    expect(await statusOf({ method: 'PUT', url: itemUrl, headers: creator, payload: { ...item, updatedAt: '2026-01-02T00:00:00.000Z' } })).toBe(204)
+    expect(await statusOf({ method: 'PUT', url: itemUrl, headers: creator, payload: { ...item, name: '' } })).toBe(400)
+    expect(await statusOf({ method: 'PUT', url: itemUrl, headers: otherDevice, payload: item })).toBe(403)
+    expect(
+      await statusOf({ method: 'PUT', url: `/v1/lists/${otherListId}/items/${itemId}`, headers: creator, payload: item }),
+    ).toBe(409)
+    expect(await statusOf({ method: 'GET', url: itemUrl, headers: creator })).toBe(200)
+    expect(await statusOf({ method: 'GET', url: itemUrl, headers: otherDevice })).toBe(403)
+    expect(await statusOf({ method: 'GET', url: `/v1/lists/${listId}/items/not-a-uuid`, headers: creator })).toBe(400)
+
+    const itemsUrl = `/v1/lists/${listId}/items`
+    expect(await statusOf({ method: 'GET', url: `${itemsUrl}?updatedAfter=2025-01-01T00:00:00.000Z`, headers: creator })).toBe(200)
+    expect(await statusOf({ method: 'GET', url: `${itemsUrl}?updatedAfter=2025-01-01T00:00:00+01:00`, headers: creator })).toBe(400)
+    expect(await statusOf({ method: 'GET', url: `${itemsUrl}?updatedAfter=2025-01-01T00:00:00.000Z`, headers: otherDevice })).toBe(403)
+
+    expect(await statusOf({ method: 'GET', url: `/v1/lists/${listId}`, headers: creator })).toBe(200)
+    expect(await statusOf({ method: 'GET', url: `/v1/lists/${listId}` })).toBe(400)
+    expect(await statusOf({ method: 'GET', url: `/v1/lists/${listId}`, headers: otherDevice })).toBe(403)
+
+    expect(await statusOf({ method: 'POST', url: `/v1/lists/${listId}/share-tokens`, headers: otherDevice })).toBe(403)
+    expect(await statusOf({ method: 'POST', url: `/v1/lists/${listId}/share-tokens` })).toBe(400)
+    const redeemUrl = `/v1/share-tokens/${crypto.randomUUID()}/redeem`
+    expect(await statusOf({ method: 'POST', url: redeemUrl, headers: otherDevice })).toBe(401)
+    expect(await statusOf({ method: 'POST', url: redeemUrl })).toBe(400)
+
+    expect(await statusOf({ method: 'DELETE', url: `/v1/lists/${listId}`, headers: otherDevice })).toBe(403)
+    expect(await statusOf({ method: 'DELETE', url: `/v1/lists/${listId}` })).toBe(400)
+    expect(await statusOf({ method: 'DELETE', url: `/v1/lists/${listId}`, headers: creator })).toBe(204)
+
+    // Without an Upgrade header the WebSocket route answers 404.
+    expect(await statusOf({ method: 'GET', url: '/v1/ws' })).toBe(404)
+    // Excluded from the spec check: Fastify's HEAD routes and CORS preflight.
+    expect(await statusOf({ method: 'HEAD', url: '/health' })).toBe(503)
+    expect(
+      await statusOf({
+        method: 'OPTIONS',
+        url: `/v1/lists/${listId}`,
+        headers: { origin: 'https://go-list.app', 'access-control-request-method': 'PUT' },
+      }),
+    ).toBe(204)
+
+    await app.close()
+  })
 })

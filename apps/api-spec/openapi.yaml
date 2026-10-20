@@ -2,13 +2,25 @@ openapi: 3.1.0
 info:
   title: GoList Sharing API
   version: v1
+  description: |
+    REST + WebSocket API of the GoList backend (`apps/backend`). There is no bearer auth: callers
+    identify themselves with a client-generated `X-Device-Id` UUID, and list access is granted by
+    creating the list or by redeeming one of its share tokens.
+
+    Keep this file in sync with the Fastify routes; `apps/backend/src/openapi-spec.test.ts` fails
+    when routes and paths diverge or a contract-test response does not match these schemas.
+  license:
+    name: GPL-3.0-only
+    url: https://www.gnu.org/licenses/gpl-3.0.html
 servers:
-  - url: https://api.example.com
+  - url: https://go-list.app/api
 components:
   securitySchemes:
-    BearerAuth:
-      type: http
-      scheme: bearer
+    DeviceId:
+      type: apiKey
+      in: header
+      name: X-Device-Id
+      description: Client-generated device UUID, persisted and sent on every request.
   parameters:
     ShareToken:
       name: shareToken
@@ -35,22 +47,32 @@ components:
       name: updatedAfter
       in: query
       required: true
+      description: UTC timestamp with a `Z` suffix (offsets such as `+01:00` are rejected with 400).
       schema:
         type: string
         format: date-time
-    DeviceIdHeader:
-      name: X-Device-Id
-      in: header
-      required: true
-      schema:
-        type: string
-        format: uuid
   schemas:
+    ErrorResponse:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+    HealthResponse:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [ok, error]
     ListItem:
       type: object
-      required: [id, name, iconName, category, deleted, createdAt, updatedAt]
+      required: [id, listId, name, iconName, category, deleted, createdAt, updatedAt]
       properties:
         id:
+          type: string
+          format: uuid
+        listId:
           type: string
           format: uuid
         name:
@@ -62,12 +84,7 @@ components:
           type: string
         category:
           type: string
-          description: Item category id. If omitted for creates or name changes, the server derives it from item name and language.
-        language:
-          type: string
-          enum: [en, de, es]
-          default: en
-          description: Language used for server-side category mapping when category is omitted.
+          description: Item category id (derived by the server from the item name when a write omits it).
         deleted:
           type: boolean
         createdAt:
@@ -101,6 +118,7 @@ components:
       properties:
         name:
           type: string
+          minLength: 1
         updatedAt:
           type: string
           format: date-time
@@ -117,19 +135,24 @@ components:
       properties:
         name:
           type: string
+          minLength: 1
         iconName:
           type: string
+          minLength: 1
           description: Optional item icon asset name. If omitted for creates or name changes, the server derives it from item name and language.
         quantityOrUnit:
           type: string
+          minLength: 1
         category:
           type: string
+          minLength: 1
           description: Item category id. If omitted for creates or name changes, the server derives it from item name and language.
         language:
           type: string
           enum: [en, de, es]
-          default: en
-          description: Language used for server-side category mapping when category is omitted.
+          description: |
+            Language used for server-side category/icon mapping when category or iconName is omitted.
+            If omitted too, the server infers it from the other items on the list (falling back to `en`).
         deleted:
           type: boolean
         updatedAt:
@@ -185,18 +208,34 @@ components:
         updatedAt:
           type: integer
     SyncItem:
-      allOf:
-        - $ref: "#/components/schemas/ListItem"
-        - type: object
-          required: [listId]
-          properties:
-            listId:
-              type: string
-              format: uuid
-            createdAt:
-              type: integer
-            updatedAt:
-              type: integer
+      description: Item state as carried in WebSocket `item_patch` messages (timestamps in epoch milliseconds).
+      type: object
+      required: [id, listId, name, iconName, category, deleted, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        listId:
+          type: string
+          format: uuid
+        name:
+          type: string
+          minLength: 1
+        iconName:
+          type: string
+          minLength: 1
+        quantityOrUnit:
+          type: string
+          minLength: 1
+        category:
+          type: string
+          minLength: 1
+        deleted:
+          type: boolean
+        createdAt:
+          type: integer
+        updatedAt:
+          type: integer
     WebSocketClientMessage:
       description: Client-to-server websocket sync messages.
       oneOf:
@@ -327,16 +366,49 @@ components:
               const: error
             message:
               type: string
+  responses:
+    BadRequest:
+      description: Malformed path parameter, `X-Device-Id` header, query or body
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Forbidden:
+      description: The device has no access to this list (neither created it nor redeemed one of its share tokens)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
 security:
-  - BearerAuth: []
+  - DeviceId: []
 paths:
+  /health:
+    get:
+      operationId: getHealth
+      security: []
+      summary: Health check (also pings the database)
+      responses:
+        "200":
+          description: Backend and database are reachable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+        "503":
+          description: Database query failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
   /v1/lists/{listId}:
     parameters:
       - $ref: "#/components/parameters/ListId"
-      - $ref: "#/components/parameters/DeviceIdHeader"
     put:
-      summary: Upsert list
-      security: []
+      operationId: upsertList
+      summary: Create a list with a client-generated id, or rename it
+      description: |
+        Creates the list (the calling device becomes its creator) or renames it. A rename with an
+        `updatedAt` older than the stored one is ignored and still answered with 200.
       requestBody:
         required: true
         content:
@@ -351,14 +423,17 @@ paths:
               schema:
                 $ref: "#/components/schemas/ListCreateResponse"
         "200":
-          description: Existing list updated
+          description: Existing list updated (or the write was older than the stored state)
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ListCreateResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
         "403":
-          description: Existing list update requires caller access to that list
+          $ref: "#/components/responses/Forbidden"
     get:
+      operationId: getList
       summary: Fetch list by list id
       responses:
         "200":
@@ -367,18 +442,25 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ListDocument"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
     delete:
+      operationId: deleteList
       summary: Delete list (creator device only)
       responses:
         "204":
           description: List deleted
+        "400":
+          $ref: "#/components/responses/BadRequest"
         "403":
-          description: Only the creator device may delete the list
+          $ref: "#/components/responses/Forbidden"
   /v1/lists/{listId}/items:
     parameters:
       - $ref: "#/components/parameters/ListId"
-      - $ref: "#/components/parameters/DeviceIdHeader"
     get:
+      operationId: listItemsUpdatedAfter
       summary: Fetch items updated after timestamp
       parameters:
         - $ref: "#/components/parameters/UpdatedAfter"
@@ -389,12 +471,16 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UpdatedItemsResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
   /v1/lists/{listId}/items/{itemId}:
     parameters:
       - $ref: "#/components/parameters/ListId"
-      - $ref: "#/components/parameters/DeviceIdHeader"
       - $ref: "#/components/parameters/ItemId"
     get:
+      operationId: getItem
       summary: Fetch item by id
       responses:
         "200":
@@ -403,8 +489,20 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ListItem"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          description: Item not found in this list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
     put:
+      operationId: upsertItem
       summary: Upsert item in list
+      description: Last write wins by `updatedAt`; an older write is ignored and still answered with 204.
       requestBody:
         required: true
         content:
@@ -415,21 +513,31 @@ paths:
         "201":
           description: Item created
         "204":
-          description: Item updated
+          description: Item updated (or the write was older than the stored state)
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
         "409":
           description: Item id belongs to another list
-
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /v1/ws:
     get:
+      operationId: syncWebSocket
+      security: []
       summary: WebSocket endpoint for realtime list item synchronization
       description: |
         Upgrades to a websocket connection. Client must send `hello` first, then list-scoped
         subscribe/unsubscribe and digest/hash/item-patch messages as documented in
         `docs/websocket-sync-protocol.md`.
-      security: []
       responses:
         "101":
           description: Switching Protocols (WebSocket upgrade)
+        "404":
+          description: Not a WebSocket upgrade request
       x-websocket-messages:
         client:
           $ref: "#/components/schemas/WebSocketClientMessage"
@@ -438,9 +546,10 @@ paths:
   /v1/share-tokens/{shareToken}/redeem:
     parameters:
       - $ref: "#/components/parameters/ShareToken"
-      - $ref: "#/components/parameters/DeviceIdHeader"
     post:
+      operationId: redeemShareToken
       summary: Redeem a share token for the requesting device
+      description: Grants the device access to the token's list. Redeeming the same token again is allowed.
       responses:
         "200":
           description: Share token redeemed
@@ -448,12 +557,20 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ShareTokenRedeemResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          description: Unknown share token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /v1/lists/{listId}/share-tokens:
     parameters:
       - $ref: "#/components/parameters/ListId"
-      - $ref: "#/components/parameters/DeviceIdHeader"
     post:
-      summary: Create additional share token for a list
+      operationId: createShareToken
+      summary: Create an additional share token for a list the device has access to
       responses:
         "201":
           description: Share token created
@@ -461,3 +578,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ShareTokenCreateResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"

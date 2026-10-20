@@ -17,6 +17,9 @@ from pathlib import Path
 from typing import Any
 
 API_BASE_URL = "https://go-list.app/api"
+# The production API rejects cross-origin callers it does not recognize, so
+# requests present themselves as the GoList web app.
+API_ORIGIN = "https://go-list.app"
 STATE_FILE_ENV = "OPENCLAW_STATE_FILE"
 DEFAULT_STATE_FILE = Path.home() / ".openclaw_golist_state.json"
 
@@ -115,6 +118,7 @@ def ensure_device_id(state: RuntimeState) -> str:
 def build_headers(device_id: str, include_json: bool = True) -> dict[str, str]:
     headers = {
         "X-Device-Id": device_id,
+        "Origin": API_ORIGIN,
     }
     if include_json:
         headers["Content-Type"] = "application/json"
@@ -315,6 +319,11 @@ def find_item_by_name(list_payload: dict[str, Any], name: str) -> dict[str, Any]
     return None
 
 
+def existing_quantity(item: dict[str, Any] | None) -> str | None:
+    quantity = item.get("quantityOrUnit") if isinstance(item, dict) else None
+    return quantity if isinstance(quantity, str) and quantity else None
+
+
 def cmd_upsert(state: RuntimeState, args: argparse.Namespace) -> None:
     device_id = ensure_device_id(state)
     known_list = resolve_list_reference(state, args.list)
@@ -330,8 +339,12 @@ def cmd_upsert(state: RuntimeState, args: argparse.Namespace) -> None:
         "deleted": bool(args.deleted),
         "updatedAt": now_iso(),
     }
-    if args.quantity is not None:
-        body["quantityOrUnit"] = args.quantity
+    # The server clears quantityOrUnit when a write omits it, so keep the
+    # existing one unless --quantity was given ("" clears it: the API rejects
+    # an empty quantityOrUnit, so omitting the field is how to clear it).
+    quantity = args.quantity if args.quantity is not None else existing_quantity(existing_item)
+    if quantity:
+        body["quantityOrUnit"] = quantity
 
     payload = api_request("PUT", f"/v1/lists/{known_list.id}/items/{item_id}", device_id=device_id, body=body)
 
@@ -352,11 +365,15 @@ def cmd_delete(state: RuntimeState, args: argparse.Namespace) -> None:
     if not isinstance(item_id, str) or not isinstance(item_name, str):
         raise CliError("Found item but it is missing required fields in API response.")
 
-    body = {
+    body: dict[str, Any] = {
         "name": item_name,
         "deleted": True,
         "updatedAt": now_iso(),
     }
+    # Keep the quantity so restoring the item brings it back.
+    quantity = existing_quantity(existing_item)
+    if quantity:
+        body["quantityOrUnit"] = quantity
 
     payload = api_request("PUT", f"/v1/lists/{known_list.id}/items/{item_id}", device_id=device_id, body=body)
 
@@ -380,7 +397,7 @@ def cmd_share(state: RuntimeState, args: argparse.Namespace) -> None:
             {
                 "list": {"id": known_list.id, "name": known_list.name},
                 "shareToken": share_token,
-                "shareUrl": f"https://go-list.app/?shareToken={share_token}",
+                "shareUrl": f"{API_ORIGIN}/?shareToken={share_token}",
             },
             indent=2,
         )
@@ -431,7 +448,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     upsert_parser = subparsers.add_parser("upsert", help="Create/update an item by name")
     upsert_parser.add_argument("name", help="Item name")
-    upsert_parser.add_argument("--quantity", help="Optional quantity/unit text")
+    upsert_parser.add_argument(
+        "--quantity", help='Optional quantity/unit text. Omit to keep the existing one; "" clears it'
+    )
     upsert_parser.add_argument("--deleted", action="store_true", help="Optionally mark the item as deleted (default: false)")
     upsert_parser.add_argument("--list", help="Optional list id or name. Defaults to active list")
     upsert_parser.set_defaults(func=cmd_upsert)
@@ -446,7 +465,7 @@ def build_parser() -> argparse.ArgumentParser:
     share_parser.set_defaults(func=cmd_share)
 
     sync_parser = subparsers.add_parser("sync", help="Fetch items updated after a timestamp")
-    sync_parser.add_argument("updated_after", help="ISO timestamp")
+    sync_parser.add_argument("updated_after", help="UTC ISO timestamp with Z suffix, e.g. 2026-01-01T00:00:00Z")
     sync_parser.add_argument("--list", help="Optional list id or name. Defaults to active list")
     sync_parser.set_defaults(func=cmd_sync)
 

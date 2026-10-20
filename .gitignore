@@ -12,3 +12,6 @@ apps/web/playwright-report/
 apps/web/.e2e-logs/
 # Throwaway exploration specs (see AGENTS.md testing playbook)
 apps/web/e2e/scratch/
+
+# Python bytecode (apps/openclaw tests)
+__pycache__/

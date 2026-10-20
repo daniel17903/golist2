@@ -3,6 +3,14 @@
 ## Repository layout (monorepo)
 - `apps/web/` contains the existing React + TypeScript + Vite PWA.
 - `apps/backend/` contains a Fastify + TypeScript backend scaffold with env validation, a `/health` endpoint, and local Docker Compose config (`apps/backend/docker-compose.yml`).
+- `apps/api-spec/` holds `openapi.yaml`, the REST/WebSocket API spec (published as Redoc docs via its `Dockerfile`).
+  `npm run lint -w apps/api-spec` lints it (Redocly `recommended-strict`, config in `redocly.yaml`);
+  `apps/backend/src/openapi-spec.test.ts` fails when the registered Fastify routes and the spec's paths diverge, and
+  the contract tests (`server.contract.test.ts`) validate every response against the spec's schemas
+  (helpers in `apps/backend/src/test/openapi-spec.ts`).
+- `apps/openclaw/` is an OpenClaw skill (`SKILL.md`) plus a stdlib-only Python CLI (`golist_cli.py`) that calls the
+  **production** API. `test_golist_cli.py` (unittest, mocked HTTP) checks each command's requests (URL, method,
+  `X-Device-Id`/`Origin` headers, payload) and that every request path exists in `openapi.yaml`.
 - `packages/shared/` contains shared domain code that can be reused by web and backend (currently shared types).
 - `apps/web/sim/` is the in-process multi-device sync simulation (real web store + sync client against the real backend); see `apps/web/sim/README.md`.
 - `scripts/` holds repo tooling: `agent-setup.sh` (container setup, also run by the Claude Code SessionStart hook in `.claude/`), `local-postgres.sh` (throwaway local database), `verify.mjs` (runs the right checks).
@@ -66,6 +74,8 @@
 
 ## CI/CD
 - GitHub Actions `ci.yml` workflow validates `lint`, `typecheck`, `test` (incl. the sync simulation) and `build` for the web workspace plus backend `lint`/`typecheck`/`test` on PRs, and runs the Playwright E2E suite against both the in-memory and the Postgres backend. Failed E2E runs upload traces, per-device WebSocket frames/console logs and the backend log as the `e2e-<backend>-artifacts` artifact.
+- `ci.yml` also lints `apps/api-spec/openapi.yaml` (in the `validate` job) and runs the openclaw CLI tests
+  (`openclaw-cli` job, Python via `actions/setup-python`).
 - GitHub Actions `backend-bootstrap.yml` runs backend `lint` + `typecheck` + `db:migrate` + `test` (against ephemeral Postgres) on PRs that touch `apps/backend/**`.
 - Deploy workflow builds on `main`.
 
@@ -79,6 +89,11 @@
   is set — use `eval "$(scripts/local-postgres.sh)"` locally.
 - Run `npm run test:e2e -w apps/web` for changes to UI flows, the store, sync or backend routes
   (with `E2E_BACKEND=postgres` too when touching the Postgres repository).
+- **When changing backend routes** (paths, methods, status codes, request or response shapes): update
+  `apps/api-spec/openapi.yaml` in the same PR, run `npm run lint -w apps/api-spec` and `npm run test -w apps/backend`,
+  and check `apps/openclaw/golist_cli.py` (+ `SKILL.md`) still matches — then run
+  `python3 -m unittest discover -s apps/openclaw`. `npm run verify:changed` picks these up for spec, openclaw and
+  backend route changes.
 - Run `npm run db:migrate -w apps/backend` for backend schema/migration changes.
 - Run `npm run build -w apps/web` for changes that touch PWA assets or build config; run `npm run build -w apps/backend` when backend runtime/build config changes.
 
