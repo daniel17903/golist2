@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "lint": "redocly lint openapi.yaml",
     "build": "redocly build-docs openapi.yaml --output dist/index.html"
   },
   "devDependencies": {

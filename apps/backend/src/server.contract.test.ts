@@ -1,14 +1,30 @@
 import crypto from 'node:crypto'
 
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import { z } from 'zod'
 
-import { buildServer } from './server.js'
+import { buildServer, type BuildServerOptions } from './server.js'
 import { InMemoryListRepository } from './test/in-memory-list-repository.js'
+import { checkResponsesAgainstSpec } from './test/openapi-spec.js'
+
+// Every response in these tests must also match apps/api-spec/openapi.yaml.
+let specViolations: string[] = []
+
+function buildSpecCheckedServer(options: BuildServerOptions) {
+  const app = buildServer(options)
+  specViolations = checkResponsesAgainstSpec(app).violations
+  return app
+}
+
+afterEach(() => {
+  const violations = specViolations
+  specViolations = []
+  expect(violations).toEqual([])
+})
 
 describe('sharing API contract basics', () => {
   it('allows a client to create a new list using a self-generated list id via PUT', async () => {
-    const app = buildServer({ listRepository: new InMemoryListRepository() })
+    const app = buildSpecCheckedServer({ listRepository: new InMemoryListRepository() })
     const listId = crypto.randomUUID()
 
     const createResponse = await app.inject({
@@ -39,7 +55,7 @@ describe('sharing API contract basics', () => {
   })
 
   it('creates a list and returns listId', async () => {
-    const app = buildServer({ listRepository: new InMemoryListRepository() })
+    const app = buildSpecCheckedServer({ listRepository: new InMemoryListRepository() })
 
     const response = await app.inject({
       method: 'PUT',
@@ -55,7 +71,7 @@ describe('sharing API contract basics', () => {
   })
 
   it('rejects putting an existing list without required X-Device-Id header', async () => {
-    const app = buildServer({ listRepository: new InMemoryListRepository() })
+    const app = buildSpecCheckedServer({ listRepository: new InMemoryListRepository() })
 
     await app.inject({
       method: 'PUT',
@@ -76,7 +92,7 @@ describe('sharing API contract basics', () => {
   })
 
   it('requires X-Device-Id header for protected routes', async () => {
-    const app = buildServer({ listRepository: new InMemoryListRepository() })
+    const app = buildSpecCheckedServer({ listRepository: new InMemoryListRepository() })
 
     const response = await app.inject({ method: 'GET', url: '/v1/lists/11111111-1111-4111-8111-111111111111' })
 
@@ -87,7 +103,7 @@ describe('sharing API contract basics', () => {
 
   it('forbids devices without list access on protected routes', async () => {
     const repository = new InMemoryListRepository()
-    const app = buildServer({ listRepository: repository })
+    const app = buildSpecCheckedServer({ listRepository: repository })
 
     await app.inject({
       method: 'PUT',
@@ -109,7 +125,7 @@ describe('sharing API contract basics', () => {
 
   it('allows list item updates for the list creator without a redemption record', async () => {
     const repository = new InMemoryListRepository()
-    const app = buildServer({ listRepository: repository })
+    const app = buildSpecCheckedServer({ listRepository: repository })
 
     await app.inject({
       method: 'PUT',
@@ -140,7 +156,7 @@ describe('sharing API contract basics', () => {
 
   it('accepts item updatedAt values with explicit UTC offsets', async () => {
     const repository = new InMemoryListRepository()
-    const app = buildServer({ listRepository: repository })
+    const app = buildSpecCheckedServer({ listRepository: repository })
 
     await app.inject({
       method: 'PUT',
@@ -169,7 +185,7 @@ describe('sharing API contract basics', () => {
 
   it('auto-assigns category from item name when category is omitted and defaults language to en', async () => {
     const repository = new InMemoryListRepository()
-    const app = buildServer({ listRepository: repository })
+    const app = buildSpecCheckedServer({ listRepository: repository })
 
     await app.inject({
       method: 'PUT',
@@ -209,7 +225,7 @@ describe('sharing API contract basics', () => {
 
   it('auto-assigns category using the provided language when category is omitted', async () => {
     const repository = new InMemoryListRepository()
-    const app = buildServer({ listRepository: repository })
+    const app = buildSpecCheckedServer({ listRepository: repository })
 
     await app.inject({
       method: 'PUT',
@@ -250,7 +266,7 @@ describe('sharing API contract basics', () => {
 
   it('infers the language from existing list items when category and language are omitted', async () => {
     const repository = new InMemoryListRepository()
-    const app = buildServer({ listRepository: repository })
+    const app = buildSpecCheckedServer({ listRepository: repository })
 
     await app.inject({
       method: 'PUT',
@@ -302,7 +318,7 @@ describe('sharing API contract basics', () => {
 
   it('allows redeem route before token redemption and records redemption', async () => {
     const repository = new InMemoryListRepository()
-    const app = buildServer({ listRepository: repository })
+    const app = buildSpecCheckedServer({ listRepository: repository })
 
     await app.inject({
       method: 'PUT',
@@ -332,7 +348,7 @@ describe('sharing API contract basics', () => {
 
   it('creates a secondary share token only for redeemed devices', async () => {
     const repository = new InMemoryListRepository()
-    const app = buildServer({ listRepository: repository })
+    const app = buildSpecCheckedServer({ listRepository: repository })
 
     await app.inject({
       method: 'PUT',
@@ -378,7 +394,7 @@ describe('sharing API contract basics', () => {
 
   it('forbids creating a secondary share token for non-redeemed devices', async () => {
     const repository = new InMemoryListRepository()
-    const app = buildServer({ listRepository: repository })
+    const app = buildSpecCheckedServer({ listRepository: repository })
 
     await app.inject({
       method: 'PUT',
@@ -400,7 +416,7 @@ describe('sharing API contract basics', () => {
 
   it('accepts repeated redemption calls for the same device and token', async () => {
     const repository = new InMemoryListRepository()
-    const app = buildServer({ listRepository: repository })
+    const app = buildSpecCheckedServer({ listRepository: repository })
 
     await app.inject({
       method: 'PUT',
@@ -438,7 +454,7 @@ describe('sharing API contract basics', () => {
   })
 
   it('keeps list metadata version independent from newer item activity', async () => {
-    const app = buildServer({ listRepository: new InMemoryListRepository() })
+    const app = buildSpecCheckedServer({ listRepository: new InMemoryListRepository() })
     const listId = '77777777-7777-4777-8777-777777777777'
     const itemId = '88888888-8888-4888-8888-888888888888'
     const deviceId = '99999999-9999-4999-8999-999999999999'

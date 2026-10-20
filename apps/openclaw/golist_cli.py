@@ -17,6 +17,9 @@ from pathlib import Path
 from typing import Any
 
 API_BASE_URL = "https://go-list.app/api"
+# The production API rejects cross-origin callers it does not recognize, so
+# requests present themselves as the GoList web app.
+API_ORIGIN = "https://go-list.app"
 STATE_FILE_ENV = "OPENCLAW_STATE_FILE"
 DEFAULT_STATE_FILE = Path.home() / ".openclaw_golist_state.json"
 
@@ -115,6 +118,7 @@ def ensure_device_id(state: RuntimeState) -> str:
 def build_headers(device_id: str, include_json: bool = True) -> dict[str, str]:
     headers = {
         "X-Device-Id": device_id,
+        "Origin": API_ORIGIN,
     }
     if include_json:
         headers["Content-Type"] = "application/json"
@@ -330,7 +334,8 @@ def cmd_upsert(state: RuntimeState, args: argparse.Namespace) -> None:
         "deleted": bool(args.deleted),
         "updatedAt": now_iso(),
     }
-    if args.quantity is not None:
+    # The API rejects an empty quantityOrUnit; omit it instead.
+    if args.quantity:
         body["quantityOrUnit"] = args.quantity
 
     payload = api_request("PUT", f"/v1/lists/{known_list.id}/items/{item_id}", device_id=device_id, body=body)
@@ -380,7 +385,7 @@ def cmd_share(state: RuntimeState, args: argparse.Namespace) -> None:
             {
                 "list": {"id": known_list.id, "name": known_list.name},
                 "shareToken": share_token,
-                "shareUrl": f"https://go-list.app/?shareToken={share_token}",
+                "shareUrl": f"{API_ORIGIN}/?shareToken={share_token}",
             },
             indent=2,
         )
@@ -446,7 +451,7 @@ def build_parser() -> argparse.ArgumentParser:
     share_parser.set_defaults(func=cmd_share)
 
     sync_parser = subparsers.add_parser("sync", help="Fetch items updated after a timestamp")
-    sync_parser.add_argument("updated_after", help="ISO timestamp")
+    sync_parser.add_argument("updated_after", help="UTC ISO timestamp with Z suffix, e.g. 2026-01-01T00:00:00Z")
     sync_parser.add_argument("--list", help="Optional list id or name. Defaults to active list")
     sync_parser.set_defaults(func=cmd_sync)
 

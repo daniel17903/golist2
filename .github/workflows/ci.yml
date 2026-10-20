@@ -26,7 +26,22 @@ jobs:
       # backend-bootstrap.yml runs them against Postgres).
       - run: npm run lint -w apps/backend
       - run: npm run typecheck -w apps/backend
+      # Includes openapi-spec.test.ts and the contract tests, which check the
+      # registered routes and their responses against apps/api-spec/openapi.yaml.
       - run: npm run test -w apps/backend
+      - run: npm run lint -w apps/api-spec
+
+  openclaw-cli:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+      # Request construction of every CLI command (mocked HTTP, no network),
+      # checked against the paths in apps/api-spec/openapi.yaml.
+      - run: python3 -m unittest discover -s apps/openclaw -v
 
   web-e2e-playwright:
     runs-on: ubuntu-latest

@@ -1,4 +1,4 @@
-import Fastify, { type FastifyRequest } from 'fastify'
+import Fastify, { type FastifyRequest, type RouteOptions } from 'fastify'
 import cors from '@fastify/cors'
 
 import { env } from './config/env.js'
@@ -32,6 +32,9 @@ export type BuildServerOptions = {
   // Test-only: where log lines go (defaults to stdout), or `false` to
   // silence logging entirely (the web sync simulation harness).
   logger?: { stream: { write(line: string): void } } | false
+  // Test-only: called for every route as it is registered (the OpenAPI spec
+  // test uses it to compare the registered routes with openapi.yaml).
+  onRoute?: (route: RouteOptions) => void
 }
 
 export function buildServer(deps: BuildServerOptions = {}) {
@@ -57,6 +60,9 @@ export function buildServer(deps: BuildServerOptions = {}) {
       },
     },
   })
+  if (deps.onRoute) {
+    app.addHook('onRoute', deps.onRoute)
+  }
   const listRepository = deps.listRepository ?? postgresListRepository
   // Shared between the REST list/item routes and the WebSocket sync route so
   // that a write made over either transport invalidates the same cached

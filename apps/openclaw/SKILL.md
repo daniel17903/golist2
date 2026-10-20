@@ -35,7 +35,7 @@ Use `apps/openclaw/golist_cli.py` as the operational API wrapper for this skill.
 - Generates and persists device id when missing.
 - Generates list IDs and item IDs when creating entities.
 - Generates item `updatedAt` timestamps on write operations.
-- Automatically sends `X-Device-Id` on every request.
+- Automatically sends `X-Device-Id` (and `Origin: https://go-list.app`, which the production API expects) on every request.
 - Persists known lists with friendly names and IDs, and tracks an active list.
 
 ### CLI state and environment

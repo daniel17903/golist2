@@ -1,0 +1,8 @@
+# Lint config for `npm run lint -w apps/api-spec` (also run in CI).
+# recommended-strict turns every recommended warning into an error.
+extends:
+  - recommended-strict
+rules:
+  # The WebSocket message schemas are only referenced from the
+  # `x-websocket-messages` extension, which this rule does not follow.
+  no-unused-components: off
