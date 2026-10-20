@@ -582,6 +582,41 @@ body {
   -moz-appearance: none;
 }
 
+.invite-landing p {
+  margin: 0;
+  color: #2f2433;
+  line-height: 1.45;
+}
+
+.invite-landing__steps {
+  margin: 0;
+  padding-left: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: #2f2433;
+  line-height: 1.45;
+}
+
+.invite-landing .invite-landing__note {
+  font-size: 14px;
+  color: #6f6a77;
+}
+
+.join-list__paste {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  margin-top: -8px;
+}
+
+.join-list__paste-error {
+  margin: 0;
+  font-size: 13px;
+  color: #b3261e;
+}
+
 .modal__actions {
   display: flex;
   justify-content: space-between;

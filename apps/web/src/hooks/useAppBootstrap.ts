@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useStore } from "../state/useStore";
 import { useI18n } from "../i18n";
+import { isIosBrowserTab, readDisplayEnvironment } from "../domain/iosBrowserTab";
 
 // Store actions are stable references — select them once at module scope.
 const { load, addList, joinSharedList, syncAllLists } = useStore.getState();
@@ -10,12 +11,18 @@ const { load, addList, joinSharedList, syncAllLists } = useStore.getState();
 type AppBootstrapOptions = {
   // Called when the share token from the URL cannot be redeemed.
   onShareLinkJoinFailed: () => void;
+  // Called instead of joining when a share link opens in an iOS browser tab,
+  // where the list would land in the browser's storage rather than in the
+  // installed home-screen app.
+  onIosShareLink: (shareToken: string) => void;
 };
 
-export const useAppBootstrap = ({ onShareLinkJoinFailed }: AppBootstrapOptions) => {
+export const useAppBootstrap = ({ onShareLinkJoinFailed, onIosShareLink }: AppBootstrapOptions) => {
   const { t } = useI18n();
   const onShareLinkJoinFailedRef = useRef(onShareLinkJoinFailed);
   useEffect(() => { onShareLinkJoinFailedRef.current = onShareLinkJoinFailed; });
+  const onIosShareLinkRef = useRef(onIosShareLink);
+  useEffect(() => { onIosShareLinkRef.current = onIosShareLink; });
   const isLoaded = useStore((s) => s.isLoaded);
   const listCount = useStore((s) => s.lists.length);
   const backendSharingEnabled = useStore((s) => s.backendSharingEnabled);
@@ -40,15 +47,25 @@ export const useAppBootstrap = ({ onShareLinkJoinFailed }: AppBootstrapOptions) 
       return;
     }
 
+    const removeShareTokenFromUrl = () => {
+      const cleanedUrl = new URL(window.location.href);
+      cleanedUrl.searchParams.delete("shareToken");
+      window.history.replaceState({}, "", cleanedUrl.toString());
+    };
+
+    if (isIosBrowserTab(readDisplayEnvironment())) {
+      onIosShareLinkRef.current(shareTokenFromUrl);
+      removeShareTokenFromUrl();
+      return;
+    }
+
     void (async () => {
       try {
         await joinSharedList(shareTokenFromUrl);
       } catch {
         onShareLinkJoinFailedRef.current();
       } finally {
-        const cleanedUrl = new URL(window.location.href);
-        cleanedUrl.searchParams.delete("shareToken");
-        window.history.replaceState({}, "", cleanedUrl.toString());
+        removeShareTokenFromUrl();
       }
     })();
   }, [isLoaded, backendSharingEnabled]);

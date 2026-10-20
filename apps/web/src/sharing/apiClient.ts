@@ -309,6 +309,9 @@ export const isBackendSharingEnabled = defaultApi.isBackendSharingEnabled;
 export const setBackendCallLogger = defaultApi.setBackendCallLogger;
 export const setActiveBackendRequestLogger = defaultApi.setActiveBackendRequestLogger;
 
+export const buildShareLink = (shareToken: string): string =>
+  `${window.location.origin}/?shareToken=${shareToken}`;
+
 export const extractShareToken = (value: string): string | null => {
   const trimmed = value.trim();
   if (!trimmed) {

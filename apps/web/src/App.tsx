@@ -12,6 +12,7 @@ import LanguageSuggestionModal from "./components/LanguageSuggestionModal";
 import ToastStacks from "./components/ToastStacks";
 
 const JoinListModal = lazy(() => import("./components/JoinListModal"));
+const InviteLandingModal = lazy(() => import("./components/InviteLandingModal"));
 const SettingsModal = lazy(() => import("./components/SettingsModal"));
 const LegalModal = lazy(() => import("./components/LegalModal"));
 const ListStatsModal = lazy(() => import("./components/ListStatsModal"));
@@ -22,6 +23,7 @@ import { useBackGestureTrap } from "./hooks/useBackGestureTrap";
 import { useCreateListDialog } from "./hooks/useCreateListDialog";
 import { useEditItemDialog } from "./hooks/useEditItemDialog";
 import { useItemExitAnimation } from "./hooks/useItemExitAnimation";
+import { useInviteLanding } from "./hooks/useInviteLanding";
 import { useJoinListDialog } from "./hooks/useJoinListDialog";
 import { useKeyboardInset } from "./hooks/useKeyboardInset";
 import { useLanguageSuggestion } from "./hooks/useLanguageSuggestion";
@@ -63,7 +65,9 @@ const App = () => {
     pushAppToast(t("sync.joinFailed"), "error");
   }, [pushAppToast, t]);
 
-  useAppBootstrap({ onShareLinkJoinFailed: handleJoinFailed });
+  const handleInviteCopyFailed = useCallback(() => {
+    pushAppToast(t("toast.inviteCopyFailed"), "error");
+  }, [pushAppToast, t]);
 
   const {
     lists,
@@ -83,6 +87,7 @@ const App = () => {
   const isAddDialogOpen = stack.includes("add-item");
   const isCreateListModalOpen = stack.includes("create-list");
   const isJoinListModalOpen = stack.includes("join-list");
+  const isInviteLandingOpen = stack.includes("invite-landing");
   const isSettingsModalOpen = stack.includes("settings");
   const isListStatsOpen = stack.includes("list-stats");
   const isLegalModalOpen = stack.includes("legal");
@@ -123,7 +128,19 @@ const App = () => {
     openJoinList,
     cancelJoinList,
     handleJoinList,
+    handlePasteJoin,
   } = useJoinListDialog({ openPopup, closePopup, onJoinFailed: handleJoinFailed });
+
+  const {
+    inviteToken,
+    isInviteCopied,
+    showInviteLanding,
+    closeInviteLanding,
+    copyInvite,
+    joinInBrowser,
+  } = useInviteLanding({ openPopup, closePopup, onCopyFailed: handleInviteCopyFailed, onJoinFailed: handleJoinFailed });
+
+  useAppBootstrap({ onShareLinkJoinFailed: handleJoinFailed, onIosShareLink: showInviteLanding });
 
   const { exitingItemIds, removedItemIds, handleExitComplete, handleToggleItem } = useItemExitAnimation({
     items,
@@ -372,6 +389,19 @@ const App = () => {
             onChange={setJoinListValue}
             onCancel={cancelJoinList}
             onJoin={handleConfirmJoinList}
+            onPasteJoin={handlePasteJoin}
+          />
+        </Suspense>
+      )}
+
+      {isInviteLandingOpen && inviteToken !== null && (
+        <Suspense fallback={null}>
+          <InviteLandingModal
+            isOpen
+            isCopied={isInviteCopied}
+            onCopy={copyInvite}
+            onJoinHere={joinInBrowser}
+            onClose={closeInviteLanding}
           />
         </Suspense>
       )}

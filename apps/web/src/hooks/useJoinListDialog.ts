@@ -27,16 +27,24 @@ export const useJoinListDialog = ({ openPopup, closePopup, onJoinFailed }: JoinL
     closePopup("join-list");
   }, [closePopup]);
 
-  const handleJoinList = useCallback(async () => {
+  const joinWithValue = useCallback(async (value: string) => {
     try {
-      await joinSharedList(joinListValue);
+      await joinSharedList(value);
     } catch {
       onJoinFailed();
       return;
     }
     setJoinListValue("");
     closePopup("join-list");
-  }, [joinListValue, closePopup, onJoinFailed]);
+  }, [closePopup, onJoinFailed]);
+
+  const handleJoinList = useCallback(() => joinWithValue(joinListValue), [joinWithValue, joinListValue]);
+
+  // Joins with a link pasted from the clipboard in one tap.
+  const handlePasteJoin = useCallback((pastedValue: string) => {
+    setJoinListValue(pastedValue);
+    void joinWithValue(pastedValue);
+  }, [joinWithValue]);
 
   return {
     joinListValue,
@@ -44,5 +52,6 @@ export const useJoinListDialog = ({ openPopup, closePopup, onJoinFailed }: JoinL
     openJoinList,
     cancelJoinList,
     handleJoinList,
+    handlePasteJoin,
   };
 };

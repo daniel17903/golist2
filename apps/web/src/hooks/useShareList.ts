@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef } from "react";
 import type { List } from "@golist/shared/domain/types";
 import { useStore } from "../state/useStore";
 import { useI18n } from "../i18n";
+import { buildShareLink as buildShareLinkFor } from "../sharing/apiClient";
 
 // Store actions are stable references — select them once at module scope.
 const { ensureShareToken } = useStore.getState();
@@ -33,7 +34,7 @@ export const useShareList = ({ activeList, pushAppToast }: ShareListOptions) => 
       throw new Error(t("sync.noActiveList"));
     }
     const token = await ensureShareToken(list.id);
-    return `${window.location.origin}/?shareToken=${token}`;
+    return buildShareLinkFor(token);
   }, [t]);
 
   const shareWithSystemSheet = useCallback(async (shareLink: string): Promise<boolean> => {
