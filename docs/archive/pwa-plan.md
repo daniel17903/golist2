@@ -1,3 +1,5 @@
+> **Status: archived.** Original planning notes; the app has since gained backend sync and sharing, so the "local-only storage" goal and the data model below are out of date. See `AGENTS.md` and `docs/sharing-plan.md` for the current architecture.
+
 # GoList PWA (React + TypeScript) plan
 
 ## Goals

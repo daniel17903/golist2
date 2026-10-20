@@ -6,11 +6,12 @@
 - `packages/shared/` contains shared domain code that can be reused by web and backend (currently shared types).
 - `apps/web/sim/` is the in-process multi-device sync simulation (real web store + sync client against the real backend); see `apps/web/sim/README.md`.
 - `scripts/` holds repo tooling: `agent-setup.sh` (container setup, also run by the Claude Code SessionStart hook in `.claude/`), `local-postgres.sh` (throwaway local database), `verify.mjs` (runs the right checks).
+- `.claude/hooks/` holds Claude Code hooks: `session-start.sh` (runs `agent-setup.sh` in cloud sessions) and `pre-push-verify.sh` (a PreToolUse hook that blocks `git push` until `npm run verify:changed` passes; push detection in `is-git-push.mjs`, tested by `node --test .claude/hooks/is-git-push.test.mjs`). The hook is **not registered in `.claude/settings.json` yet**, so it does not run.
 - Root `package.json` is a workspace manifest; run workspace commands with `-w apps/web` or `-w apps/backend`, or use root aliases like `npm run dev:web` and `npm run dev:backend`.
 
 ## Project snapshot (web app)
 - **Stack**: React + TypeScript + Vite, Dexie (IndexedDB), Zustand, Vite PWA plugin.
-- **Entry points**: `apps/web/index.html`, `apps/web/src/main.tsx`, `apps/web/src/App.tsx` (a thin composition layer — behavior lives in hooks).
+- **Entry points**: `apps/web/index.html`, `apps/web/src/main.tsx`, `apps/web/src/App.tsx` (the root component, ~450 lines: calls the feature hooks, holds the glue callbacks between them and renders the layout plus every modal; feature behavior itself lives in `hooks/`).
 - **State + storage**: `apps/web/src/state/useStore.ts` (Zustand) + `apps/web/src/storage/db.ts` (Dexie).
 - **Backend sharing/sync**: `apps/web/src/sharing/` — `apiClient.ts` (REST client), `socketSync.ts` (WebSocket realtime sync manager), `storeSyncBridge.ts` (wires incoming sync data into the store). Protocol details in `docs/websocket-sync-protocol.md` and `docs/frontend-sharing-sync.md`.
 - **i18n**: `apps/web/src/i18n/` — locale resolution (`resolveLocale.ts`), translations (`resources.ts`), `useI18n()`/module-level `t()`. Language auto-suggestion logic lives in `apps/web/src/domain/languageSuggestion.ts`.
@@ -181,6 +182,20 @@ background in `docs/frontend-performance-plan.md`. Checklist for every change in
 - `fix-sync-bug` — reproduce a sync bug in the sim, fix, fuzz, add E2E, update sync docs.
 - `react-performance` — memoization/selector/ref rules for web components and hooks.
 - `steward` — driving a PR to green: CI checks, artifacts, merging `main`, lockfiles, review threads.
+
+## Before opening a PR
+- **Review your own diff first.** Run `/code-review` (or an independent review subagent) on the diff and address
+  its findings before you open the PR. Recent agent PRs (#357, #358, #359) each had 2–4 real bugs that a reviewer
+  only found after the PR was open.
+- **Prove every regression test can fail.** Run it once with the fix reverted (or stubbed out) and confirm it fails
+  for the right reason; a test that passes either way proves nothing (the #358 leak test could never fail).
+- **Follow-ups become issues.** Every "not in this PR" / "follow-up" / "known remaining gap" note gets a GitHub issue
+  (search for an existing one first), linked from the PR body.
+- **Descriptive PR titles.** The title is a short sentence describing the change ("Broadcast REST list renames to
+  WebSocket subscribers"), never the branch name (#324 was titled "Claude/api category icon defaults mtnba0").
+- Fill in `.github/pull_request_template.md` (Summary / Changes / Tests / Follow-up issues).
+- Run `npm run verify:changed` yourself before every push and fix what it reports. `.claude/hooks/pre-push-verify.sh`
+  will enforce this once it is registered in `.claude/settings.json`; until then nothing checks it for you.
 
 ## Documentation maintenance
 - Keep `docs/sharing-plan.md` up to date when backend sharing architecture, sequencing, or CI expectations change.
