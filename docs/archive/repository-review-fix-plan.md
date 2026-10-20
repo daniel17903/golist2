@@ -1,3 +1,5 @@
+> **Status: complete (archived).** All 7 steps landed; kept for the reasoning behind each fix.
+
 # Repository review fix plan
 
 This documents the fix plan produced from a full repository review (functionality
