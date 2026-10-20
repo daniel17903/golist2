@@ -25,7 +25,7 @@ This skill supports:
 5. OpenClaw must generate all item UUIDs and timestamps in the Python CLI (never require the agent to provide them).
 6. Immediately after creating a new list, OpenClaw must always generate a share token and send the share URL to the user without being asked.
 7. When talking to the user, OpenClaw must never refer to lists by ID; always use list names (use the stored name↔id mapping internally).
-8. For item upserts, if the user does not explicitly provide a quantity/unit, OpenClaw must omit `quantityOrUnit`.
+8. For item upserts, if the user does not explicitly provide a quantity/unit, OpenClaw must not pass `--quantity` (the CLI then keeps the item's existing quantity). To remove a quantity the user asked to remove, pass `--quantity ""`.
 
 ## Python CLI tool
 Use `apps/openclaw/golist_cli.py` as the operational API wrapper for this skill.

@@ -107,7 +107,11 @@ export function responseViolations(
     return [`${label}: response is not JSON: ${body}`]
   }
   const schemaRef = `${SPEC_ID}#${pointer}/content/application~1json/schema`
-  const validate = ajv.getSchema(schemaRef) ?? ajv.compile({ $ref: schemaRef })
+  // Compiles the pointer into the registered spec once, then serves it from Ajv's cache.
+  const validate = ajv.getSchema(schemaRef)
+  if (!validate) {
+    throw new Error(`openapi.yaml has no schema at ${schemaRef}`)
+  }
   if (validate(parsed)) {
     return []
   }
@@ -124,6 +128,11 @@ export function checkResponsesAgainstSpec(app: FastifyInstance): { violations: s
     const routeUrl = request.routeOptions.url
     if (!routeUrl) {
       violations.push(`${request.method} ${request.url}: no route matched`)
+      return payload
+    }
+    // Same exclusions as registeredOperations: Fastify's automatic HEAD
+    // routes and the CORS preflight route are not part of the spec.
+    if (request.method === 'HEAD' || (request.method === 'OPTIONS' && routeUrl === '*')) {
       return payload
     }
     const body = payload === null || payload === undefined ? '' : String(payload)

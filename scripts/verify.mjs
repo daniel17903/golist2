@@ -27,7 +27,11 @@ const checks = {
   testBackend: { label: "backend tests", cmd: ["npm", "run", "test", "-w", "apps/backend"] },
   buildBackend: { label: "backend build", cmd: ["npm", "run", "build", "-w", "apps/backend"] },
   lintApiSpec: { label: "API spec lint (openapi.yaml)", cmd: ["npm", "run", "lint", "-w", "apps/api-spec"] },
-  testOpenclaw: { label: "openclaw CLI tests", cmd: ["python3", "-m", "unittest", "discover", "-s", "apps/openclaw"] },
+  testOpenclaw: {
+    label: "openclaw CLI tests",
+    cmd: ["python3", "-m", "unittest", "discover", "-s", "apps/openclaw"],
+    skipIfMissing: "install Python 3 to run them; CI runs them on every PR",
+  },
 };
 
 const order = Object.keys(checks);
@@ -135,12 +139,18 @@ for (const name of selected) {
   console.log(`\n[verify] ▶ ${label}: ${cmd.join(" ")}`);
   const startedAt = Date.now();
   const outcome = spawnSync(cmd[0], cmd.slice(1), { stdio: "inherit" });
+  if (outcome.error?.code === "ENOENT" && checks[name].skipIfMissing) {
+    // Optional toolchain (python3 for the openclaw CLI tests); CI always runs it.
+    console.log(`[verify] ${cmd[0]} not found; skipping (${checks[name].skipIfMissing})`);
+    results.push({ label, ok: true, skipped: true, seconds: 0 });
+    continue;
+  }
   results.push({ label, ok: outcome.status === 0, seconds: (Date.now() - startedAt) / 1000 });
 }
 
 console.log("\n[verify] summary");
-for (const { label, ok, seconds } of results) {
-  console.log(`  ${ok ? "PASS" : "FAIL"}  ${label} (${seconds.toFixed(1)}s)`);
+for (const { label, ok, skipped, seconds } of results) {
+  console.log(`  ${skipped ? "SKIP" : ok ? "PASS" : "FAIL"}  ${label} (${seconds.toFixed(1)}s)`);
 }
 const failures = results.filter((result) => !result.ok);
 if (failures.some((result) => result.label.startsWith("web E2E"))) {

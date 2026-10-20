@@ -279,10 +279,21 @@ class UpsertTest(CliTestCase):
         self.assert_requests([("GET", f"/api/v1/lists/{LIST_ID}"), ("PUT", f"/api/v1/lists/{LIST_ID}/items/{ITEM_ID}")])
         self.assertEqual(set(self.requests[1].body), {"name", "deleted", "updatedAt"})
 
-    def test_omits_empty_quantity(self) -> None:
+    def test_keeps_existing_quantity_when_none_is_given(self) -> None:
+        # The server clears quantityOrUnit when a write omits it.
         self.write_state()
+        existing = {"id": ITEM_ID, "name": "Milk", "deleted": False, "quantityOrUnit": "2 L"}
 
-        self.run_cli("upsert", "milk", "--quantity", "", responses=[{"listId": LIST_ID, "name": "Groceries", "items": []}, None])
+        self.run_cli("upsert", "milk", responses=[{"listId": LIST_ID, "name": "Groceries", "items": [existing]}, None])
+
+        self.assertEqual(self.requests[1].body["quantityOrUnit"], "2 L")
+
+    def test_empty_quantity_clears_it_by_omitting_the_field(self) -> None:
+        # The API rejects an empty quantityOrUnit with 400.
+        self.write_state()
+        existing = {"id": ITEM_ID, "name": "Milk", "deleted": False, "quantityOrUnit": "2 L"}
+
+        self.run_cli("upsert", "milk", "--quantity", "", responses=[{"listId": LIST_ID, "name": "Groceries", "items": [existing]}, None])
 
         self.assertNotIn("quantityOrUnit", self.requests[1].body)
 
@@ -311,8 +322,9 @@ class DeleteTest(CliTestCase):
         self.assertEqual(exit_code, 0)
         self.assert_requests([("GET", f"/api/v1/lists/{LIST_ID}"), ("PUT", f"/api/v1/lists/{LIST_ID}/items/{ITEM_ID}")])
         body = self.requests[1].body
-        self.assertEqual(set(body), {"name", "deleted", "updatedAt"})
-        self.assertEqual((body["name"], body["deleted"]), ("Milk", True))
+        # The quantity is kept so restoring the item brings it back.
+        self.assertEqual(set(body), {"name", "deleted", "updatedAt", "quantityOrUnit"})
+        self.assertEqual((body["name"], body["deleted"], body["quantityOrUnit"]), ("Milk", True, "2 L"))
         self.assertRegex(body["updatedAt"], ISO_UTC)
 
     def test_fails_for_unknown_item(self) -> None:

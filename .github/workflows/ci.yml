@@ -38,7 +38,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
         with:
-          python-version: "3.14"
+          python-version: "3.15"
       # Request construction of every CLI command (mocked HTTP, no network),
       # checked against the paths in apps/api-spec/openapi.yaml.
       - run: python3 -m unittest discover -s apps/openclaw -v
