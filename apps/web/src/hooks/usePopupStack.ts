@@ -6,6 +6,7 @@ export type PopupId =
   | "add-item"
   | "create-list"
   | "join-list"
+  | "invite-landing"
   | "settings"
   | "list-stats"
   | "legal"

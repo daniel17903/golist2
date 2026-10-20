@@ -92,6 +92,16 @@ On subscription and manual resync:
 
 Protocol details are documented in `docs/websocket-sync-protocol.md` and mirrored in `apps/api-spec/openapi.yaml` under `/v1/ws`.
 
+## Joining via share links
+
+- Share links have the form `{origin}/?shareToken={token}`. On startup the app redeems a `shareToken`
+  query parameter and removes it from the URL.
+- Exception: in an iOS browser tab (Safari or an in-app browser, not the installed home-screen app) the
+  token is not redeemed automatically. iOS cannot open the home-screen app from a link and keeps its
+  storage separate from Safari's, so joining there would hide the list from the installed app. The
+  invite screen instead offers to copy the link (to paste into the app's Join dialog via its
+  "Paste from clipboard" button) or to join in the browser.
+
 ## HTTP usage boundaries
 
 - HTTP remains used for list/share-token operations (`PUT /v1/lists/{listId}`, `GET /v1/lists/{listId}`, share-token create/redeem).

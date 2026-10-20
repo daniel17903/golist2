@@ -34,6 +34,10 @@
 - **Item suggestions** are **list-specific**, ranked by frequency then recency.
 - **Realtime sync**: lists sync over a WebSocket (`/v1/ws`) using hash-diff reconciliation; offline changes are reconciled per list after reconnect. See `docs/websocket-sync-protocol.md` before touching `apps/web/src/sharing/socketSync.ts`.
 - **i18n**: en/de/es with locale auto-detection and a one-time language-switch suggestion based on recently added item names.
+- **Invite links on iOS**: iOS opens links in Safari, never in the installed home-screen app, and the two keep
+  separate storage. So a `?shareToken=` link opened in an iOS browser tab (`apps/web/src/domain/iosBrowserTab.ts`)
+  is not joined automatically; `InviteLandingModal` offers to copy the invite for the home-screen app (whose Join
+  dialog has a one-tap "Paste from clipboard" button) or to use the list in the browser.
 - **Undo toasts** for item deletion and list rename (max 3 stacked, 5s timeout).
 - **Pull-to-refresh** forces a WebSocket reconnect; the pull distance is written straight to the DOM to avoid per-frame re-renders.
 - **Item grid animations**: `apps/web/src/hooks/useGridLayoutAnimation.ts` (FLIP via the Web Animations API) glides cards into new slots and pops in new cards; skipped on first render, on list switches and with reduced motion. A checked-off card leaves the grid as soon as its exit animation ends, without waiting for the IndexedDB write.
@@ -139,7 +143,7 @@
 - Specs: `lists.spec.ts`, `items.spec.ts`, `sync.spec.ts` (multi-device share/join, realtime
   propagation, offline reconciliation), `sync-conflicts.spec.ts` (concurrent offline edits, three
   devices, slow network), `ui.spec.ts` (i18n, language suggestion, stats, legal, back gesture,
-  join errors).
+  join errors), `ios-invite.spec.ts` (iOS invite screen, join-dialog paste button).
 - Fixtures (`e2e/fixtures.ts`): `app` = primary device (already on `/`), `newDevice()` = extra
   isolated device (own browser context), `backend` = REST client to assert server state.
   `GoListApp` (`e2e/support/goListApp.ts`) is the page object; `disconnectBackend()` /

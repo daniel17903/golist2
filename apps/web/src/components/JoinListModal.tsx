@@ -1,4 +1,4 @@
-import { memo, type FormEvent } from "react";
+import { memo, useState, type FormEvent } from "react";
 import Modal from "./Modal";
 import { extractShareToken } from "../sharing/apiClient";
 import { useI18n } from "../i18n";
@@ -9,7 +9,13 @@ type JoinListModalProps = {
   onChange: (value: string) => void;
   onCancel: () => void;
   onJoin: () => void;
+  // Joins with a share link read from the clipboard.
+  onPasteJoin: (value: string) => void;
 };
+
+// Reading the clipboard needs a user gesture (iOS then shows its own "Paste"
+// confirmation), so it can only happen from a button tap.
+const canReadClipboard = () => typeof navigator.clipboard?.readText === "function";
 
 const JoinListModal = memo(function JoinListModal({
   isOpen,
@@ -17,8 +23,10 @@ const JoinListModal = memo(function JoinListModal({
   onChange,
   onCancel,
   onJoin,
+  onPasteJoin,
 }: JoinListModalProps) {
   const { t } = useI18n();
+  const [pasteError, setPasteError] = useState<"unreadable" | "noLink" | null>(null);
 
   if (!isOpen) {return null;}
 
@@ -31,6 +39,25 @@ const JoinListModal = memo(function JoinListModal({
     if (isJoinDisabled) {return;}
 
     onJoin();
+  };
+
+  const handlePaste = () => {
+    void (async () => {
+      let pasted: string;
+      try {
+        pasted = await navigator.clipboard.readText();
+      } catch {
+        // Permission denied or the iOS "Paste" prompt was dismissed.
+        setPasteError("unreadable");
+        return;
+      }
+      if (!extractShareToken(pasted)) {
+        setPasteError("noLink");
+        return;
+      }
+      setPasteError(null);
+      onPasteJoin(pasted);
+    })();
   };
 
   return (
@@ -54,11 +81,26 @@ const JoinListModal = memo(function JoinListModal({
         <input
           id="join-list-token"
           value={normalizedValue}
-          onChange={(event) => onChange(event.target.value)}
+          onChange={(event) => {
+            setPasteError(null);
+            onChange(event.target.value);
+          }}
           placeholder={t("modal.shareTokenPlaceholder")}
           autoFocus
         />
       </div>
+      {canReadClipboard() ? (
+        <div className="join-list__paste">
+          <button type="button" className="text-button" onClick={handlePaste}>
+            {t("joinList.paste")}
+          </button>
+          {pasteError ? (
+            <p className="join-list__paste-error" role="alert">
+              {pasteError === "noLink" ? t("joinList.pasteFailed") : t("joinList.pasteUnreadable")}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
     </Modal>
   );
 });
