@@ -14,7 +14,8 @@ esac
 project_dir="${CLAUDE_PROJECT_DIR:-$(cd "$(dirname "$0")/../.." && pwd)}"
 
 # Decide on the parsed command: `git [global options] push ...`, possibly after
-# `cd x &&`, `;` or `|`. Branch deletions (`--delete`, `:branch`) are not checked.
+# `cd x &&`, `;` or `|`. Quoted text (e.g. a commit message mentioning
+# "git push") is ignored. Branch deletions (`--delete`, `:branch`) are not checked.
 is_push="$(printf '%s' "$input" | node -e '
   let raw = "";
   process.stdin.on("data", (chunk) => (raw += chunk));
@@ -23,6 +24,7 @@ is_push="$(printf '%s' "$input" | node -e '
     try {
       command = JSON.parse(raw)?.tool_input?.command ?? "";
     } catch {}
+    command = command.replace(/\x27[^\x27]*\x27|"(?:\\.|[^"\\])*"/g, "\"\"");
     const push = /(?:^|[\s;&|(])git(?:\s+(?:-C\s+\S+|-c\s+\S+|--?[\w-]+(?:=\S+)?))*\s+push\b([^;&|]*)/.exec(command);
     const deletes = push && /(?:\s--delete\b|\s-d\b|\s:\S)/.test(push[1]);
     process.stdout.write(push && !deletes ? "yes" : "no");
