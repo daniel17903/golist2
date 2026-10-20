@@ -124,7 +124,7 @@ covered by a regression test:
 ### Follow-ups
 
 - Playwright project that runs against the production build (`vite preview`)
-  to cover the service worker / offline boot.
+  to cover the service worker / offline boot (#363).
 - Switching to a list whose items have not been hydrated yet right after
   boot briefly shows it empty (items appear once background hydration
-  finishes). Not a data issue; the sim harness accounts for it.
+  finishes). Not a data issue; the sim harness accounts for it (#364).
