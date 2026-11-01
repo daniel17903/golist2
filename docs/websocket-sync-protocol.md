@@ -60,7 +60,9 @@ the gone socket is never registered for broadcasts.
   - same shape as client `item_patch`
 - `list_metadata_patch`
   - `{ "type": "list_metadata_patch", "listId": "<uuid>", "name": "<string>", "listType": "shopping" | "todo", "updatedAt": <number> }`
-  - always carries the stored `listType`, also when the client patch omitted it.
+  - always carries the stored `listType`, also when the client patch omitted it. An accepted
+    patch without `listType` (a list stored before list types existed) is also echoed to its
+    sender with the stored type, so that device learns a type switched on another device.
 - `error`
   - `{ "type": "error", "message": "<string>" }`
 

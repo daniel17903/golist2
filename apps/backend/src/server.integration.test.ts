@@ -494,6 +494,33 @@ describe('backend runtime integration', () => {
     }
   })
 
+  it('tells a sender without a list type which type is stored', async () => {
+    const listId = crypto.randomUUID()
+    const createResponse = await fetch(`${baseUrl}/v1/lists/${listId}`, {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json', 'x-device-id': testDeviceId },
+      body: JSON.stringify({ name: 'Chores', listType: 'todo' }),
+    })
+    expect(createResponse.status).toBe(201)
+
+    const client = await openSyncSocket()
+    try {
+      client.send({ type: 'hello', deviceId: testDeviceId })
+      await client.waitForMessage((message) => message.type === 'hello_ack')
+      client.send({ type: 'subscribe_list', listId })
+      await client.waitForMessage((message) => message.type === 'subscribed')
+
+      // A rename from a device whose stored list predates list types.
+      const renamedAt = Date.now() + 1_000
+      client.send({ type: 'list_metadata_patch', listId, name: 'Household', updatedAt: renamedAt })
+
+      const echo = await client.waitForMessage((message) => message.type === 'list_metadata_patch')
+      expect(echo).toEqual({ type: 'list_metadata_patch', listId, name: 'Household', listType: 'todo', updatedAt: renamedAt })
+    } finally {
+      client.socket.close()
+    }
+  })
+
   it('syncs the list type and todo fields over the websocket', async () => {
     const listId = crypto.randomUUID()
     const createResponse = await fetch(`${baseUrl}/v1/lists/${listId}`, {

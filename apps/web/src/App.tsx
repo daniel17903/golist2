@@ -198,7 +198,7 @@ const App = () => {
   }, [handleToggleItem]);
 
   const handleDeleteTodo = useCallback((itemId: string) => {
-    const item = items.find((entry) => entry.id === itemId);
+    const item = useStore.getState().items.find((entry) => entry.id === itemId);
     if (!item || item.deleted) {
       return;
     }
@@ -206,7 +206,7 @@ const App = () => {
       await toggleItem(itemId);
       showUndoDelete(item);
     })();
-  }, [items, showUndoDelete]);
+  }, [showUndoDelete]);
 
   const {
     todoDialogMode,

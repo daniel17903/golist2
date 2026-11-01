@@ -490,6 +490,26 @@ describe("useStore", () => {
     });
   });
 
+  it("does not write a todo when the edit dialog is saved unchanged", async () => {
+    const todo = {
+      id: "todo-1",
+      listId: "list-1",
+      name: "Vacuum",
+      iconName: "default",
+      category: "other",
+      deleted: false,
+      assignedTo: "Alex",
+      createdAt: 1,
+      updatedAt: 1,
+    };
+    useStore.setState({ items: [todo] });
+
+    await useStore.getState().updateTodo("todo-1", { title: "Vacuum", assignedTo: "Alex", description: "" });
+
+    expect(useStore.getState().items[0]).toBe(todo);
+    expect(socketQueueLocalItemPatchMock).not.toHaveBeenCalled();
+  });
+
   it("keeps a type switch when a rename starts before the switch is saved", async () => {
     listsData = [{ id: "list-1", name: "Old", createdAt: 1, updatedAt: 1 }];
     useStore.setState({ lists: [...listsData] });

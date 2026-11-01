@@ -84,6 +84,50 @@ describe("todo lists", () => {
     expect(a.itemsOf(listId).filter((item) => !item.deleted)).toHaveLength(1);
   });
 
+  it("re-completing after an undo creates the next occurrence even against a tombstone from a fast clock", async () => {
+    sim = await SyncSim.start();
+    const { listId, devices: [a, b] } = await sim.sharedList(2);
+    await a.setActiveListType("todo");
+    await a.addTodo("Mop", { dueDate: sim.clock.now(), recurrence: weekly });
+    await sim.waitForConvergence(listId);
+
+    // a's clock is a minute ahead while it completes and undoes: the next
+    // occurrence's tombstone carries a timestamp from b's future.
+    const now = sim.clock.peek();
+    sim.clock.set(now + 60_000);
+    const first = await a.completeTodo("Mop");
+    await a.undoCompleteTodo(first);
+    sim.clock.set(now);
+    await sim.waitForConvergence(listId);
+
+    const second = await b.completeTodo("Mop");
+    expect(second.spawnedItemId).toBe(first.spawnedItemId);
+    await sim.waitForConvergence(listId);
+
+    for (const device of [a, b]) {
+      expect(device.openTodoTitles()).toEqual(["Mop"]);
+      expect(device.itemsOf(listId).find((item) => item.id === second.spawnedItemId)?.deleted).toBe(false);
+    }
+  });
+
+  it("undoing a completion also removes occurrences spawned by completing the next one", async () => {
+    sim = await SyncSim.start();
+    const { listId, devices: [a, b] } = await sim.sharedList(2);
+    await a.setActiveListType("todo");
+    await a.addTodo("Mop", { dueDate: sim.clock.now(), recurrence: weekly });
+
+    const first = await a.completeTodo("Mop");
+    // The next occurrence is completed within the first undo window.
+    await a.completeTodo("Mop");
+    await a.undoCompleteTodo(first);
+    await sim.waitForConvergence(listId);
+
+    for (const device of [a, b]) {
+      expect(device.openTodoTitles()).toEqual(["Mop"]);
+      expect(device.itemsOf(listId).filter((item) => !item.deleted)).toHaveLength(1);
+    }
+  });
+
   it("concurrent offline type switch and rename converge on the newer metadata", async () => {
     sim = await SyncSim.start();
     const { listId, devices: [a, b] } = await sim.sharedList(2);
@@ -101,6 +145,29 @@ describe("todo lists", () => {
     for (const device of [a, b]) {
       expect(device.listName(listId)).toBe("Household");
       expect(device.listType(listId)).toBe("shopping");
+    }
+  });
+
+  it("a list stored before list types converges on the type switched by another device", async () => {
+    sim = await SyncSim.start();
+    const { listId, devices: [a, b] } = await sim.sharedList(2);
+    // Both devices hold the list as stored by a pre-list-type version.
+    await a.forgetListType(listId);
+    await b.forgetListType(listId);
+
+    b.goOffline();
+    await a.setActiveListType("todo");
+    await sim.waitForConvergence(listId, { devices: [a] });
+    sim.clock.advance(10);
+    await b.renameActiveList("Household");
+    b.goOnline();
+    await sim.waitForConvergence(listId);
+
+    // b's newer rename carries no type, so the server keeps a's switch, and
+    // b must learn it too.
+    for (const device of [a, b]) {
+      expect(device.listName(listId)).toBe("Household");
+      expect(device.listType(listId)).toBe("todo");
     }
   });
 

@@ -572,9 +572,20 @@ export const createGoListStore = (env: GoListStoreEnvironment) => {
       const { category: resolvedCategory, iconName: resolvedIcon } = renamed
         ? getCategoryAndIcon(input.title)
         : { category: item.category, iconName: item.iconName };
+      const fields = todoFieldsFromInput(input);
+      // Saving the dialog unchanged must not write: a newer updatedAt would
+      // win last-write-wins against a completion made on another device.
+      const unchanged =
+        fields.name === item.name &&
+        fields.description === item.description &&
+        fields.points === item.points &&
+        fields.dueDate === item.dueDate &&
+        fields.assignedTo === item.assignedTo &&
+        fields.recurrence === item.recurrence;
+      if (unchanged) {return;}
       const updated: Item = {
         ...item,
-        ...todoFieldsFromInput(input),
+        ...fields,
         iconName: resolvedIcon ?? "default",
         category: resolvedCategory ?? "other",
         updatedAt: nextUpdatedAt(item.updatedAt),
@@ -598,6 +609,10 @@ export const createGoListStore = (env: GoListStoreEnvironment) => {
         const nextDueDate = computeNextDueDate(item.recurrence, item.dueDate, now);
         if (nextDueDate !== null) {
           spawnedItemId = nextOccurrenceId(item.id);
+          // The id can already exist (deleted by an earlier undo, possibly
+          // with a timestamp from a device whose clock runs ahead): the new
+          // version must still win last-write-wins against it.
+          const previous = findItemById(get().items, spawnedItemId);
           changed.push({
             ...item,
             id: spawnedItemId,
@@ -605,8 +620,8 @@ export const createGoListStore = (env: GoListStoreEnvironment) => {
             completedAt: undefined,
             dueDate: nextDueDate,
             createdByDeviceId: get().metadata?.deviceId,
-            createdAt: now,
-            updatedAt: now,
+            createdAt: previous?.createdAt ?? now,
+            updatedAt: previous ? nextUpdatedAt(previous.updatedAt) : now,
           });
         }
       }
@@ -621,9 +636,15 @@ export const createGoListStore = (env: GoListStoreEnvironment) => {
       if (item && item.completedAt !== undefined) {
         changed.push({ ...item, completedAt: undefined, updatedAt: nextUpdatedAt(item.updatedAt) });
       }
-      const spawned = spawnedItemId ? findItemById(items, spawnedItemId) : undefined;
-      if (spawned && !spawned.deleted) {
-        changed.push({ ...spawned, deleted: true, updatedAt: nextUpdatedAt(spawned.updatedAt) });
+      // Remove the spawned occurrence, and if it was completed meanwhile, the
+      // occurrence its completion spawned too, so reopening the todo never
+      // leaves a second open occurrence behind.
+      let occurrenceId = spawnedItemId;
+      while (occurrenceId) {
+        const occurrence = findItemById(items, occurrenceId);
+        if (!occurrence || occurrence.deleted) {break;}
+        changed.push({ ...occurrence, deleted: true, updatedAt: nextUpdatedAt(occurrence.updatedAt) });
+        occurrenceId = occurrence.completedAt !== undefined ? nextOccurrenceId(occurrence.id) : undefined;
       }
       if (changed.length > 0) {
         await applyLocalItemChanges(changed);

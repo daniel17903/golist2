@@ -502,6 +502,20 @@ export function registerSyncWebsocketRoute(
               },
               socket,
             )
+
+            // A sender that did not name a type (a list stored before list
+            // types existed) must still learn the stored one, or it keeps
+            // showing its own default while every other device has the type
+            // another device switched to.
+            if (parsedPayload.listType === undefined) {
+              send(socket, {
+                type: 'list_metadata_patch',
+                listId: parsedPayload.listId,
+                name: parsedPayload.name,
+                listType: storedListType,
+                updatedAt: parsedPayload.updatedAt,
+              })
+            }
           }
         } catch (error) {
           app.log.warn({ err: error }, 'invalid websocket message')

@@ -105,7 +105,11 @@ changes the UI and the check-off action (see `useAppState.ts` and `App.tsx`):
   with a due date. The undo toast reopens it and deletes that occurrence
   (`undoTodoCompleted`). The next occurrence's id is derived from the completed
   todo's id (`nextOccurrenceId`), so two devices completing the same todo offline
-  create one next occurrence, not two. Deleting a todo (edit dialog) sets `deleted` like a shopping
+  create one next occurrence, not two. When that id already exists (deleted by an earlier
+  undo), the new version gets a newer `updatedAt` than the stored one, so it also wins
+  against a tombstone written by a device whose clock runs ahead. Undo removes the whole
+  chain of occurrences spawned since (when the next occurrence was completed too), and
+  saving an unchanged todo writes nothing. Deleting a todo (edit dialog) sets `deleted` like a shopping
   check-off.
 
 Completed todos are hidden in both views, so switching a list's type keeps showing

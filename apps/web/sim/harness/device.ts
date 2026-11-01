@@ -248,6 +248,29 @@ export class SimDevice {
       .sort();
   }
 
+  /** Makes a list look like one stored before list types existed (no `listType`), on disk and in memory. */
+  async forgetListType(listId: string) {
+    if (!this.db) {
+      throw new Error(`device ${this.name} is not running`);
+    }
+    const stored = await this.db.lists.get(listId);
+    if (stored) {
+      const { listType: _dropped, ...legacy } = stored;
+      void _dropped;
+      await this.db.lists.put(legacy);
+    }
+    this.currentStore?.setState((state) => ({
+      lists: state.lists.map((list) => {
+        if (list.id !== listId) {
+          return list;
+        }
+        const { listType: _ignored, ...legacy } = list;
+        void _ignored;
+        return legacy;
+      }),
+    }));
+  }
+
   listType(listId = this.activeListId): ListType {
     return resolveListType(this.state.lists.find((list) => list.id === listId));
   }
