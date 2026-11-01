@@ -39,10 +39,12 @@ try {
   failures.push(`load dist/server.js: ${error.message}`)
 }
 
-// The real entry point (dist/index.js), reached the way the deployment health
-// check reaches it: `wget http://localhost:3000/healthz` inside the container,
-// where `localhost` resolves to ::1 first. Any HTTP status counts (there is no
-// database here, so /healthz answers 503); a refused connection fails.
+// The real entry point (dist/index.js), reached on the addresses the
+// deployment health check uses: `wget http://localhost:3000/healthz` inside
+// the container, where `localhost` resolves to ::1 first. This only checks
+// that the listener accepts connections, so it requests an unknown path that
+// the server answers (404) without touching the database: /healthz would wait
+// for the database connection timeout here. A refused connection fails.
 const freePort = await new Promise((resolve) => {
   const probe = net.createServer().listen(0, '127.0.0.1', () => {
     const { port } = probe.address()
@@ -67,7 +69,7 @@ try {
     let status = null
     for (let attempt = 0; attempt < 50 && status === null; attempt += 1) {
       try {
-        status = (await fetch(`http://${host}:${freePort}/healthz`, { signal: AbortSignal.timeout(2000) })).status
+        status = (await fetch(`http://${host}:${freePort}/smoke-dist-listener-check`, { signal: AbortSignal.timeout(2000) })).status
       } catch {
         await new Promise((resolve) => setTimeout(resolve, 200))
       }
