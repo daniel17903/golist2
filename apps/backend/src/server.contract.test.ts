@@ -517,10 +517,12 @@ describe('sharing API contract basics', () => {
     const statusOf = async (options: InjectOptions) => (await app.inject(options)).statusCode
 
     expect(await statusOf({ method: 'GET', url: '/health' })).toBe(200)
+    expect(await statusOf({ method: 'GET', url: '/healthz' })).toBe(200)
     repository.ping = async () => {
       throw new Error('database down')
     }
     expect(await statusOf({ method: 'GET', url: '/health' })).toBe(503)
+    expect(await statusOf({ method: 'GET', url: '/healthz' })).toBe(503)
 
     expect(await statusOf({ method: 'PUT', url: `/v1/lists/${listId}`, headers: creator, payload: { name: 'A' } })).toBe(201)
     expect(await statusOf({ method: 'PUT', url: `/v1/lists/${listId}`, headers: creator, payload: { name: 'B' } })).toBe(200)

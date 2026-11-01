@@ -489,6 +489,25 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthResponse"
+  /healthz:
+    get:
+      operationId: getHealthz
+      security: []
+      summary: Health check for the deployment platform (same as /health)
+      description: Probed by the Coolify deployment health check before a new container receives traffic.
+      responses:
+        "200":
+          description: Backend and database are reachable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+        "503":
+          description: Database query failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
   /v1/lists/{listId}:
     parameters:
       - $ref: "#/components/parameters/ListId"
