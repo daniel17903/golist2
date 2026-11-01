@@ -21,6 +21,16 @@ if [ "$is_push" != "yes" ]; then
   exit 0
 fi
 
+# Hooks don't inherit the session env file agent-setup.sh writes, so redo its
+# Chromium detection here; otherwise E2E can't launch a browser in containers
+# whose preinstalled build differs from the pinned Playwright's.
+if [ -z "${PLAYWRIGHT_CHROMIUM_EXECUTABLE:-}" ]; then
+  chromium="$("$project_dir/scripts/playwright-chromium.sh" 2>/dev/null || true)"
+  if [ -n "$chromium" ]; then
+    export PLAYWRIGHT_CHROMIUM_EXECUTABLE="$chromium"
+  fi
+fi
+
 log_file="$(mktemp -t golist-verify.XXXXXX)"
 if (cd "$project_dir" && npm run --silent verify:changed) >"$log_file" 2>&1; then
   rm -f "$log_file"
