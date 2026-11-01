@@ -103,7 +103,9 @@ changes the UI and the check-off action (see `useAppState.ts` and `App.tsx`):
 - **todo**: rows (`TodoList.tsx`) sorted by due date; tapping a todo sets `completedAt`
   (`toggleTodoCompleted`), which also creates the next occurrence of a recurring todo
   with a due date. The undo toast reopens it and deletes that occurrence
-  (`undoTodoCompleted`). Deleting a todo (edit dialog) sets `deleted` like a shopping
+  (`undoTodoCompleted`). The next occurrence's id is derived from the completed
+  todo's id (`nextOccurrenceId`), so two devices completing the same todo offline
+  create one next occurrence, not two. Deleting a todo (edit dialog) sets `deleted` like a shopping
   check-off.
 
 Completed todos are hidden in both views, so switching a list's type keeps showing

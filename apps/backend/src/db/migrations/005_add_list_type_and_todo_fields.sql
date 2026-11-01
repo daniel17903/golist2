@@ -7,7 +7,7 @@ ADD COLUMN IF NOT EXISTS list_type TEXT NOT NULL DEFAULT 'shopping'
 -- Todo-only item fields. All nullable: shopping items leave them unset, and a
 -- list that switches type keeps them.
 ALTER TABLE list_items ADD COLUMN IF NOT EXISTS description TEXT;
-ALTER TABLE list_items ADD COLUMN IF NOT EXISTS points INTEGER CHECK (points > 0);
+ALTER TABLE list_items ADD COLUMN IF NOT EXISTS points INTEGER CHECK (points > 0 AND points <= 1000);
 ALTER TABLE list_items ADD COLUMN IF NOT EXISTS completed_at TIMESTAMPTZ;
 ALTER TABLE list_items ADD COLUMN IF NOT EXISTS due_date TIMESTAMPTZ;
 ALTER TABLE list_items ADD COLUMN IF NOT EXISTS assigned_to TEXT;

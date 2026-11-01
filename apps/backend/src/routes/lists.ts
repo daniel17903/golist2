@@ -1,5 +1,5 @@
 import { defaultCategoryLanguage, detectCategoryLanguageForNames, getCategoryAndIconForItemName, supportedCategoryLanguages } from '@golist/shared/domain/item-category-mapping'
-import { listTypes, type TodoFields } from '@golist/shared/domain/types'
+import { listTypes, maxTodoPoints, type TodoFields } from '@golist/shared/domain/types'
 import { type FastifyInstance } from 'fastify'
 import { z } from 'zod'
 
@@ -26,7 +26,7 @@ const itemUpsertSchema = z.object({
   // Todo fields: omitted keeps the stored value (so callers that predate
   // todo lists never wipe them), null clears it.
   description: z.string().min(1).nullable().optional(),
-  points: z.number().int().positive().nullable().optional(),
+  points: z.number().int().positive().max(maxTodoPoints).nullable().optional(),
   completedAt: z.iso.datetime({ offset: true }).nullable().optional(),
   dueDate: z.iso.datetime({ offset: true }).nullable().optional(),
   assignedTo: z.string().min(1).nullable().optional(),

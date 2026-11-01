@@ -76,6 +76,25 @@ test.describe("todo lists", () => {
     await expect(app.todoRow("Mop floor").locator(".todo-item__due-date")).toHaveText("Today");
   });
 
+  test("todos can be completed and the list type switched with the keyboard", async ({ app }) => {
+    await app.createList("Chores", { listType: "todo" });
+    await app.addTodo({ title: "Dust shelves" });
+
+    await app.todoRow("Dust shelves").focus();
+    await app.page.keyboard.press("Enter");
+    await expect(app.todoRow("Dust shelves")).toHaveCount(0);
+    await expect(app.undoToast('"Dust shelves" completed.')).toBeVisible();
+
+    // Tabbing from the name input to the type toggle keeps the edit mode open.
+    await app.listTitle.click();
+    await app.page.keyboard.press("Tab");
+    await app.page.keyboard.press("Tab");
+    await expect(app.page.getByRole("radio", { name: "Shopping list" })).toBeVisible();
+    await app.page.keyboard.press("Shift+Tab");
+    await app.page.keyboard.press("Enter");
+    await expect(app.page.getByRole("radio", { name: "Shopping list" })).toHaveAttribute("aria-checked", "true");
+  });
+
   test("edits and deletes a todo from the long-press dialog", async ({ app }) => {
     await app.createList("Chores", { listType: "todo" });
     await app.addTodo({ title: "Call landlord" });

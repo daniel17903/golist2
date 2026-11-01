@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { defaultListType, type AppMetadata, type Item, type List, type ListType } from "@golist/shared/domain/types";
 import { shouldAcceptItem, shouldAcceptListMetadata } from "@golist/shared/domain/sync";
 import { getCategoryAndIcon, getItemIconName } from "../domain/categories";
-import { computeNextDueDate } from "../domain/recurrence";
+import { computeNextDueDate, nextOccurrenceId } from "../domain/recurrence";
 import { db as defaultDb, type GoListDatabase } from "../storage/db";
 import { t } from "../i18n";
 import type { Locale } from "../i18n/config";
@@ -273,7 +273,11 @@ export const createGoListStore = (env: GoListStoreEnvironment) => {
   };
 
   // Shared write path for list metadata (name + type): both sync together as
-  // one last-write-wins record.
+  // one last-write-wins record. The in-memory list is updated synchronously
+  // and the IndexedDB writes run one after another, so overlapping calls (a
+  // type switch still saving when the rename input blurs) each build on the
+  // previous change instead of writing back a stale name or type.
+  let listMetadataWrites: Promise<unknown> = Promise.resolve();
   const updateListMetadata = async (listId: string, changes: { name?: string; listType?: ListType }) => {
     const current = store.getState().lists.find((list) => list.id === listId);
     if (!current) {
@@ -285,10 +289,14 @@ export const createGoListStore = (env: GoListStoreEnvironment) => {
       listType: changes.listType ?? current.listType,
       updatedAt: nextUpdatedAt(current.updatedAt),
     };
-    await db.lists.update(listId, { name: next.name, listType: next.listType, updatedAt: next.updatedAt });
     store.setState((state) => ({
       lists: state.lists.map((list) => (list.id === listId ? next : list)),
     }));
+    const write = listMetadataWrites.then(() =>
+      db.lists.update(listId, { name: next.name, listType: next.listType, updatedAt: next.updatedAt }),
+    );
+    listMetadataWrites = write.catch(() => undefined);
+    await write;
     runBackendSyncInBackground(
       () => syncListNameImmediately(listId, next.name, next.updatedAt, next.listType),
       t("sync.offline"),
@@ -589,7 +597,7 @@ export const createGoListStore = (env: GoListStoreEnvironment) => {
       if (completing && item.recurrence && item.dueDate !== undefined) {
         const nextDueDate = computeNextDueDate(item.recurrence, item.dueDate, now);
         if (nextDueDate !== null) {
-          spawnedItemId = createId();
+          spawnedItemId = nextOccurrenceId(item.id);
           changed.push({
             ...item,
             id: spawnedItemId,

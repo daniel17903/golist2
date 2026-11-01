@@ -490,6 +490,23 @@ describe("useStore", () => {
     });
   });
 
+  it("keeps a type switch when a rename starts before the switch is saved", async () => {
+    listsData = [{ id: "list-1", name: "Old", createdAt: 1, updatedAt: 1 }];
+    useStore.setState({ lists: [...listsData] });
+
+    // Not awaited: the rename input blurs while the type switch is still writing.
+    const switching = useStore.getState().setListType("list-1", "todo");
+    await useStore.getState().renameList("list-1", "New");
+    await switching;
+
+    expect(useStore.getState().lists[0]).toMatchObject({ name: "New", listType: "todo" });
+    expect(listUpdate).toHaveBeenLastCalledWith("list-1", expect.objectContaining({ name: "New", listType: "todo" }));
+    expect(socketQueueLocalListMetadataPatchMock).toHaveBeenLastCalledWith(
+      "list-1",
+      expect.objectContaining({ name: "New", listType: "todo" }),
+    );
+  });
+
   it("adds an item to the list", async () => {
     const uuidSpy = vi
       .spyOn(globalThis.crypto, "randomUUID")

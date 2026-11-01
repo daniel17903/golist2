@@ -332,6 +332,17 @@ class UpsertTest(CliTestCase):
         self.assertIn("No active list set", self.stderr)
 
 
+    def test_prefers_the_open_occurrence_of_a_recurring_todo(self) -> None:
+        self.write_state()
+        completed = {"id": str(uuid.uuid4()), "name": "Mop", "deleted": False, "completedAt": "2026-03-01T10:00:00.000Z"}
+        open_next = {"id": ITEM_ID, "name": "Mop", "deleted": False}
+
+        self.run_cli("upsert", "Mop", responses=[{"listId": LIST_ID, "name": "Chores", "items": [completed, open_next]}, None])
+
+        put = self.requests[1]
+        self.assertEqual(put.path, f"/api/v1/lists/{LIST_ID}/items/{ITEM_ID}")
+        self.assertNotIn("completedAt", put.body)
+
     def test_reopens_a_completed_todo_with_the_same_name(self) -> None:
         self.write_state()
         completed = {"id": ITEM_ID, "name": "Vacuum", "deleted": False, "completedAt": "2026-03-01T10:00:00.000Z"}

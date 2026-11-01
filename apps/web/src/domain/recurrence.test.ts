@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computeNextDueDate, parseRecurrence } from "./recurrence";
+import { computeNextDueDate, nextOccurrenceId, parseRecurrence } from "./recurrence";
 
 // Helper: build epoch millis for a local midnight date (same convention as the app)
 const localMidnight = (year: number, month: number, day: number): number =>
@@ -133,5 +133,17 @@ describe("computeNextDueDate", () => {
       const rule = '{"every":2,"unit":"month","anchor":"from_completion"}';
       expect(computeNextDueDate(rule, due, completion)).toBe(localMidnight(2025, 3, 20));
     });
+  });
+});
+
+describe("nextOccurrenceId", () => {
+  const source = "3f2b8c1e-5a6d-4e7f-8a9b-0c1d2e3f4a5b";
+
+  it("is a deterministic, valid UUID that differs per source and along the chain", () => {
+    const next = nextOccurrenceId(source);
+    expect(next).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-8[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+    expect(nextOccurrenceId(source)).toBe(next);
+    expect(nextOccurrenceId(next)).not.toBe(next);
+    expect(nextOccurrenceId("4f2b8c1e-5a6d-4e7f-8a9b-0c1d2e3f4a5b")).not.toBe(next);
   });
 });

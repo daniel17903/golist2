@@ -85,6 +85,8 @@ type TodoListProps = {
   onPointerDown: (itemId: string, name: string) => void;
   onPointerUp: (itemId: string) => void;
   onPointerCancel: () => void;
+  /** Completes a todo activated without a pointer (Enter/Space, screen readers). */
+  onActivate: (itemId: string) => void;
 };
 
 const TodoList = memo(function TodoList({
@@ -97,17 +99,25 @@ const TodoList = memo(function TodoList({
   onPointerDown,
   onPointerUp,
   onPointerCancel,
+  onActivate,
 }: TodoListProps) {
   const { t } = useI18n();
 
-  // Stable identity for the memoized rows (see ItemGrid).
+  // Stable identity for the memoized rows (see ItemGrid). Pointer presses
+  // complete a todo via onPointerUp; a click without a pointer (`detail` 0:
+  // keyboard activation or a screen reader) completes it here instead.
   const handleItemClick = useCallback(
     (event: MouseEvent<HTMLButtonElement>) => {
       if (longPressTriggeredRef.current || suppressItemPressRef.current) {
         event.preventDefault();
+        return;
+      }
+      const itemId = event.currentTarget.dataset.itemId;
+      if (event.detail === 0 && itemId) {
+        onActivate(itemId);
       }
     },
-    [longPressTriggeredRef, suppressItemPressRef],
+    [longPressTriggeredRef, suppressItemPressRef, onActivate],
   );
 
   return (

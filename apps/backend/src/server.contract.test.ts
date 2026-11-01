@@ -652,6 +652,9 @@ describe('list types and todo fields', () => {
 
     const invalid = await put({ name: 'x', deleted: false, updatedAt: '2026-03-22T08:00:00.000Z', points: 0 })
     expect(invalid.statusCode).toBe(400)
+    // Above the documented maximum (keeps values inside the Postgres INTEGER column).
+    const tooMany = await put({ name: 'x', deleted: false, updatedAt: '2026-03-22T08:00:00.000Z', points: 1001 })
+    expect(tooMany.statusCode).toBe(400)
 
     await app.close()
   })

@@ -57,6 +57,33 @@ describe("todo lists", () => {
     expect(a.itemsOf(listId).find((item) => item.id === completion.spawnedItemId)?.deleted).toBe(true);
   });
 
+  it("two devices completing the same recurring todo offline create one next occurrence", async () => {
+    sim = await SyncSim.start();
+    const { listId, devices: [a, b] } = await sim.sharedList(2);
+    await a.setActiveListType("todo");
+    await a.addTodo("Water plants", { dueDate: sim.clock.now(), recurrence: weekly });
+    await sim.waitForConvergence(listId);
+
+    a.goOffline();
+    b.goOffline();
+    const fromA = await a.completeTodo("Water plants");
+    const fromB = await b.completeTodo("Water plants");
+    a.goOnline();
+    b.goOnline();
+    await sim.waitForConvergence(listId);
+
+    expect(fromA.spawnedItemId).toBe(fromB.spawnedItemId);
+    for (const device of [a, b]) {
+      expect(device.openTodoTitles()).toEqual(["Water plants"]);
+    }
+
+    // Undo on one device removes the (single) next occurrence everywhere.
+    await b.undoCompleteTodo(fromB);
+    await sim.waitForConvergence(listId);
+    expect(a.openTodoTitles()).toEqual(["Water plants"]);
+    expect(a.itemsOf(listId).filter((item) => !item.deleted)).toHaveLength(1);
+  });
+
   it("concurrent offline type switch and rename converge on the newer metadata", async () => {
     sim = await SyncSim.start();
     const { listId, devices: [a, b] } = await sim.sharedList(2);

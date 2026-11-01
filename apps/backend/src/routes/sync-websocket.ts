@@ -1,5 +1,5 @@
 import { buildItemHash } from '@golist/shared/domain/sync'
-import { listTypes, type Item, type ListType } from '@golist/shared/domain/types'
+import { listTypes, maxTodoPoints, type Item, type ListType } from '@golist/shared/domain/types'
 import websocket from '@fastify/websocket'
 import type { RawData, WebSocket } from 'ws'
 import { type FastifyInstance } from 'fastify'
@@ -66,7 +66,7 @@ const itemPatchSchema = z.object({
       createdAt: dateMillisSchema,
       updatedAt: dateMillisSchema,
       description: z.string().min(1).optional(),
-      points: z.number().int().positive().optional(),
+      points: z.number().int().positive().max(maxTodoPoints).optional(),
       completedAt: dateMillisSchema.optional(),
       dueDate: dateMillisSchema.optional(),
       assignedTo: z.string().min(1).optional(),

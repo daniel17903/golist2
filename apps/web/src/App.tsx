@@ -39,13 +39,15 @@ import { TODO_TITLE_INPUT_ID, useTodoDialog } from "./hooks/useTodoDialog";
 import { calculateListStats } from "./domain/listStats";
 import { calculateTodoStats } from "./domain/todoStats";
 import { recentAssignees } from "./domain/todoSort";
-import type { Item, ListType } from "@golist/shared/domain/types";
+import { resolveListType, type Item, type ListType } from "@golist/shared/domain/types";
 import { useI18n } from "./i18n";
 import { useStore } from "./state/useStore";
 
 type LegalModalType = "imprint" | "privacy";
 
 const noAssignees: string[] = [];
+
+type RemovedEntry = { kind: "deleted" } | { kind: "completed"; spawnedItemId?: string };
 
 // Store actions are stable references — select them once at module scope.
 const {
@@ -164,16 +166,21 @@ const App = () => {
 
   // Tapping an entry removes it from the visible list: a shopping item is
   // checked off (deleted, comes back as a suggestion), a todo is completed.
-  const removeEntry = useCallback(async (itemId: string): Promise<{ spawnedItemId?: string }> => {
-    if (activeListTypeRef.current === "todo") {
-      return toggleTodoCompleted(itemId);
+  // Decided by the item's own list (not the active one, which can change
+  // during the exit animation), and returned so the undo toast matches.
+  const removeEntry = useCallback(async (itemId: string): Promise<RemovedEntry> => {
+    const { items: currentItems, lists: currentLists } = useStore.getState();
+    const listId = currentItems.find((entry) => entry.id === itemId)?.listId;
+    if (resolveListType(currentLists.find((list) => list.id === listId)) === "todo") {
+      const { spawnedItemId } = await toggleTodoCompleted(itemId);
+      return { kind: "completed", spawnedItemId };
     }
     await toggleItem(itemId);
-    return {};
+    return { kind: "deleted" };
   }, []);
 
-  const handleEntryRemoved = useCallback((item: Item, result: { spawnedItemId?: string }) => {
-    if (activeListTypeRef.current === "todo") {
+  const handleEntryRemoved = useCallback((item: Item, result: RemovedEntry) => {
+    if (result.kind === "completed") {
       showUndoComplete(item, result.spawnedItemId);
     } else {
       showUndoDelete(item);
@@ -185,6 +192,10 @@ const App = () => {
     toggleItem: removeEntry,
     onItemDeleted: handleEntryRemoved,
   });
+
+  const handleActivateTodo = useCallback((itemId: string) => {
+    void handleToggleItem(itemId);
+  }, [handleToggleItem]);
 
   const handleDeleteTodo = useCallback((itemId: string) => {
     const item = items.find((entry) => entry.id === itemId);
@@ -429,6 +440,7 @@ const App = () => {
       {activeListType === "todo" ? (
         <TodoList
           items={visibleListItems}
+          onActivate={handleActivateTodo}
           exitingItemIds={exitingItemIds}
           onExitComplete={handleExitComplete}
           longPressTriggeredRef={longPressTriggeredRef}

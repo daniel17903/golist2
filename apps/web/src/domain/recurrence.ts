@@ -118,3 +118,27 @@ export function computeNextDueDate(
 
   return next.getTime();
 }
+
+// 64-bit FNV-1a over UTF-16 code units, as 16 hex digits.
+const fnv1a64 = (value: string): string => {
+  let hash = 0xcbf29ce484222325n;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= BigInt(value.charCodeAt(index));
+    hash = (hash * 0x100000001b3n) & 0xffffffffffffffffn;
+  }
+  return hash.toString(16).padStart(16, "0");
+};
+
+/**
+ * Id of the occurrence that follows the todo `sourceId` (a version-8 UUID
+ * derived from it). Deterministic, so two devices completing the same
+ * recurring todo offline create the same next occurrence instead of two, and
+ * an undo on either device removes it everywhere.
+ */
+export const nextOccurrenceId = (sourceId: string): string => {
+  const hex = `${fnv1a64(`${sourceId}:next`)}${fnv1a64(`${sourceId}:next:2`)}`.split("");
+  hex[12] = "8";
+  hex[16] = ((Number.parseInt(hex[16], 16) & 0x3) | 0x8).toString(16);
+  const joined = hex.join("");
+  return `${joined.slice(0, 8)}-${joined.slice(8, 12)}-${joined.slice(12, 16)}-${joined.slice(16, 20)}-${joined.slice(20)}`;
+};

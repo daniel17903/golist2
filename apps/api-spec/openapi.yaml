@@ -93,6 +93,7 @@ components:
         points:
           type: integer
           minimum: 1
+          maximum: 1000
           description: 'Todo lists: effort points used by the stats (unset means 1).'
         completedAt:
           type: string
@@ -198,6 +199,7 @@ components:
         points:
           type: [integer, 'null']
           minimum: 1
+          maximum: 1000
           description: 'Omitted keeps the stored value, null clears it. Todo lists: effort points used by the stats (unset means 1).'
         completedAt:
           type: [string, 'null']
@@ -296,6 +298,7 @@ components:
         points:
           type: integer
           minimum: 1
+          maximum: 1000
           description: 'Todo lists: effort points used by the stats (unset means 1).'
         completedAt:
           type: integer

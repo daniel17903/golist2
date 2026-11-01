@@ -1,4 +1,5 @@
 import { memo, useCallback, type ChangeEvent, type FormEvent } from "react";
+import { maxTodoPoints } from "@golist/shared/domain/types";
 import Modal from "./Modal";
 import RecurrenceInput from "./RecurrenceInput";
 import { TODO_TITLE_INPUT_ID, type TodoFormValues } from "../hooks/useTodoDialog";
@@ -136,6 +137,7 @@ const TodoFormModal = memo(function TodoFormModal({
           type="number"
           inputMode="numeric"
           min="1"
+          max={maxTodoPoints}
           step="1"
           value={values.points}
           onChange={(event) => onChange({ points: event.target.value })}

@@ -129,16 +129,17 @@ const RecurrenceInput = memo(function RecurrenceInput({
               min={1}
               max={99}
               step={1}
+              aria-label={t("todo.recurrenceInterval")}
               value={every}
               onChange={handleEveryChange}
             />
-            <select value={unit} onChange={handleUnitChange}>
+            <select value={unit} onChange={handleUnitChange} aria-label={t("todo.recurrenceUnitLabel")}>
               <option value="day">{t("todo.recurrenceUnit.day")}</option>
               <option value="week">{t("todo.recurrenceUnit.week")}</option>
               <option value="month">{t("todo.recurrenceUnit.month")}</option>
             </select>
             {unit === "week" && (
-              <select value={weekday} onChange={handleWeekdayChange}>
+              <select value={weekday} onChange={handleWeekdayChange} aria-label={t("todo.recurrenceWeekday")}>
                 <option value="">{t("todo.recurrenceWeekdayNone")}</option>
                 {WEEKDAYS.map((wd) => (
                   <option key={wd} value={wd}>

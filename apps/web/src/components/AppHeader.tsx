@@ -59,18 +59,27 @@ const AppHeader = memo(function AppHeader({
       <div className="header-card">
         <div className="title-row">
           {isEditingName ? (
-            <div className="title-edit" role="group" aria-label={t("header.editListName")}>
+            <div
+              className="title-edit"
+              role="group"
+              aria-label={t("header.editListName")}
+              onBlur={(event) => {
+                // Moving focus between the name input and the type toggle
+                // (e.g. Tab) stays in edit mode; leaving the group saves.
+                if (event.relatedTarget instanceof Node && event.currentTarget.contains(event.relatedTarget)) {
+                  return;
+                }
+                if (skipBlurSaveRef.current) {
+                  skipBlurSaveRef.current = false;
+                  return;
+                }
+                handleSaveRename();
+              }}
+            >
               <input
                 ref={renameInputRef}
                 value={renameValue}
                 onChange={(event) => setRenameValue(event.target.value)}
-                onBlur={() => {
-                  if (skipBlurSaveRef.current) {
-                    skipBlurSaveRef.current = false;
-                    return;
-                  }
-                  handleSaveRename();
-                }}
                 onKeyDown={(event) => {
                   if (event.key === "Enter") {
                     event.preventDefault();

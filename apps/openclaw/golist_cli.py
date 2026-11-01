@@ -325,13 +325,22 @@ def find_item_by_name(list_payload: dict[str, Any], name: str) -> dict[str, Any]
         return None
 
     normalized_name = name.strip().lower()
-    for item in items:
-        if not isinstance(item, dict):
-            continue
-        item_name = item.get("name")
-        if isinstance(item_name, str) and item_name.strip().lower() == normalized_name:
-            return item
-    return None
+    matches = [
+        item
+        for item in items
+        if isinstance(item, dict)
+        and isinstance(item.get("name"), str)
+        and item["name"].strip().lower() == normalized_name
+    ]
+    # Prefer an open entry (e.g. the next occurrence of a recurring todo), then
+    # a completed todo, then a checked-off/deleted item to revive.
+    for match in matches:
+        if not match.get("deleted") and not match.get("completedAt"):
+            return match
+    for match in matches:
+        if not match.get("deleted"):
+            return match
+    return matches[0] if matches else None
 
 
 def existing_quantity(item: dict[str, Any] | None) -> str | None:

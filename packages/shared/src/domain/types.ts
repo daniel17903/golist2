@@ -12,6 +12,9 @@ export const listTypes: readonly ListType[] = ["shopping", "todo"];
 
 export const defaultListType: ListType = "shopping";
 
+/** Upper bound for todo `points` (validated by the API; well inside the Postgres INTEGER range). */
+export const maxTodoPoints = 1000;
+
 export const isListType = (value: unknown): value is ListType => value === "shopping" || value === "todo";
 
 export type SharedList = {

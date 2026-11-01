@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { Item } from "@golist/shared/domain/types";
+import { maxTodoPoints, type Item } from "@golist/shared/domain/types";
 import { dateInputToMillis, millisToDateInput } from "../domain/dueDate";
 import { useStore, type TodoInput } from "../state/useStore";
 import type { PopupId } from "./usePopupStack";
@@ -34,7 +34,7 @@ const toTodoInput = (values: TodoFormValues): TodoInput => {
   return {
     title: values.title.trim(),
     description: values.description,
-    points: Number.isInteger(points) && points > 0 ? points : undefined,
+    points: Number.isInteger(points) && points > 0 ? Math.min(points, maxTodoPoints) : undefined,
     dueDate: dateInputToMillis(values.dueDate),
     assignedTo: values.assignedTo,
     recurrence: values.recurrence,
