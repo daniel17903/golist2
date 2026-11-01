@@ -131,7 +131,10 @@
   import through the package name (`@golist/shared/domain/types`), which the `exports` map resolves to the `.ts`
   file. vitest, tsx and Vite accept extensionless relative imports, so only `npm run smoke:dist -w apps/backend`
   catches this (an extensionless import crashed the production backend once).
-- The deployment (Coolify) health check probes `GET /healthz`; keep that route (same handler as `/health`).
+- The deployment (Coolify) health check runs `wget http://localhost:3000/healthz` inside the Alpine image (no `curl`
+  there), and Alpine resolves `localhost` to `::1` first. Keep the `/healthz` route (same handler as `/health`) and
+  keep the server listening dual-stack (`apps/backend/src/listen.ts` binds `::` for `HOST=0.0.0.0`, falling back to
+  IPv4 without IPv6); an IPv4-only bind makes every rollout unhealthy.
 
 - The PWA service worker can cache aggressively; use hard refresh or clear site data
   when debugging PWA changes.
