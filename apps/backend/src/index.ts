@@ -1,4 +1,5 @@
 import { env } from './config/env.js'
+import { listenOnHost } from './listen.js'
 import { buildServer } from './server.js'
 
 const server = buildServer()
@@ -14,11 +15,11 @@ async function start() {
   )
 
   try {
-    await server.listen({ host: env.HOST, port: env.PORT })
+    const boundHost = await listenOnHost(server, env.HOST, env.PORT)
 
     server.log.info(
       {
-        host: env.HOST,
+        host: boundHost,
         port: env.PORT,
       },
       'backend server is listening',

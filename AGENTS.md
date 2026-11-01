@@ -13,8 +13,8 @@
 - `packages/shared/` contains shared domain code that can be reused by web and backend (types, sync hashing, item
   category mapping, Berlin time, recurrence).
 - `apps/web/sim/` is the in-process multi-device sync simulation (real web store + sync client against the real backend); see `apps/web/sim/README.md`.
-- `scripts/` holds repo tooling: `agent-setup.sh` (container setup, also run by the Claude Code SessionStart hook in `.claude/`), `local-postgres.sh` (throwaway local database), `verify.mjs` (runs the right checks).
-- `.claude/hooks/` holds Claude Code hooks: `session-start.sh` (runs `agent-setup.sh` in cloud sessions) and `pre-push-verify.sh` (a PreToolUse hook that blocks `git push` until `npm run verify:changed` passes; push detection in `is-git-push.mjs`, tested by `node --test .claude/hooks/is-git-push.test.mjs`). It is registered in `.claude/settings.json`, which also allowlists the routine check commands.
+- `scripts/` holds repo tooling: `agent-setup.sh` (container setup, also run by the Claude Code SessionStart hook in `.claude/`), `playwright-chromium.sh` (finds a usable Chromium when the pinned Playwright's build is missing), `local-postgres.sh` (throwaway local database), `verify.mjs` (runs the right checks).
+- `.claude/hooks/` holds Claude Code hooks: `session-start.sh` (runs `agent-setup.sh` in cloud sessions) and `pre-push-verify.sh` (a PreToolUse hook that blocks `git push` until `npm run verify:changed` passes; it sets `PLAYWRIGHT_CHROMIUM_EXECUTABLE` itself via `scripts/playwright-chromium.sh`, since hooks don't inherit the session env; push detection in `is-git-push.mjs`, tested by `node --test .claude/hooks/is-git-push.test.mjs`). It is registered in `.claude/settings.json`, which also allowlists the routine check commands.
 - Root `package.json` is a workspace manifest; run workspace commands with `-w apps/web` or `-w apps/backend`, or use root aliases like `npm run dev:web` and `npm run dev:backend`.
 
 ## Project snapshot (web app)
@@ -29,7 +29,9 @@
 - **localStorage keys**: `golist.deviceId`, `golist.selectedListId`, plus the i18n keys defined in `apps/web/src/i18n/config.ts`.
 
 ## Quickstart
-- Requires Node `>= 24` (see `engines` in the root `package.json`).
+- Requires Node `>= 24.22.1` (see `engines` in the root `package.json`): the first Node 24 release with the fix for
+  CVE-2026-111497 (Broccoli2Shell, Brotli decoder RCE). CI workflows and Dockerfiles pin an exact patched version;
+  bump them together when a newer Node security release lands.
 - Fresh (agent) container: `scripts/agent-setup.sh` installs deps and sets up the Playwright browser (prints `export` lines to eval when not run from the SessionStart hook).
 - `npm install`
 - `npm run dev:web` (runs web app dev server from root, default http://localhost:5173)
@@ -135,7 +137,10 @@
   import through the package name (`@golist/shared/domain/types`), which the `exports` map resolves to the `.ts`
   file. vitest, tsx and Vite accept extensionless relative imports, so only `npm run smoke:dist -w apps/backend`
   catches this (an extensionless import crashed the production backend once).
-- The deployment (Coolify) health check probes `GET /healthz`; keep that route (same handler as `/health`).
+- The deployment (Coolify) health check runs `wget http://localhost:3000/healthz` inside the Alpine image (no `curl`
+  there), and Alpine resolves `localhost` to `::1` first. Keep the `/healthz` route (same handler as `/health`) and
+  keep the server listening dual-stack (`apps/backend/src/listen.ts` binds `::` for `HOST=0.0.0.0`, falling back to
+  IPv4 without IPv6); an IPv4-only bind makes every rollout unhealthy.
 
 - The PWA service worker can cache aggressively; use hard refresh or clear site data
   when debugging PWA changes.

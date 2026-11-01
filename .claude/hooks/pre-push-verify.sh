@@ -21,12 +21,14 @@ if [ "$is_push" != "yes" ]; then
   exit 0
 fi
 
-# The hook runs in Claude Code's own environment, which does not see the
-# exports the SessionStart hook wrote for the Bash tool (e.g. the Chromium
-# path the E2E suite needs). Re-derive them; agent-setup.sh is idempotent and
-# skips `npm install` when node_modules is up to date.
+# Hooks don't inherit the session env file agent-setup.sh writes, so redo its
+# Chromium detection here; otherwise E2E can't launch a browser in containers
+# whose preinstalled build differs from the pinned Playwright's.
 if [ -z "${PLAYWRIGHT_CHROMIUM_EXECUTABLE:-}" ]; then
-  eval "$(cd "$project_dir" && scripts/agent-setup.sh 2>/dev/null)" || true
+  chromium="$("$project_dir/scripts/playwright-chromium.sh" 2>/dev/null || true)"
+  if [ -n "$chromium" ]; then
+    export PLAYWRIGHT_CHROMIUM_EXECUTABLE="$chromium"
+  fi
 fi
 
 log_file="$(mktemp -t golist-verify.XXXXXX)"

@@ -1,4 +1,4 @@
-FROM node:24.8.0-alpine3.22 AS deps
+FROM node:24.22.1-alpine3.24 AS deps
 WORKDIR /app
 COPY package*.json ./
 COPY apps/backend/package.json ./apps/backend/package.json
@@ -11,7 +11,7 @@ COPY apps/backend ./apps/backend
 COPY packages/shared ./packages/shared
 RUN npm run build -w apps/backend
 
-FROM node:24.8.0-alpine3.22 AS runtime
+FROM node:24.22.1-alpine3.24 AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 COPY package*.json ./

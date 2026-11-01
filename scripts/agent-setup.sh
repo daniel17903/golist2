@@ -25,9 +25,9 @@ emit_env() {
 
 cd "$repo_root"
 
-node_major="$(node -p 'process.versions.node.split(".")[0]')"
-if (( node_major < 24 )); then
-  log "warning: Node $(node -v) is older than the required >=24 (package.json engines); things usually still work."
+# 24.22.1 is the first Node 24 release with the fix for CVE-2026-111497 (Broccoli2Shell, Brotli decoder RCE).
+if ! node -e 'const [a, b, c] = process.versions.node.split(".").map(Number); process.exit(a > 24 || (a === 24 && (b > 22 || (b === 22 && c >= 1))) ? 0 : 1)'; then
+  log "warning: Node $(node -v) is older than the required >=24.22.1 (package.json engines); upgrade it (CVE-2026-111497)."
 fi
 
 # `npm install` (not `npm ci`) so a cached container state is reused.
@@ -42,29 +42,16 @@ fi
 # The pinned Playwright expects one Chromium build; containers often ship a
 # different one under $PLAYWRIGHT_BROWSERS_PATH. Use the expected build when
 # present, otherwise point the suite at any installed Chromium.
-browsers_dir="${PLAYWRIGHT_BROWSERS_PATH:-$HOME/.cache/ms-playwright}"
-expected_rev="$(node -e '
-  const fs = require("node:fs");
-  const path = require("node:path");
-  const file = path.join(path.dirname(require.resolve("playwright-core")), "browsers.json");
-  const entry = JSON.parse(fs.readFileSync(file, "utf8")).browsers.find((b) => b.name === "chromium");
-  process.stdout.write(entry ? entry.revision : "");
-')"
-
-if [[ -n "$expected_rev" && ( -d "$browsers_dir/chromium_headless_shell-$expected_rev" || -d "$browsers_dir/chromium-$expected_rev" ) ]]; then
-  log "Playwright Chromium $expected_rev is installed"
-else
-  # Prefer a full Chromium build, fall back to a headless-shell-only install.
-  fallback="$(ls -d "$browsers_dir"/chromium-*/chrome-linux*/chrome 2>/dev/null | sort -V | tail -n 1 || true)"
-  if [[ -z "$fallback" ]]; then
-    fallback="$(ls -d "$browsers_dir"/chromium_headless_shell-*/chrome-*/chrome-headless-shell 2>/dev/null | sort -V | tail -n 1 || true)"
-  fi
+# Detection lives in playwright-chromium.sh so the pre-push hook can reuse it.
+if fallback="$("$repo_root/scripts/playwright-chromium.sh")"; then
   if [[ -n "$fallback" ]]; then
-    log "Playwright wants Chromium $expected_rev; using preinstalled $fallback"
+    log "Playwright's expected Chromium is missing; using preinstalled $fallback"
     emit_env PLAYWRIGHT_CHROMIUM_EXECUTABLE "$fallback"
   else
-    log "no Chromium found; run: npx playwright install chromium && npx playwright install-deps chromium"
+    log "Playwright's expected Chromium is installed"
   fi
+else
+  log "no Chromium found; run: npx playwright install chromium && npx playwright install-deps chromium"
 fi
 
 # --- Postgres -----------------------------------------------------------------
