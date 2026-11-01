@@ -42,6 +42,7 @@ export class InMemoryListRepository implements ListRepository {
   private readonly items = new Map<string, ListItemRecord>()
   private readonly shareTokens = new Map<string, ShareToken>()
   private readonly redemptions = new Set<string>()
+  private readonly visibleLists = new Map<string, Set<string>>()
   private readonly connectors = new Map<string, ConnectorRecord & { keyHash: string }>()
   private pingError: Error | null = null
 
@@ -91,6 +92,7 @@ export class InMemoryListRepository implements ListRepository {
     return (
       connector !== undefined &&
       (connector.includeAllLists || connector.listIds.includes(listId)) &&
+      (this.visibleLists.get(connector.ownerDeviceId)?.has(listId) ?? false) &&
       this.hasDirectListAccess(listId, connector.ownerDeviceId)
     )
   }
@@ -319,6 +321,10 @@ export class InMemoryListRepository implements ListRepository {
   private toConnectorRecord({ keyHash, ...connector }: ConnectorRecord & { keyHash: string }): ConnectorRecord {
     void keyHash
     return { ...connector, listIds: [...connector.listIds] }
+  }
+
+  async setVisibleLists(deviceId: string, listIds: string[]): Promise<void> {
+    this.visibleLists.set(deviceId, new Set(listIds))
   }
 
   async createConnector(ownerDeviceId: string, keyHash: string, input: ConnectorInput): Promise<ConnectorRecord> {

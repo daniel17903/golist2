@@ -795,6 +795,33 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "403":
           $ref: "#/components/responses/Forbidden"
+  /v1/device/lists:
+    put:
+      operationId: setDeviceLists
+      summary: Report the lists the calling device's app currently shows
+      description: |
+        Replaces the stored set. AI assistant connectors only reach lists that their owner device still shows, so
+        a list deleted in the app (deleting is local to the device) is no longer reachable through them. The app
+        sends this on start and whenever its lists change.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [listIds]
+              properties:
+                listIds:
+                  type: array
+                  maxItems: 1000
+                  items:
+                    type: string
+                    format: uuid
+      responses:
+        "204":
+          description: Stored
+        "400":
+          $ref: "#/components/responses/BadRequest"
   /v1/connectors:
     get:
       operationId: listConnectors

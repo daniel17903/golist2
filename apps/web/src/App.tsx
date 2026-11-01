@@ -21,6 +21,7 @@ const AiConnectorsModal = lazy(() => import("./components/AiConnectorsModal"));
 const ListStatsModal = lazy(() => import("./components/ListStatsModal"));
 const TodoStatsModal = lazy(() => import("./components/TodoStatsModal"));
 import { useAppBootstrap } from "./hooks/useAppBootstrap";
+import { useReportDeviceLists } from "./hooks/useReportDeviceLists";
 import { useAppState } from "./hooks/useAppState";
 import { useAddItemDialog } from "./hooks/useAddItemDialog";
 import { useBackGestureTrap } from "./hooks/useBackGestureTrap";
@@ -162,6 +163,7 @@ const App = () => {
   } = useInviteLanding({ openPopup, closePopup, onCopyFailed: handleInviteCopyFailed, onJoinFailed: handleJoinFailed });
 
   useAppBootstrap({ onShareLinkJoinFailed: handleJoinFailed, onIosShareLink: showInviteLanding });
+  useReportDeviceLists({ lists, deviceId, isLoaded, backendSharingEnabled, backendConnection });
 
   const activeListTypeRef = useRef(activeListType);
   useEffect(() => { activeListTypeRef.current = activeListType; });

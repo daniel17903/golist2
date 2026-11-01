@@ -71,7 +71,8 @@ export interface ListRepository {
   /**
    * Whether the device may read and write the list: it created the list, or
    * redeemed a valid share token for it — or it is a connector whose owner
-   * device may access the list and that connector includes the list.
+   * device may access the list, still shows it (`setVisibleLists`), and that
+   * connector includes the list.
    */
   hasListAccess(listId: string, deviceId: string): Promise<boolean>
   /** Every list `hasListAccess` allows for the device, ordered by id. */
@@ -93,6 +94,8 @@ export interface ListRepository {
   createShareToken(listId: string, deviceId: string): Promise<{ tokenId: string; createdAt: string }>
   recordShareTokenRedemption(tokenId: string, deviceId: string): Promise<void>
 
+  /** Replaces the lists the device's app currently shows. */
+  setVisibleLists(deviceId: string, listIds: string[]): Promise<void>
   createConnector(ownerDeviceId: string, keyHash: string, input: ConnectorInput): Promise<ConnectorRecord>
   listConnectors(ownerDeviceId: string): Promise<ConnectorRecord[]>
   findConnectorByKeyHash(keyHash: string): Promise<ConnectorRecord | null>

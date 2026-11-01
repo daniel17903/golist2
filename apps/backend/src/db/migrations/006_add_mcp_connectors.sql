@@ -24,3 +24,14 @@ CREATE TABLE IF NOT EXISTS mcp_connector_lists (
 
 -- Listing a device's (or a connector owner's) lists looks lists up by creator.
 CREATE INDEX IF NOT EXISTS idx_shared_lists_created_by_device_id ON shared_lists(created_by_device_id);
+
+-- The lists each device currently shows (reported by the app on start and
+-- whenever its lists change). Deleting a list in the app is local-only, so
+-- without this a connector would still reach lists the owner deleted. No
+-- foreign key: the app may report a list it created offline before the
+-- backend knows it.
+CREATE TABLE IF NOT EXISTS device_visible_lists (
+  device_id UUID NOT NULL,
+  list_id UUID NOT NULL,
+  PRIMARY KEY (device_id, list_id)
+);

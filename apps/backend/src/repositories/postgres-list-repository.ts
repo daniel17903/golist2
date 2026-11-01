@@ -45,7 +45,7 @@ const directAccessCondition = (list: string, device: string) => `(
 
 // SQL condition for `ListRepository.hasListAccess`: direct access, or the
 // device is a connector that includes the list and whose owner has direct
-// access to it.
+// access to it and still shows it in the app.
 const accessCondition = (list: string, device: string) => `(
   ${directAccessCondition(list, device)}
   OR EXISTS(
@@ -60,6 +60,12 @@ const accessCondition = (list: string, device: string) => `(
             WHERE picked.connector_id = connectors.id
               AND picked.list_id = ${list}
          )
+       )
+       AND EXISTS(
+         SELECT 1
+           FROM device_visible_lists visible
+          WHERE visible.device_id = connectors.owner_device_id
+            AND visible.list_id = ${list}
        )
        AND ${directAccessCondition(list, 'connectors.owner_device_id')}
   )
@@ -547,6 +553,18 @@ export class PostgresListRepository implements ListRepository {
        ON CONFLICT (token_id, device_id) DO NOTHING`,
       [tokenId, deviceId],
     )
+  }
+
+  async setVisibleLists(deviceId: string, listIds: string[]): Promise<void> {
+    await withTransaction(async (client) => {
+      await client.query('DELETE FROM device_visible_lists WHERE device_id = $1', [deviceId])
+      await client.query(
+        `INSERT INTO device_visible_lists(device_id, list_id)
+         SELECT $1, list_id FROM unnest($2::uuid[]) AS list_id
+         ON CONFLICT DO NOTHING`,
+        [deviceId, listIds],
+      )
+    })
   }
 
   async createConnector(ownerDeviceId: string, keyHash: string, input: ConnectorInput): Promise<ConnectorRecord> {

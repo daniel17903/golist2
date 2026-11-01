@@ -61,7 +61,8 @@
   dialog has a one-tap "Paste from clipboard" button) or to use the list in the browser.
 - **AI assistant connections (MCP)**: Settings → AI assistants creates a connector URL (`/v1/mcp/{key}`; the key is
   the only credential and is shown once). Each connector has its own device id and reaches all of the owner device's
-  lists or the picked ones; its writes are broadcast to the open apps. Details in `docs/mcp-server.md`.
+  lists or the picked ones — only lists the owner's app still shows, which the app reports via `PUT /v1/device/lists`
+  (`hooks/useReportDeviceLists.ts`); its writes are broadcast to the open apps. Details in `docs/mcp-server.md`.
 - **Undo toasts** for item deletion, todo completion (also removes the next occurrence of a recurring todo) and list
   rename (max 3 stacked, 5s timeout).
 - **Pull-to-refresh** forces a WebSocket reconnect; the pull distance is written straight to the DOM to avoid per-frame re-renders.

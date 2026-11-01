@@ -35,6 +35,15 @@ export function registerConnectorRoutes(app: FastifyInstance, listRepository: Li
     return access.every(Boolean) ? { ...input, listIds } : null
   }
 
+  // The app reports the lists it shows, so connectors never reach a list the
+  // owner deleted in the app (deleting is local-only).
+  app.put('/v1/device/lists', async (request, reply) => {
+    const headers = deviceHeaderSchema.parse(request.headers)
+    const body = z.object({ listIds: z.array(z.uuid()).max(1000) }).parse(request.body)
+    await listRepository.setVisibleLists(headers['x-device-id'], [...new Set(body.listIds)])
+    reply.code(204)
+  })
+
   app.get('/v1/connectors', async (request) => {
     const headers = deviceHeaderSchema.parse(request.headers)
     const connectors = await listRepository.listConnectors(headers['x-device-id'])

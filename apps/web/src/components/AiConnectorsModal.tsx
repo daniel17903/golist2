@@ -96,6 +96,9 @@ const AiConnectorsModal = memo(function AiConnectorsModal({ isOpen, deviceId, on
     };
     const editing = view.connector;
     void run(async () => {
+      // Connectors only reach lists this device reports as shown; make sure
+      // the backend has the current set before the connector is used.
+      await sharingApiClient.setDeviceLists({ deviceId, listIds: lists.map((list) => list.id) });
       if (editing) {
         await sharingApiClient.updateConnector({ deviceId, connectorId: editing.connectorId, input });
         setView({ kind: "overview" });

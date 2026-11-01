@@ -99,4 +99,28 @@ test.describe("AI assistant connections", () => {
     await app.page.getByRole("button", { name: "Done" }).click();
     await expect(app.page.getByTestId("ai-connector")).toContainText("1 list(s)");
   });
+
+  test("an assistant no longer reaches a list deleted in the app", async ({ app }) => {
+    await app.waitForRealtimeSync();
+    await app.createList("Old list");
+    await app.waitForRealtimeSync();
+
+    await app.openDrawer();
+    await app.drawer.getByRole("button", { name: "Settings" }).click();
+    await app.page.getByRole("button", { name: "Connect an AI assistant" }).click();
+    await app.page.getByRole("button", { name: "Add", exact: true }).click();
+    await app.page.getByRole("button", { name: "Create URL" }).click();
+    const url = await app.page.getByLabel("Connector URL").inputValue();
+    const listNames = async () => listsOf((await callTool(url, "list_lists")).result).map((entry) => entry.name);
+    expect(await listNames()).toContain("Old list");
+
+    // Reload to close the dialogs; the device keeps its lists.
+    await app.goto();
+    await app.openDrawer();
+    await app.drawer.getByRole("button", { name: "Delete: Old list" }).click();
+    await app.drawer.getByRole("button", { name: "Confirm delete: Old list" }).click();
+
+    await expect.poll(listNames).not.toContain("Old list");
+    expect(await listNames()).toContain("Shopping list");
+  });
 });

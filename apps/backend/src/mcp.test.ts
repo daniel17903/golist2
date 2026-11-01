@@ -29,10 +29,26 @@ const api = async (method: string, path: string, deviceId: string, body?: unknow
   return { status: response.status, body: jsonObjectSchema.parse(text ? JSON.parse(text) : {}) }
 }
 
+// The lists each device's app shows, as the app reports them.
+const shownLists = new Map<string, Set<string>>()
+const reportLists = async (deviceId: string) => {
+  const response = await api('PUT', '/v1/device/lists', deviceId, { listIds: [...(shownLists.get(deviceId) ?? [])] })
+  expect(response.status).toBe(204)
+}
+const showList = async (deviceId: string, listId: string) => {
+  shownLists.set(deviceId, new Set([...(shownLists.get(deviceId) ?? []), listId]))
+  await reportLists(deviceId)
+}
+const hideList = async (deviceId: string, listId: string) => {
+  shownLists.get(deviceId)?.delete(listId)
+  await reportLists(deviceId)
+}
+
 const createList = async (name: string, deviceId = ownerDeviceId, listType: 'shopping' | 'todo' = 'shopping') => {
   const listId = crypto.randomUUID()
   const response = await api('PUT', `/v1/lists/${listId}`, deviceId, { name, listType })
   expect(response.status).toBe(201)
+  await showList(deviceId, listId)
   return listId
 }
 
@@ -206,12 +222,26 @@ describe.each(repositories)('MCP connectors (%s repository)', (_, makeRepository
       const listId = await createList('Shared with me', otherDeviceId)
       const token = await api('POST', `/v1/lists/${listId}/share-tokens`, otherDeviceId)
       await api('POST', `/v1/share-tokens/${String(token.body.shareToken)}/redeem`, owner)
+      await showList(owner, listId)
       const { key } = await createConnector({ includeAllLists: true }, owner)
       const client = await connect(key)
       expect(await listNames(client)).toEqual(['Shared with me'])
 
       await api('DELETE', `/v1/lists/${listId}`, otherDeviceId)
       expect(await listNames(client)).toEqual([])
+    })
+
+    it('loses access to a list the owner deleted in the app', async () => {
+      const owner = crypto.randomUUID()
+      const kept = await createList('Kept', owner)
+      const deleted = await createList('Deleted in the app', owner)
+      const { key } = await createConnector({ includeAllLists: false, listIds: [kept, deleted] }, owner)
+      const client = await connect(key)
+      expect(await listNames(client)).toEqual(['Deleted in the app', 'Kept'])
+
+      await hideList(owner, deleted)
+      expect(await listNames(client)).toEqual(['Kept'])
+      expect(await callError(client, 'get_list', { listId: deleted })).toContain('No list with this id')
     })
 
     it('adds, updates and checks off shopping items as its own device, and pushes them to open apps', async () => {

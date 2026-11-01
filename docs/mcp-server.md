@@ -12,10 +12,15 @@ assistant that supports remote MCP servers can read and edit a user's lists. Use
   SHA-256 hash is stored, so the app shows the URL once (after creating it or "New URL"). Assistants add it as a
   custom connector without authentication. The key is redacted from request logs (`lib/redact-url.ts`).
 - **Access** (`ListRepository.hasListAccess`): the connector's device id may use a list when it created the list
-  or redeemed one of its share tokens, **or** when the owner may use the list (created/redeemed) and the
-  connector includes it (`include_all_lists`, or a row in `mcp_connector_lists`). The rule is checked on every
+  or redeemed one of its share tokens, **or** when the owner may use the list (created/redeemed), still shows it in
+  the app (`device_visible_lists`) and the connector includes it (`include_all_lists`, or a row in
+  `mcp_connector_lists`). The rule is checked on every
   request, so lists the owner adds later, a changed selection and a deleted connector apply immediately. A
   connector can only delete lists it created itself.
+- **Lists the owner deleted**: deleting a list in the app is local to the device, so the backend would still count
+  it as the owner's list. The app reports the ids of the lists it shows (`PUT /v1/device/lists`,
+  `apps/web/src/hooks/useReportDeviceLists.ts`) after loading, on every change and after reconnecting, and the
+  connector dialog reports them before saving; connectors only reach reported lists.
 - The tools never redeem a share token for the connector itself, except `join_list`: `share_list` would otherwise
   give it direct access that outlives a narrowed selection. Lists the assistant creates or joins stay reachable for
   the connector until it is deleted.

@@ -346,6 +346,23 @@ export const createSharingApiClient = (config: SharingApiConfig) => {
       return parseShareTokenCreateResponse(await response.json());
     },
 
+    /**
+     * Reports the lists this device shows. AI assistant connectors only reach
+     * lists their owner device still shows (deleting a list is local-only).
+     */
+    async setDeviceLists(params: { deviceId: string; listIds: string[] }): Promise<void> {
+      const response = await fetchWithTimeout(
+        `${requireApiBaseUrl()}/v1/device/lists`,
+        {
+          method: "PUT",
+          headers: createHeaders(params.deviceId, { includeJsonContentType: true }),
+          body: JSON.stringify({ listIds: params.listIds }),
+        },
+        "report device lists",
+      );
+      await assertOk(response, "report device lists");
+    },
+
     async listConnectors(params: { deviceId: string }): Promise<ApiConnector[]> {
       const response = await fetchWithTimeout(
         `${requireApiBaseUrl()}/v1/connectors`,
