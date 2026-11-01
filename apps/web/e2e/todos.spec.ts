@@ -123,6 +123,28 @@ test.describe("todo lists", () => {
     await expect(card.locator(".stats-row--this-week .stats-row__value")).toHaveText("5 / 5");
   });
 
+  test("the lists drawer shows each list's type with its own icon", async ({ app }) => {
+    await app.createList("Chores", { listType: "todo" });
+
+    const drawerRow = (name: string) =>
+      app.drawer.locator(".drawer__item-button", {
+        has: app.page.locator(".drawer__item-label", { hasText: new RegExp(`^${name}$`) }),
+      });
+    await app.openDrawer();
+    await expect(drawerRow("Chores")).toHaveAccessibleName(/Chores\s*Todo list/);
+    await expect(drawerRow("Chores").locator(".drawer__item-icon")).toHaveAttribute("data-list-type", "todo");
+    const otherList = app.drawer.locator(".drawer__item-button", { hasNotText: "Chores" }).first();
+    await expect(otherList).toHaveAccessibleName(/Shopping list/);
+    await expect(otherList.locator(".drawer__item-icon")).toHaveAttribute("data-list-type", "shopping");
+    await drawerRow("Chores").click();
+    await expect(app.page.locator(".drawer.drawer--open")).toHaveCount(0);
+
+    await app.setActiveListType("shopping");
+    await app.openDrawer();
+    await expect(drawerRow("Chores")).toHaveAccessibleName(/Chores\s*Shopping list/);
+    await expect(drawerRow("Chores").locator(".drawer__item-icon")).toHaveAttribute("data-list-type", "shopping");
+  });
+
   test("switching a list's type keeps its open entries", async ({ app, backend }) => {
     await app.addItem("milk");
     await app.addItem("bread");

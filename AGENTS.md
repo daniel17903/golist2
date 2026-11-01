@@ -44,7 +44,8 @@
 - **List types**: every list is a `shopping` list (icon grid, check-off deletes the item and it comes back as a
   suggestion) or a `todo` list (rows with due date, assignee, points and recurrence; check-off sets `completedAt`;
   ported from the former DoList app). The type is chosen in the create dialog and switched from the header's inline
-  rename mode; it syncs with the list name as one metadata record (`listType`, missing = `shopping`). Both types share
+  rename mode; it syncs with the list name as one metadata record (`listType`, missing = `shopping`). The lists
+  drawer marks each list with its type's icon (cart or checklist). Both types share
   the items table, store write paths and sync code; the todo fields are optional on every item and only included in
   the item hash when set (so shopping-item hashes are unchanged). Todo UI: `TodoList.tsx`, `TodoFormModal.tsx`,
   `RecurrenceInput.tsx`, `TodoStatsModal.tsx`, `hooks/useTodoDialog.ts`; todo logic: `domain/recurrence.ts`,
