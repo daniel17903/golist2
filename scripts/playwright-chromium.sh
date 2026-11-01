@@ -17,7 +17,10 @@ expected_rev="$(cd "$repo_root" && node -e '
   process.stdout.write(entry ? entry.revision : "");
 ' 2>/dev/null)"
 
-if [[ -n "$expected_rev" && ( -d "$browsers_dir/chromium_headless_shell-$expected_rev" || -d "$browsers_dir/chromium-$expected_rev" ) ]]; then
+# The suite runs headless without a `channel`, so Playwright launches the
+# headless shell; a full Chromium build of the expected revision alone is not
+# enough and is handled by the fallback below.
+if [[ -n "$expected_rev" && -d "$browsers_dir/chromium_headless_shell-$expected_rev" ]]; then
   exit 0
 fi
 
