@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Item } from "@golist/shared/domain/types";
-import { dateInputToMillis, isOpenTodo, millisToDateInput, recentAssignees, sortTodoItems } from "./todoSort";
+import { isOpenTodo, recentAssignees, sortTodoItems } from "./todoSort";
 
 const todo = (id: string, overrides: Partial<Item> = {}): Item => ({
   id,
@@ -53,15 +53,5 @@ describe("recentAssignees", () => {
       "list-1",
     );
     expect(assignees).toEqual(["sam", "ALEX", "Kim"]);
-  });
-});
-
-describe("date input conversion", () => {
-  it("round-trips local dates", () => {
-    const millis = dateInputToMillis("2026-03-07");
-    expect(millis).toBe(new Date(2026, 2, 7).getTime());
-    expect(millisToDateInput(millis)).toBe("2026-03-07");
-    expect(dateInputToMillis("")).toBeUndefined();
-    expect(millisToDateInput(undefined)).toBe("");
   });
 });

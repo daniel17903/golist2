@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatDueDate, isOverdue } from "./dueDate";
+import { dateInputToMillis, formatDueDate, isOverdue, millisToDateInput } from "./dueDate";
 
 const t = (key: string, values?: Record<string, string | number>) =>
   values ? `${key}(${Object.values(values).join(",")})` : key;
@@ -26,5 +26,15 @@ describe("isOverdue", () => {
   it("is overdue only once the due day has passed", () => {
     expect(isOverdue(day(0), now)).toBe(false);
     expect(isOverdue(day(-1), now)).toBe(true);
+  });
+});
+
+describe("date input conversion", () => {
+  it("round-trips local dates", () => {
+    const millis = dateInputToMillis("2026-03-07");
+    expect(millis).toBe(new Date(2026, 2, 7).getTime());
+    expect(millisToDateInput(millis)).toBe("2026-03-07");
+    expect(dateInputToMillis("")).toBeUndefined();
+    expect(millisToDateInput(undefined)).toBe("");
   });
 });

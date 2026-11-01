@@ -1,7 +1,7 @@
 import { memo, useCallback, type ChangeEvent, type FormEvent } from "react";
 import Modal from "./Modal";
 import RecurrenceInput from "./RecurrenceInput";
-import type { TodoFormValues } from "../hooks/useTodoDialog";
+import { TODO_TITLE_INPUT_ID, type TodoFormValues } from "../hooks/useTodoDialog";
 import { useI18n } from "../i18n";
 
 type TodoFormModalProps = {
@@ -72,9 +72,9 @@ const TodoFormModal = memo(function TodoFormModal({
       }
     >
       <div className="modal__field">
-        <label htmlFor="todo-title">{t("todo.title")}</label>
+        <label htmlFor={TODO_TITLE_INPUT_ID}>{t("todo.title")}</label>
         <input
-          id="todo-title"
+          id={TODO_TITLE_INPUT_ID}
           value={values.title}
           onChange={(event) => onChange({ title: event.target.value })}
           placeholder={t("todo.titlePlaceholder")}

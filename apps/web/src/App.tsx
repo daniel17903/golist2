@@ -35,7 +35,7 @@ import { usePopupStack } from "./hooks/usePopupStack";
 import { usePullToRefresh } from "./hooks/usePullToRefresh";
 import { useShareList } from "./hooks/useShareList";
 import { useToasts } from "./hooks/useToasts";
-import { useTodoDialog } from "./hooks/useTodoDialog";
+import { TODO_TITLE_INPUT_ID, useTodoDialog } from "./hooks/useTodoDialog";
 import { calculateListStats } from "./domain/listStats";
 import { calculateTodoStats } from "./domain/todoStats";
 import { recentAssignees } from "./domain/todoSort";
@@ -220,7 +220,7 @@ const App = () => {
   const { handleShareList } = useShareList({ activeList, pushAppToast });
 
   const { languageSuggestion, acceptLanguageSuggestion, dismissLanguageSuggestion } =
-    useLanguageSuggestion({ items, deviceId, isLoaded });
+    useLanguageSuggestion({ items, lists, deviceId, isLoaded });
 
   const {
     handlePointerDown,
@@ -358,7 +358,11 @@ const App = () => {
 
   const handleOpenAddDialog = useCallback(() => {
     if (activeListTypeRef.current === "todo") {
-      openAddTodo();
+      // Mount the dialog and focus it within the tap, so iOS opens the keyboard.
+      flushSync(() => {
+        openAddTodo();
+      });
+      document.getElementById(TODO_TITLE_INPUT_ID)?.focus();
       return;
     }
     flushSync(() => {

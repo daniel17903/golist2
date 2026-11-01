@@ -332,6 +332,18 @@ class UpsertTest(CliTestCase):
         self.assertIn("No active list set", self.stderr)
 
 
+    def test_reopens_a_completed_todo_with_the_same_name(self) -> None:
+        self.write_state()
+        completed = {"id": ITEM_ID, "name": "Vacuum", "deleted": False, "completedAt": "2026-03-01T10:00:00.000Z"}
+
+        self.run_cli("upsert", "Vacuum", responses=[{"listId": LIST_ID, "name": "Chores", "items": [completed]}, None])
+
+        put = self.requests[1]
+        self.assertEqual(put.path, f"/api/v1/lists/{LIST_ID}/items/{ITEM_ID}")
+        self.assertIsNone(put.body["completedAt"])
+        self.assertFalse(put.body["deleted"])
+
+
 class DeleteTest(CliTestCase):
     def test_soft_deletes_item_found_by_name(self) -> None:
         self.write_state()

@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
-import type { Item } from "@golist/shared/domain/types";
+import type { Item, List } from "@golist/shared/domain/types";
 import {
   findLanguageSuggestion,
   isLanguageSuggestionHandled,
@@ -13,15 +13,21 @@ const { recategorizeSuggestedItems } = useStore.getState();
 
 type LanguageSuggestionOptions = {
   items: Item[];
+  lists: List[];
   deviceId: string | undefined;
   isLoaded: boolean;
 };
 
 // Detects when recently added items match another supported language better
 // than the current locale and offers to switch (recategorizing those items).
-export const useLanguageSuggestion = ({ items, deviceId, isLoaded }: LanguageSuggestionOptions) => {
+export const useLanguageSuggestion = ({ items, lists, deviceId, isLoaded }: LanguageSuggestionOptions) => {
   const { locale, setLanguagePreference } = useI18n();
   const [dismissedLocale, setDismissedLocale] = useState<string | null>(null);
+
+  const todoListIds = useMemo(
+    () => new Set(lists.filter((list) => list.listType === "todo").map((list) => list.id)),
+    [lists],
+  );
 
   const suggestion = useMemo(() => {
     if (!isLoaded || !deviceId || isLanguageSuggestionHandled()) {
@@ -32,8 +38,9 @@ export const useLanguageSuggestion = ({ items, deviceId, isLoaded }: LanguageSug
       currentLocale: locale,
       currentDeviceId: deviceId,
       items,
+      todoListIds,
     });
-  }, [deviceId, isLoaded, items, locale]);
+  }, [deviceId, isLoaded, items, todoListIds, locale]);
 
   const languageSuggestion =
     suggestion && dismissedLocale !== suggestion.suggestedLocale ? suggestion : null;

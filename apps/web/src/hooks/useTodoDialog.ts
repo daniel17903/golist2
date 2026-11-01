@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Item } from "@golist/shared/domain/types";
-import { dateInputToMillis, millisToDateInput } from "../domain/todoSort";
+import { dateInputToMillis, millisToDateInput } from "../domain/dueDate";
 import { useStore, type TodoInput } from "../state/useStore";
 import type { PopupId } from "./usePopupStack";
 
 // Store actions are stable references — select them once at module scope.
 const { addTodo, updateTodo } = useStore.getState();
+
+/** DOM id of the todo dialog's title input (focused synchronously when the add dialog opens). */
+export const TODO_TITLE_INPUT_ID = "todo-title";
 
 /** Raw form state of the todo dialog (inputs hold strings). */
 export type TodoFormValues = {

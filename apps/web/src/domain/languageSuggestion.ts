@@ -18,6 +18,8 @@ export type FindLanguageSuggestionInput = {
   currentLocale: Locale;
   currentDeviceId: string;
   items: Item[];
+  /** Todo-type lists: their entries are todo titles, not grocery names, so they are ignored. */
+  todoListIds?: ReadonlySet<string>;
   now?: number;
 };
 
@@ -45,10 +47,13 @@ export const findLanguageSuggestion = ({
   currentLocale,
   currentDeviceId,
   items,
+  todoListIds,
   now = Date.now(),
 }: FindLanguageSuggestionInput): LanguageSuggestion | null => {
   const cutoffTime = now - sevenDaysInMs;
-  const eligibleItems = items.filter((item) => isEligibleItem(item, currentDeviceId, cutoffTime));
+  const eligibleItems = items.filter(
+    (item) => !todoListIds?.has(item.listId) && isEligibleItem(item, currentDeviceId, cutoffTime),
+  );
 
   if (eligibleItems.length < minEligibleItemCount) {
     return null;

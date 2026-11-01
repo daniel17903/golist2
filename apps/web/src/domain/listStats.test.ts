@@ -12,9 +12,22 @@ const createItem = (overrides: Partial<Item> & Pick<Item, "id" | "listId" | "nam
   createdAt: overrides.createdAt ?? 0,
   updatedAt: overrides.updatedAt ?? overrides.createdAt ?? 0,
   quantityOrUnit: overrides.quantityOrUnit,
+  completedAt: overrides.completedAt,
 });
 
 describe("calculateListStats", () => {
+  it("does not count completed todos as open items", () => {
+    const stats = calculateListStats(
+      [
+        createItem({ id: "1", listId: "a", name: "Milk", createdAt: 1000 }),
+        createItem({ id: "2", listId: "a", name: "Vacuum", createdAt: 2000, completedAt: 3000 }),
+      ],
+      "a",
+    );
+
+    expect(stats.openItems).toBe(1);
+  });
+
   it("returns per-list stats", () => {
     const items: Item[] = [
       createItem({ id: "1", listId: "a", name: "Milk", createdAt: 1000, updatedAt: 1000 }),

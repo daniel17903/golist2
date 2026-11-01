@@ -360,6 +360,10 @@ def cmd_upsert(state: RuntimeState, args: argparse.Namespace) -> None:
     quantity = args.quantity if args.quantity is not None else existing_quantity(existing_item)
     if quantity:
         body["quantityOrUnit"] = quantity
+    # Re-adding a completed todo reopens it: the server keeps todo fields a
+    # write omits, so the completion has to be cleared explicitly.
+    if not args.deleted and isinstance(existing_item, dict) and existing_item.get("completedAt"):
+        body["completedAt"] = None
 
     payload = api_request("PUT", f"/v1/lists/{known_list.id}/items/{item_id}", device_id=device_id, body=body)
 

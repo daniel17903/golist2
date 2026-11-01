@@ -116,6 +116,22 @@ describe("languageSuggestion", () => {
     expect(suggestion?.itemUpdates).toHaveLength(2);
   });
 
+  it("ignores entries of todo lists, so todo titles neither block nor trigger a suggestion", () => {
+    const suggestion = findLanguageSuggestion({
+      currentLocale: "de",
+      currentDeviceId: "device-a",
+      items: [
+        createItem({ name: "manzana", createdByDeviceId: "device-a" }),
+        createItem({ name: "pan", createdByDeviceId: "device-a" }),
+        createItem({ listId: "todos", name: "Fenster putzen", createdByDeviceId: "device-a" }),
+      ],
+      todoListIds: new Set(["todos"]),
+    });
+
+    expect(suggestion?.suggestedLocale).toBe("es");
+    expect(suggestion?.itemUpdates).toHaveLength(2);
+  });
+
   it("returns null when no single locale resolves all items", () => {
     const suggestion = findLanguageSuggestion({
       currentLocale: "en",
