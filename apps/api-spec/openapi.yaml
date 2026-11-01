@@ -5,7 +5,8 @@ info:
   description: |
     REST + WebSocket API of the GoList backend (`apps/backend`). There is no bearer auth: callers
     identify themselves with a client-generated `X-Device-Id` UUID, and list access is granted by
-    creating the list or by redeeming one of its share tokens.
+    creating the list or by redeeming one of its share tokens. AI assistants connect to the MCP
+    endpoint (`/v1/mcp/{key}`) with the secret key of a connector a device created.
 
     Keep this file in sync with the Fastify routes; `apps/backend/src/openapi-spec.test.ts` fails
     when routes and paths diverge or a contract-test response does not match these schemas.
@@ -43,6 +44,20 @@ components:
       schema:
         type: string
         format: uuid
+    ConnectorId:
+      name: connectorId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    ConnectorKey:
+      name: key
+      in: path
+      required: true
+      description: The connector's secret key, as returned when the connector was created or its key regenerated.
+      schema:
+        type: string
     UpdatedAfter:
       name: updatedAfter
       in: query
@@ -254,6 +269,77 @@ components:
         listId:
           type: string
           format: uuid
+
+    Connector:
+      type: object
+      description: An AI assistant connection (MCP connector) owned by the calling device.
+      required: [connectorId, label, includeAllLists, listIds, createdAt]
+      additionalProperties: false
+      properties:
+        connectorId:
+          type: string
+          format: uuid
+        label:
+          type: string
+          description: Name the user gave the connection, e.g. "Claude".
+        includeAllLists:
+          type: boolean
+          description: The connector reaches every list the owner device can access, including lists added later.
+        listIds:
+          type: array
+          description: The lists the connector reaches when `includeAllLists` is false (empty otherwise).
+          items:
+            type: string
+            format: uuid
+        createdAt:
+          type: string
+          format: date-time
+        lastUsedAt:
+          type: string
+          format: date-time
+          description: Last request to the connector's MCP endpoint; missing when it was never used.
+    ConnectorUpsertRequest:
+      type: object
+      required: [label, includeAllLists]
+      properties:
+        label:
+          type: string
+          minLength: 1
+          maxLength: 60
+        includeAllLists:
+          type: boolean
+        listIds:
+          type: array
+          description: Lists the calling device can access; ignored when `includeAllLists` is true.
+          maxItems: 500
+          items:
+            type: string
+            format: uuid
+    ConnectorListResponse:
+      type: object
+      required: [connectors]
+      properties:
+        connectors:
+          type: array
+          items:
+            $ref: "#/components/schemas/Connector"
+    ConnectorKeyResponse:
+      type: object
+      required: [key]
+      properties:
+        key:
+          type: string
+          description: |
+            Secret key for the MCP endpoint (`/v1/mcp/{key}`). Only a hash is stored, so this is the only
+            time the key is returned.
+    ConnectorCreateResponse:
+      allOf:
+        - $ref: "#/components/schemas/ConnectorKeyResponse"
+        - type: object
+          required: [connector]
+          properties:
+            connector:
+              $ref: "#/components/schemas/Connector"
 
     SyncItemSummary:
       type: object
@@ -468,6 +554,25 @@ components:
         application/json:
           schema:
             $ref: "#/components/schemas/ErrorResponse"
+    ConnectorNotFound:
+      description: The calling device has no connector with this id
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    UnknownConnectorKey:
+      description: No connector has this key (never existed, deleted, or the key was regenerated)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    McpResponse:
+      description: |
+        MCP Streamable HTTP response: a JSON-RPC message (`application/json`) or a stream of them
+        (`text/event-stream`). See https://modelcontextprotocol.io/specification.
+      content:
+        application/json: {}
+        text/event-stream: {}
 security:
   - DeviceId: []
 paths:
@@ -690,3 +795,175 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "403":
           $ref: "#/components/responses/Forbidden"
+  /v1/device/lists:
+    put:
+      operationId: setDeviceLists
+      summary: Report the lists the calling device's app currently shows
+      description: |
+        Replaces the stored set. AI assistant connectors only reach lists that their owner device still shows, so
+        a list deleted in the app (deleting is local to the device) is no longer reachable through them. The app
+        sends this on start and whenever its lists change.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [listIds]
+              properties:
+                listIds:
+                  type: array
+                  maxItems: 1000
+                  items:
+                    type: string
+                    format: uuid
+      responses:
+        "204":
+          description: Stored
+        "400":
+          $ref: "#/components/responses/BadRequest"
+  /v1/connectors:
+    get:
+      operationId: listConnectors
+      summary: List the AI assistant connections (MCP connectors) of the calling device
+      responses:
+        "200":
+          description: The device's connectors, oldest first
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConnectorListResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+    post:
+      operationId: createConnector
+      summary: Create an AI assistant connection (MCP connector)
+      description: |
+        The calling device becomes the connector's owner. The connector gets its own device id and reaches
+        the owner's lists (all of them, or the picked ones) through `/v1/mcp/{key}`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConnectorUpsertRequest"
+      responses:
+        "201":
+          description: Connector created; the response holds its secret key
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConnectorCreateResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          description: A picked list is not accessible to the calling device
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /v1/connectors/{connectorId}:
+    parameters:
+      - $ref: "#/components/parameters/ConnectorId"
+    put:
+      operationId: updateConnector
+      summary: Rename a connector or change the lists it reaches
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConnectorUpsertRequest"
+      responses:
+        "200":
+          description: Connector updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Connector"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          description: A picked list is not accessible to the calling device
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          $ref: "#/components/responses/ConnectorNotFound"
+    delete:
+      operationId: deleteConnector
+      summary: Delete a connector; its URL stops working
+      responses:
+        "204":
+          description: Connector deleted
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/ConnectorNotFound"
+  /v1/connectors/{connectorId}/key:
+    parameters:
+      - $ref: "#/components/parameters/ConnectorId"
+    post:
+      operationId: regenerateConnectorKey
+      summary: Replace a connector's secret key; the old URL stops working
+      responses:
+        "200":
+          description: New key
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConnectorKeyResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/ConnectorNotFound"
+  /v1/mcp/{key}:
+    parameters:
+      - $ref: "#/components/parameters/ConnectorKey"
+    post:
+      operationId: mcpRequest
+      security: []
+      summary: MCP endpoint for AI assistants (Streamable HTTP, stateless)
+      description: |
+        Remote MCP server (spec 2026-07-28, plus the stateless 2025 fallback) with tools to read and edit the
+        connector's lists. The secret key in the path is the credential, so assistants add the URL as a
+        connector without authentication. The tools act as the connector's own device.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: A JSON-RPC 2.0 request or notification.
+      responses:
+        "200":
+          $ref: "#/components/responses/McpResponse"
+        "202":
+          description: Notification accepted
+        "400":
+          $ref: "#/components/responses/McpResponse"
+        "404":
+          $ref: "#/components/responses/UnknownConnectorKey"
+        "406":
+          $ref: "#/components/responses/McpResponse"
+        "415":
+          $ref: "#/components/responses/McpResponse"
+    get:
+      operationId: mcpListenStream
+      security: []
+      summary: Not supported (stateless server)
+      responses:
+        "404":
+          $ref: "#/components/responses/UnknownConnectorKey"
+        "405":
+          $ref: "#/components/responses/McpResponse"
+    delete:
+      operationId: mcpDeleteSession
+      security: []
+      summary: Not supported (stateless server, no sessions)
+      responses:
+        "404":
+          $ref: "#/components/responses/UnknownConnectorKey"
+        "405":
+          $ref: "#/components/responses/McpResponse"

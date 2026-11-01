@@ -46,9 +46,37 @@ export type UpsertListItemResult =
   | { outcome: 'ignored' }
   | { outcome: 'conflict' }
 
+/** An AI assistant connection (MCP connector); see `006_add_mcp_connectors.sql`. */
+export type ConnectorRecord = {
+  id: string
+  label: string
+  /** The connector's own device id (never shown to the owner or the assistant). */
+  deviceId: string
+  ownerDeviceId: string
+  includeAllLists: boolean
+  /** The lists picked when `includeAllLists` is false (sorted). */
+  listIds: string[]
+  createdAt: string
+  lastUsedAt?: string
+}
+
+export type ConnectorInput = {
+  label: string
+  includeAllLists: boolean
+  listIds: string[]
+}
+
 export interface ListRepository {
   ping(): Promise<void>
+  /**
+   * Whether the device may read and write the list: it created the list, or
+   * redeemed a valid share token for it — or it is a connector whose owner
+   * device may access the list, still shows it (`setVisibleLists`), and that
+   * connector includes the list.
+   */
   hasListAccess(listId: string, deviceId: string): Promise<boolean>
+  /** Every list `hasListAccess` allows for the device, ordered by id. */
+  listAccessibleLists(deviceId: string): Promise<ListRecord[]>
   findValidShareToken(shareToken: string): Promise<{ tokenId: string; listId: string } | null>
   /**
    * Creates or renames a list. `listType` unset keeps the stored type (or
@@ -65,4 +93,16 @@ export interface ListRepository {
   upsertListItems(listId: string, deviceId: string, entries: ItemBatchUpsertEntry[]): Promise<UpsertListItemResult[]>
   createShareToken(listId: string, deviceId: string): Promise<{ tokenId: string; createdAt: string }>
   recordShareTokenRedemption(tokenId: string, deviceId: string): Promise<void>
+
+  /** Replaces the lists the device's app currently shows. */
+  setVisibleLists(deviceId: string, listIds: string[]): Promise<void>
+  createConnector(ownerDeviceId: string, keyHash: string, input: ConnectorInput): Promise<ConnectorRecord>
+  listConnectors(ownerDeviceId: string): Promise<ConnectorRecord[]>
+  findConnectorByKeyHash(keyHash: string): Promise<ConnectorRecord | null>
+  /** `null` when the owner has no connector with that id. */
+  updateConnector(connectorId: string, ownerDeviceId: string, input: ConnectorInput): Promise<ConnectorRecord | null>
+  /** Replaces the key; `false` when the owner has no connector with that id. */
+  rotateConnectorKey(connectorId: string, ownerDeviceId: string, keyHash: string): Promise<boolean>
+  deleteConnector(connectorId: string, ownerDeviceId: string): Promise<boolean>
+  markConnectorUsed(connectorId: string): Promise<void>
 }

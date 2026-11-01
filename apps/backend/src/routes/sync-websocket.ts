@@ -7,6 +7,7 @@ import { z } from 'zod'
 
 import { todoFieldsToIso, toSyncItem } from '../repositories/item-snapshot.js'
 import { type ListRepository } from '../repositories/list-repository.js'
+import { ListBroadcaster, send as sendToSocket } from '../sync/list-broadcaster.js'
 import { ListSyncCache } from '../sync/list-sync-cache.js'
 
 declare module 'fastify' {
@@ -170,73 +171,26 @@ export function registerSyncWebsocketRoute(
   app: FastifyInstance,
   listRepository: ListRepository,
   listSyncCache: ListSyncCache = new ListSyncCache(),
+  broadcaster: ListBroadcaster = new ListBroadcaster(),
 ) {
-  const subscribers = new Map<string, Set<ServerSocket>>()
-  app.decorate('syncSubscriberCount', (listId: string) => subscribers.get(listId)?.size ?? 0)
+  app.decorate('syncSubscriberCount', (listId: string) => broadcaster.count(listId))
 
   const loadSnapshot = (listId: string) =>
     listSyncCache.getSnapshot(listId, async () => (await listRepository.listItems(listId)).map(toSyncItem))
 
-  const send = (socket: ServerSocket, message: ServerMessage) => {
-    // A closing/closed socket only buffers data that is never delivered.
-    if (socket.readyState !== socket.OPEN) {
-      return
-    }
-    socket.send(JSON.stringify(message))
-  }
+  const send = (socket: ServerSocket, message: ServerMessage) => sendToSocket(socket, message)
 
   // Stops broadcasts to the socket; the connection's logical subscription
   // (`state.subscribedListId`) is left alone.
   const detachFromBroadcasts = (socket: ServerSocket, state: ConnectionState) => {
-    if (!state.subscribedListId) {
-      return
-    }
-    const listSockets = subscribers.get(state.subscribedListId)
-    listSockets?.delete(socket)
-    if (listSockets && listSockets.size === 0) {
-      subscribers.delete(state.subscribedListId)
+    if (state.subscribedListId) {
+      broadcaster.remove(state.subscribedListId, socket)
     }
   }
 
   const removeFromSubscription = (socket: ServerSocket, state: ConnectionState) => {
     detachFromBroadcasts(socket, state)
     state.subscribedListId = undefined
-  }
-
-  const broadcastItemPatch = (listId: string, items: Item[]) => {
-    const listSockets = subscribers.get(listId)
-    if (!listSockets) {
-      return
-    }
-
-    for (const socket of listSockets.values()) {
-      send(socket, { type: 'item_patch', listId, items })
-    }
-  }
-
-  const broadcastListMetadataPatch = (
-    listId: string,
-    payload: { name: string; listType: ListType; updatedAt: number },
-    sender: ServerSocket,
-  ) => {
-    const listSockets = subscribers.get(listId)
-    if (!listSockets) {
-      return
-    }
-
-    for (const socket of listSockets.values()) {
-      if (socket === sender) {
-        continue
-      }
-
-      send(socket, {
-        type: 'list_metadata_patch',
-        listId,
-        name: payload.name,
-        listType: payload.listType,
-        updatedAt: payload.updatedAt,
-      })
-    }
   }
 
   void app.register(async (websocketApp) => {
@@ -308,9 +262,7 @@ export function registerSyncWebsocketRoute(
               // applied, but never register a gone socket for broadcasts.
               return
             }
-            const listSockets = subscribers.get(parsedPayload.listId) ?? new Set<ServerSocket>()
-            listSockets.add(socket)
-            subscribers.set(parsedPayload.listId, listSockets)
+            broadcaster.add(parsedPayload.listId, socket)
 
             const snapshot = await loadSnapshot(parsedPayload.listId)
             const listRecord = await listRepository.getList(parsedPayload.listId)
@@ -435,7 +387,7 @@ export function registerSyncWebsocketRoute(
               if (accepted.length > 0) {
                 // Include the sender so its client-generated createdAt/listId
                 // are replaced with the canonical persisted representation.
-                broadcastItemPatch(parsedPayload.listId, accepted)
+                broadcaster.broadcastItemPatch(parsedPayload.listId, accepted)
               }
             }
 
@@ -493,7 +445,7 @@ export function registerSyncWebsocketRoute(
             // older client) kept it, and subscribers need the full metadata.
             const storedListType =
               parsedPayload.listType ?? (await listRepository.getList(parsedPayload.listId))?.listType ?? 'shopping'
-            broadcastListMetadataPatch(
+            broadcaster.broadcastListMetadataPatch(
               parsedPayload.listId,
               {
                 name: parsedPayload.name,

@@ -25,6 +25,7 @@ The API contract is maintained in `apps/api-spec/openapi.yaml` (and related file
 - Share links use random UUID share tokens (token IDs).
 - Protected list/item API calls use only `X-Device-Id`; server-side access control is based on list ownership or redeemed-token access records.
 - If device identity is needed for an endpoint, require `X-Device-Id` header and do not accept `deviceId` in query parameters.
+- AI assistant connectors (`docs/mcp-server.md`) have their own device id and reach the lists of the device that created them (all, or a picked set); the secret key in the MCP URL is their only credential.
 
 ### Data model direction
 - Store each shared list as a canonical document with metadata and items.
@@ -185,7 +186,7 @@ The API contract is maintained in `apps/api-spec/openapi.yaml` (and related file
 - CI enforces contract tests for API changes.
 - Enforced in CI: `apps/backend/src/openapi-spec.test.ts` compares the registered Fastify routes with the spec's
   paths, the contract tests validate every response against the spec's schemas, the spec is linted
-  (`npm run lint -w apps/api-spec`), and the openclaw CLI tests check its requests against the spec's paths.
+  (`npm run lint -w apps/api-spec`).
 
 ### Milestone C: End-to-end sharing flow
 - Device A can create and share a list.

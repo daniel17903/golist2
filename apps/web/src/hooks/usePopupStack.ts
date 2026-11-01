@@ -8,6 +8,7 @@ export type PopupId =
   | "join-list"
   | "invite-landing"
   | "settings"
+  | "ai-connectors"
   | "list-stats"
   | "legal"
   | "edit-item"

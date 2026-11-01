@@ -137,6 +137,50 @@ const parseListDocumentResponse = (payload: unknown): ApiListDocument => {
   };
 };
 
+/** An AI assistant connection (MCP connector) of this device. */
+export type ApiConnector = {
+  connectorId: string;
+  label: string;
+  includeAllLists: boolean;
+  listIds: string[];
+  createdAt: string;
+  lastUsedAt?: string;
+};
+
+export type ApiConnectorInput = {
+  label: string;
+  includeAllLists: boolean;
+  listIds: string[];
+};
+
+const parseConnector = (payload: unknown): ApiConnector => {
+  const connectorId = readString(payload, "connectorId");
+  const label = readString(payload, "label");
+  const includeAllLists = readBoolean(payload, "includeAllLists");
+  const createdAt = readString(payload, "createdAt");
+  const rawListIds: unknown =
+    typeof payload === "object" && payload !== null ? Reflect.get(payload, "listIds") : undefined;
+  if (!connectorId || label === null || includeAllLists === null || !createdAt || !Array.isArray(rawListIds)) {
+    throw new Error("Invalid connector response");
+  }
+  return {
+    connectorId,
+    label,
+    includeAllLists,
+    listIds: rawListIds.filter((value): value is string => typeof value === "string"),
+    createdAt,
+    lastUsedAt: readString(payload, "lastUsedAt") ?? undefined,
+  };
+};
+
+const parseConnectorKey = (payload: unknown): string => {
+  const key = readString(payload, "key");
+  if (!key) {
+    throw new Error("Invalid connector key response");
+  }
+  return key;
+};
+
 type SharingApiConfig = {
   baseUrl: string | null;
   timeoutMs: number;
@@ -300,6 +344,101 @@ export const createSharingApiClient = (config: SharingApiConfig) => {
       );
       await assertOk(response, "share token create");
       return parseShareTokenCreateResponse(await response.json());
+    },
+
+    /**
+     * Reports the lists this device shows. AI assistant connectors only reach
+     * lists their owner device still shows (deleting a list is local-only).
+     */
+    async setDeviceLists(params: { deviceId: string; listIds: string[] }): Promise<void> {
+      const response = await fetchWithTimeout(
+        `${requireApiBaseUrl()}/v1/device/lists`,
+        {
+          method: "PUT",
+          headers: createHeaders(params.deviceId, { includeJsonContentType: true }),
+          body: JSON.stringify({ listIds: params.listIds }),
+        },
+        "report device lists",
+      );
+      await assertOk(response, "report device lists");
+    },
+
+    async listConnectors(params: { deviceId: string }): Promise<ApiConnector[]> {
+      const response = await fetchWithTimeout(
+        `${requireApiBaseUrl()}/v1/connectors`,
+        { method: "GET", headers: createHeaders(params.deviceId) },
+        "list connectors",
+      );
+      await assertOk(response, "list connectors");
+      const payload: unknown = await response.json();
+      const connectors: unknown =
+        typeof payload === "object" && payload !== null ? Reflect.get(payload, "connectors") : undefined;
+      if (!Array.isArray(connectors)) {
+        throw new Error("Invalid connector list response");
+      }
+      return connectors.map(parseConnector);
+    },
+
+    async createConnector(params: {
+      deviceId: string;
+      input: ApiConnectorInput;
+    }): Promise<{ connector: ApiConnector; key: string }> {
+      const response = await fetchWithTimeout(
+        `${requireApiBaseUrl()}/v1/connectors`,
+        {
+          method: "POST",
+          headers: createHeaders(params.deviceId, { includeJsonContentType: true }),
+          body: JSON.stringify(params.input),
+        },
+        "create connector",
+      );
+      await assertOk(response, "create connector");
+      const payload: unknown = await response.json();
+      const connector: unknown =
+        typeof payload === "object" && payload !== null ? Reflect.get(payload, "connector") : undefined;
+      return { connector: parseConnector(connector), key: parseConnectorKey(payload) };
+    },
+
+    async updateConnector(params: {
+      deviceId: string;
+      connectorId: string;
+      input: ApiConnectorInput;
+    }): Promise<ApiConnector> {
+      const response = await fetchWithTimeout(
+        `${requireApiBaseUrl()}/v1/connectors/${params.connectorId}`,
+        {
+          method: "PUT",
+          headers: createHeaders(params.deviceId, { includeJsonContentType: true }),
+          body: JSON.stringify(params.input),
+        },
+        "update connector",
+      );
+      await assertOk(response, "update connector");
+      return parseConnector(await response.json());
+    },
+
+    async regenerateConnectorKey(params: { deviceId: string; connectorId: string }): Promise<string> {
+      const response = await fetchWithTimeout(
+        `${requireApiBaseUrl()}/v1/connectors/${params.connectorId}/key`,
+        { method: "POST", headers: createHeaders(params.deviceId) },
+        "regenerate connector key",
+      );
+      await assertOk(response, "regenerate connector key");
+      return parseConnectorKey(await response.json());
+    },
+
+    async deleteConnector(params: { deviceId: string; connectorId: string }): Promise<void> {
+      const response = await fetchWithTimeout(
+        `${requireApiBaseUrl()}/v1/connectors/${params.connectorId}`,
+        { method: "DELETE", headers: createHeaders(params.deviceId) },
+        "delete connector",
+      );
+      await assertOk(response, "delete connector");
+    },
+
+    /** The URL an AI assistant connects to (the key is its only credential). */
+    buildConnectorUrl(key: string): string {
+      return new URL(`${requireApiBaseUrl()}/v1/mcp/${key}`, globalThis.location?.origin).toString();
     },
   };
 

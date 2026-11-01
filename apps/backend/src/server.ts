@@ -2,15 +2,18 @@ import Fastify, { type FastifyRequest, type RouteOptions } from 'fastify'
 import cors from '@fastify/cors'
 
 import { env } from './config/env.js'
-import { redactShareTokenUrl } from './lib/redact-url.js'
+import { redactUrlSecrets } from './lib/redact-url.js'
 import { registerErrorHandler } from './plugins/error-handler.js'
 import { registerObservability } from './plugins/observability.js'
 import { type ListRepository } from './repositories/list-repository.js'
 import { postgresListRepository } from './repositories/postgres-list-repository.js'
+import { registerConnectorRoutes } from './routes/connectors.js'
 import { registerHealthRoutes } from './routes/health.js'
 import { registerListRoutes } from './routes/lists.js'
+import { registerMcpRoutes } from './routes/mcp.js'
 import { registerShareTokenRoutes } from './routes/share-tokens.js'
 import { registerSyncWebsocketRoute } from './routes/sync-websocket.js'
+import { ListBroadcaster } from './sync/list-broadcaster.js'
 import { ListSyncCache } from './sync/list-sync-cache.js'
 
 const PRODUCTION_ORIGIN = 'https://go-list.app'
@@ -35,6 +38,8 @@ export type BuildServerOptions = {
   // Test-only: called for every route as it is registered (the OpenAPI spec
   // test uses it to compare the registered routes with openapi.yaml).
   onRoute?: (route: RouteOptions) => void
+  // Origin of the web app for share links (defaults to PUBLIC_APP_URL).
+  appUrl?: string
 }
 
 export function buildServer(deps: BuildServerOptions = {}) {
@@ -51,7 +56,7 @@ export function buildServer(deps: BuildServerOptions = {}) {
         req(request: FastifyRequest) {
           return {
             method: request.method,
-            url: redactShareTokenUrl(request.url),
+            url: redactUrlSecrets(request.url),
             hostname: request.hostname,
             remoteAddress: request.ip,
             remotePort: request.socket?.remotePort,
@@ -68,9 +73,12 @@ export function buildServer(deps: BuildServerOptions = {}) {
   // that a write made over either transport invalidates the same cached
   // digest/summaries snapshot (see sync/list-sync-cache.ts).
   const listSyncCache = new ListSyncCache()
+  // The sockets subscribed to each list: the WebSocket route registers them,
+  // and the MCP server pushes its writes to them too.
+  const broadcaster = new ListBroadcaster()
 
-  void app.register(cors, {
-    origin: (origin, callback) => {
+  const appCorsOptions = {
+    origin: (origin: string | undefined, callback: (error: Error | null, allow: boolean) => void) => {
       // No Origin header (e.g. same-origin requests, curl) — allow, matching
       // the prior @fastify/cors default behavior for non-browser callers.
       if (!origin || isAllowedOrigin(origin)) {
@@ -82,6 +90,20 @@ export function buildServer(deps: BuildServerOptions = {}) {
     },
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'X-Device-Id'],
+  }
+  // The MCP endpoint is called by AI assistants, some of them from a browser
+  // page on their own origin (e.g. the MCP Inspector). The secret key in the
+  // path is the credential (no cookies), so any origin may call it.
+  const mcpCorsOptions = {
+    origin: true,
+    methods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Accept', 'Authorization', 'Mcp-Protocol-Version', 'Mcp-Session-Id', 'Last-Event-ID'],
+    exposedHeaders: ['Mcp-Session-Id', 'Mcp-Protocol-Version'],
+  }
+  void app.register(cors, {
+    delegator: (request, callback) => {
+      callback(null, request.url.startsWith('/v1/mcp/') ? mcpCorsOptions : appCorsOptions)
+    },
   })
 
   registerObservability(app)
@@ -89,7 +111,9 @@ export function buildServer(deps: BuildServerOptions = {}) {
   registerHealthRoutes(app, listRepository)
   registerListRoutes(app, listRepository, listSyncCache)
   registerShareTokenRoutes(app, listRepository)
-  void registerSyncWebsocketRoute(app, listRepository, listSyncCache)
+  registerConnectorRoutes(app, listRepository)
+  registerMcpRoutes(app, { listRepository, listSyncCache, broadcaster, appUrl: deps.appUrl ?? env.PUBLIC_APP_URL })
+  void registerSyncWebsocketRoute(app, listRepository, listSyncCache, broadcaster)
 
   return app
 }

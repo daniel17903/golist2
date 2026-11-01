@@ -130,3 +130,6 @@ older clients keep agreeing with the server.
 
 - Realtime sync is active-list scoped: one subscribed list per client connection.
 - Item fan-out broadcasts target only sockets currently subscribed to the same list.
+- Writes made through the MCP server (`docs/mcp-server.md`) are broadcast the same way: accepted items as an
+  `item_patch` with the stored versions, renames as a `list_metadata_patch` (the subscriber registry lives in
+  `apps/backend/src/sync/list-broadcaster.ts`). REST writes are still not broadcast.

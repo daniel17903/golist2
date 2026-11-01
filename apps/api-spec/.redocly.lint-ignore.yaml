@@ -2,6 +2,7 @@
 # See https://redocly.com/docs/cli/ for more information.
 # - /health and /healthz have no client errors (they take no input), only 200/503.
 # - /v1/ws answers a successful request with 101 Switching Protocols, never 2xx.
+# - GET/DELETE /v1/mcp/{key} exist only to answer 405: the MCP server is stateless.
 # - The WebSocket message schemas are only referenced from the `x-websocket-messages`
 #   extension, which no-unused-components does not follow.
 openapi.yaml:
@@ -10,6 +11,8 @@ openapi.yaml:
     - '#/paths/~1healthz/get/responses'
   operation-2xx-response:
     - '#/paths/~1v1~1ws/get/responses'
+    - '#/paths/~1v1~1mcp~1{key}/get/responses'
+    - '#/paths/~1v1~1mcp~1{key}/delete/responses'
   no-unused-components:
     - '#/components/schemas/WebSocketClientMessage'
     - '#/components/schemas/WebSocketServerMessage'

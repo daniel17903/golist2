@@ -17,9 +17,11 @@ const JoinListModal = lazy(() => import("./components/JoinListModal"));
 const InviteLandingModal = lazy(() => import("./components/InviteLandingModal"));
 const SettingsModal = lazy(() => import("./components/SettingsModal"));
 const LegalModal = lazy(() => import("./components/LegalModal"));
+const AiConnectorsModal = lazy(() => import("./components/AiConnectorsModal"));
 const ListStatsModal = lazy(() => import("./components/ListStatsModal"));
 const TodoStatsModal = lazy(() => import("./components/TodoStatsModal"));
 import { useAppBootstrap } from "./hooks/useAppBootstrap";
+import { useReportDeviceLists } from "./hooks/useReportDeviceLists";
 import { useAppState } from "./hooks/useAppState";
 import { useAddItemDialog } from "./hooks/useAddItemDialog";
 import { useBackGestureTrap } from "./hooks/useBackGestureTrap";
@@ -107,6 +109,7 @@ const App = () => {
   const isSettingsModalOpen = stack.includes("settings");
   const isListStatsOpen = stack.includes("list-stats");
   const isLegalModalOpen = stack.includes("legal");
+  const isAiConnectorsOpen = stack.includes("ai-connectors");
   const isEditItemOpen = stack.includes("edit-item");
   const isTodoDialogOpen = stack.includes("add-todo") || stack.includes("edit-todo");
 
@@ -160,6 +163,7 @@ const App = () => {
   } = useInviteLanding({ openPopup, closePopup, onCopyFailed: handleInviteCopyFailed, onJoinFailed: handleJoinFailed });
 
   useAppBootstrap({ onShareLinkJoinFailed: handleJoinFailed, onIosShareLink: showInviteLanding });
+  useReportDeviceLists({ lists, deviceId, isLoaded, backendSharingEnabled, backendConnection });
 
   const activeListTypeRef = useRef(activeListType);
   useEffect(() => { activeListTypeRef.current = activeListType; });
@@ -333,6 +337,8 @@ const App = () => {
   const handleCloseStats = useCallback(() => closePopup("list-stats"), [closePopup]);
   const handleCloseSettings = useCallback(() => closePopup("settings"), [closePopup]);
   const handleCloseLegal = useCallback(() => closePopup("legal"), [closePopup]);
+  const handleOpenAiConnectors = useCallback(() => openPopup("ai-connectors"), [openPopup]);
+  const handleCloseAiConnectors = useCallback(() => closePopup("ai-connectors"), [closePopup]);
 
   const handleOpenSettings = useCallback(() => {
     closePopup("drawer");
@@ -552,6 +558,17 @@ const App = () => {
           <SettingsModal
             isOpen
             onClose={handleCloseSettings}
+            onOpenAiConnectors={backendSharingEnabled ? handleOpenAiConnectors : undefined}
+          />
+        </Suspense>
+      )}
+
+      {isAiConnectorsOpen && (
+        <Suspense fallback={null}>
+          <AiConnectorsModal
+            isOpen
+            deviceId={deviceId}
+            onClose={handleCloseAiConnectors}
           />
         </Suspense>
       )}

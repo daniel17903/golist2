@@ -1808,3 +1808,109 @@ body {
   padding: 0;
   border: none;
 }
+
+/* AI assistant connections (Settings → AI assistants). */
+.ai-connectors__heading {
+  font-size: 13px;
+  color: #6f6a77;
+}
+
+.ai-connectors__hint {
+  margin: 0;
+  color: #2f2433;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.ai-connectors__error {
+  margin: 0;
+  color: #d32f2f;
+  font-size: 14px;
+}
+
+.settings-ai-connectors,
+.ai-connectors__copy {
+  align-self: flex-start;
+  padding-left: 0;
+}
+
+.ai-connectors__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ai-connectors__item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(47, 36, 51, 0.15);
+  color: #2f2433;
+}
+
+.ai-connectors__item-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 14px;
+}
+
+.ai-connectors__item-text span {
+  color: #6f6a77;
+}
+
+.ai-connectors__item-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+
+.ai-connectors__item-actions .text-button {
+  padding-left: 0;
+  font-size: 14px;
+}
+
+.ai-connectors__scope {
+  border: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: #2f2433;
+}
+
+.ai-connectors__scope legend {
+  font-size: 13px;
+  color: #6f6a77;
+  padding: 0;
+  margin-bottom: 4px;
+}
+
+.ai-connectors__option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 15px;
+}
+
+/* `.modal__body input` would otherwise restyle the radios and checkboxes. */
+.modal__body .ai-connectors__option input {
+  padding: 0;
+  border: none;
+  width: 18px;
+  height: 18px;
+}
+
+.ai-connectors__lists {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 40vh;
+  overflow-y: auto;
+  padding-left: 28px;
+}
