@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 
-FROM node:24.8.0-alpine AS build
+FROM node:24.22.1-alpine3.24 AS build
 WORKDIR /app
 
 # Install workspace dependencies and build the API docs.
