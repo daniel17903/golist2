@@ -47,6 +47,10 @@
   the item hash when set (so shopping-item hashes are unchanged). Todo UI: `TodoList.tsx`, `TodoFormModal.tsx`,
   `RecurrenceInput.tsx`, `TodoStatsModal.tsx`, `hooks/useTodoDialog.ts`; todo logic: `domain/recurrence.ts`,
   `domain/todoStats.ts`, `domain/todoSort.ts`, `domain/dueDate.ts`.
+- **Time zone**: due dates, recurrences, "today"/"overdue" labels and the stats weeks are always computed in
+  **Europe/Berlin**, whatever the device's time zone (`packages/shared/src/domain/berlin-time.ts`, built on
+  `Intl.DateTimeFormat`). A due date is stored as the epoch millis of Berlin midnight. Never use `Date`'s local-time
+  getters/setters (`getDate`, `setHours`, ...) for todo dates; tests must pass under any `TZ`.
 - **Item sorting** by grocery category order, fallback to created order.
 - **Item suggestions** are **list-specific**, ranked by frequency then recency.
 - **Realtime sync**: lists sync over a WebSocket (`/v1/ws`) using hash-diff reconciliation; offline changes are reconciled per list after reconnect. See `docs/websocket-sync-protocol.md` before touching `apps/web/src/sharing/socketSync.ts`.

@@ -1,16 +1,18 @@
 import { expect, test } from "./fixtures";
 import { shareAcross } from "./support/multiDevice";
 
-// `yyyy-mm-dd` of today + `offset` days (local time, like the date input).
+// `yyyy-mm-dd` of today + `offset` days in Europe/Berlin, the time zone the
+// app computes all due dates in.
 const dayInput = (offset: number) => {
-  const date = new Date();
-  date.setDate(date.getDate() + offset);
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${date.getFullYear()}-${month}-${day}`;
+  const berlinToday = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Berlin" }).format(new Date());
+  const [year, month, day] = berlinToday.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day + offset)).toISOString().slice(0, 10);
 };
 
 test.describe("todo lists", () => {
+  // A device far from Berlin: due dates and labels must still follow Berlin days.
+  test.use({ timezoneId: "America/New_York" });
+
   test("creates a todo list and stores todos with their details on the backend", async ({ app, backend }) => {
     await app.createList("Chores", { listType: "todo" });
     await expect(app.page.getByText("Nothing to do. Add a todo with +.")).toBeVisible();

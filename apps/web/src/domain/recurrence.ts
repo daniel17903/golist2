@@ -1,3 +1,12 @@
+import {
+  addCalendarDays,
+  addCalendarMonths,
+  berlinDateOf,
+  berlinMidnight,
+  weekdayOf,
+  type CalendarDate,
+} from "@golist/shared/domain/berlin-time";
+
 type RecurrenceUnit = "day" | "week" | "month";
 type RecurrenceWeekday = "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun";
 type RecurrenceAnchor = "from_due_date" | "from_completion";
@@ -86,37 +95,30 @@ export function computeNextDueDate(
     return null;
   }
 
+  // Calendar math on the Berlin day of the anchor (see berlin-time.ts):
+  // every device computes the same next due date, whatever its time zone.
   const baseMs = rule.anchor === "from_due_date" ? currentDueDateMs : completionDateMs;
-  const base = new Date(baseMs);
+  const base = berlinDateOf(baseMs);
 
-  let next: Date;
+  let next: CalendarDate;
 
   if (rule.unit === "day") {
-    next = new Date(base.getFullYear(), base.getMonth(), base.getDate() + rule.every);
+    next = addCalendarDays(base, rule.every);
   } else if (rule.unit === "week") {
-    // Advance every * 7 days first
-    const advanced = new Date(base.getFullYear(), base.getMonth(), base.getDate() + rule.every * 7);
-
+    // Advance every * 7 days first, then forward to the requested weekday.
+    const advanced = addCalendarDays(base, rule.every * 7);
     if (rule.weekday !== undefined) {
-      const targetDay = WEEKDAY_INDEX[rule.weekday];
-      const advancedDay = advanced.getDay();
-      const diff = (targetDay - advancedDay + 7) % 7;
-      next = new Date(advanced.getFullYear(), advanced.getMonth(), advanced.getDate() + diff);
+      const diff = (WEEKDAY_INDEX[rule.weekday] - weekdayOf(advanced) + 7) % 7;
+      next = addCalendarDays(advanced, diff);
     } else {
       next = advanced;
     }
   } else {
-    // month: add every months, clamping to the last day of the target month if needed
-    const targetMonth = base.getMonth() + rule.every;
-    const targetYear = base.getFullYear();
-    const targetDay = base.getDate();
-    // new Date(year, month + 1, 0) gives the last day of the target month
-    const lastDayOfTargetMonth = new Date(targetYear, targetMonth + 1, 0).getDate();
-    const clampedDay = Math.min(targetDay, lastDayOfTargetMonth);
-    next = new Date(targetYear, targetMonth, clampedDay);
+    // month: add every months, clamping to the last day of the target month.
+    next = addCalendarMonths(base, rule.every);
   }
 
-  return next.getTime();
+  return berlinMidnight(next);
 }
 
 // 64-bit FNV-1a over UTF-16 code units, as 16 hex digits.

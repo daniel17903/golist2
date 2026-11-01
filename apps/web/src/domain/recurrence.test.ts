@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
+import { berlinMidnight } from "@golist/shared/domain/berlin-time";
 import { computeNextDueDate, nextOccurrenceId, parseRecurrence } from "./recurrence";
 
-// Helper: build epoch millis for a local midnight date (same convention as the app)
+// Helper: epoch millis of Berlin midnight on a date (the app's due-date convention)
 const localMidnight = (year: number, month: number, day: number): number =>
-  new Date(year, month - 1, day).getTime();
+  berlinMidnight({ year, month, day });
 
 describe("parseRecurrence", () => {
   it("returns a valid rule for a minimal daily recurrence", () => {

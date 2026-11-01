@@ -1,10 +1,15 @@
-const dayMs = 24 * 60 * 60 * 1000;
+import {
+  appTimeZone,
+  berlinDateOf,
+  berlinMidnight,
+  berlinStartOfDay,
+  calendarDaysBetween,
+  formatCalendarDate,
+  parseCalendarDate,
+} from "@golist/shared/domain/berlin-time";
 
-const startOfDay = (timestamp: number) => {
-  const date = new Date(timestamp);
-  date.setHours(0, 0, 0, 0);
-  return date.getTime();
-};
+// Due dates are Berlin calendar days (see berlin-time.ts): "today",
+// "overdue" and the labels are the same on every device.
 
 /** Relative due-date label (ported from DoList): today/tomorrow/yesterday, weekday names within a week, else a short date. */
 export const formatDueDate = (
@@ -13,38 +18,28 @@ export const formatDueDate = (
   t: (key: string, values?: Record<string, string | number>) => string,
   now = Date.now(),
 ): string => {
-  const diffDays = Math.round((startOfDay(dueDate) - startOfDay(now)) / dayMs);
+  const diffDays = calendarDaysBetween(berlinDateOf(now), berlinDateOf(dueDate));
 
   if (diffDays === 0) { return t("todo.due.today"); }
   if (diffDays === 1) { return t("todo.due.tomorrow"); }
   if (diffDays === -1) { return t("todo.due.yesterday"); }
 
-  const weekday = new Date(dueDate).toLocaleDateString(locale, { weekday: "long" });
+  const weekday = new Date(dueDate).toLocaleDateString(locale, { weekday: "long", timeZone: appTimeZone });
   if (diffDays >= 2 && diffDays <= 6) { return weekday; }
   if (diffDays <= -2 && diffDays >= -6) { return t("todo.due.lastWeekday", { weekday }); }
 
-  return new Date(dueDate).toLocaleDateString(locale, { month: "short", day: "numeric" });
+  return new Date(dueDate).toLocaleDateString(locale, { month: "short", day: "numeric", timeZone: appTimeZone });
 };
 
-/** A todo is overdue once its due day has passed. */
-export const isOverdue = (dueDate: number, now = Date.now()): boolean => dueDate < startOfDay(now);
+/** A todo is overdue once its due day (in Berlin) has passed. */
+export const isOverdue = (dueDate: number, now = Date.now()): boolean => dueDate < berlinStartOfDay(now);
 
-/** `yyyy-mm-dd` (an `<input type="date">` value) to local midnight in epoch millis. */
+/** `yyyy-mm-dd` (an `<input type="date">` value) to Berlin midnight of that day in epoch millis. */
 export const dateInputToMillis = (value: string): number | undefined => {
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
-  if (!match) {
-    return undefined;
-  }
-  return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3])).getTime();
+  const date = parseCalendarDate(value);
+  return date ? berlinMidnight(date) : undefined;
 };
 
-/** Epoch millis to the local `yyyy-mm-dd` value of an `<input type="date">`. */
-export const millisToDateInput = (value: number | undefined): string => {
-  if (value === undefined) {
-    return "";
-  }
-  const date = new Date(value);
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${date.getFullYear()}-${month}-${day}`;
-};
+/** Epoch millis to the `yyyy-mm-dd` value of an `<input type="date">` (the Berlin day). */
+export const millisToDateInput = (value: number | undefined): string =>
+  value === undefined ? "" : formatCalendarDate(berlinDateOf(value));

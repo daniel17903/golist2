@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { berlinMidnight } from "@golist/shared/domain/berlin-time";
 import { dateInputToMillis, formatDueDate, isOverdue, millisToDateInput } from "./dueDate";
 
 const t = (key: string, values?: Record<string, string | number>) =>
@@ -30,9 +31,9 @@ describe("isOverdue", () => {
 });
 
 describe("date input conversion", () => {
-  it("round-trips local dates", () => {
+  it("round-trips dates as Berlin calendar days", () => {
     const millis = dateInputToMillis("2026-03-07");
-    expect(millis).toBe(new Date(2026, 2, 7).getTime());
+    expect(millis).toBe(berlinMidnight({ year: 2026, month: 3, day: 7 }));
     expect(millisToDateInput(millis)).toBe("2026-03-07");
     expect(dateInputToMillis("")).toBeUndefined();
     expect(millisToDateInput(undefined)).toBe("");

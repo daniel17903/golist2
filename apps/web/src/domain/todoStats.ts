@@ -1,4 +1,5 @@
 import type { Item } from "@golist/shared/domain/types";
+import { addCalendarDays, berlinDateOf, berlinMidnight, weekdayOf, type CalendarDate } from "@golist/shared/domain/berlin-time";
 import { computeNextDueDate, parseRecurrence } from "./recurrence";
 
 export type PersonListStats = {
@@ -22,19 +23,11 @@ const normalizePerson = (assignedTo?: string): { key: string; label: string } =>
   return { key: trimmed.toLocaleLowerCase(), label: trimmed };
 };
 
-const startOfWeekMonday = (value: Date): Date => {
-  const start = new Date(value);
-  start.setHours(0, 0, 0, 0);
-  const day = start.getDay();
-  const offset = day === 0 ? -6 : 1 - day;
-  start.setDate(start.getDate() + offset);
-  return start;
-};
-
-const addDays = (value: Date, days: number): Date => {
-  const next = new Date(value);
-  next.setDate(next.getDate() + days);
-  return next;
+// Weeks run Monday to Sunday in Berlin (see berlin-time.ts).
+const mondayOfWeek = (now: number): CalendarDate => {
+  const today = berlinDateOf(now);
+  const day = weekdayOf(today);
+  return addCalendarDays(today, day === 0 ? -6 : 1 - day);
 };
 
 const inRange = (value: number, startInclusive: number, endExclusive: number): boolean =>
@@ -78,10 +71,11 @@ const countPredictedOccurrencesInRange = (
 
 /** Per-person points stats of a todo list (ported from DoList). */
 export const calculateTodoStats = (items: readonly Item[], listId: string, now = Date.now()): PersonListStats[] => {
-  const startThisWeek = startOfWeekMonday(new Date(now)).getTime();
-  const startNextWeek = addDays(new Date(startThisWeek), 7).getTime();
-  const startLastWeek = addDays(new Date(startThisWeek), -7).getTime();
-  const startFollowingWeek = addDays(new Date(startThisWeek), 14).getTime();
+  const monday = mondayOfWeek(now);
+  const startThisWeek = berlinMidnight(monday);
+  const startNextWeek = berlinMidnight(addCalendarDays(monday, 7));
+  const startLastWeek = berlinMidnight(addCalendarDays(monday, -7));
+  const startFollowingWeek = berlinMidnight(addCalendarDays(monday, 14));
 
   const byPerson = new Map<string, PersonListStats>();
 

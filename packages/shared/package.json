@@ -6,7 +6,8 @@
   "exports": {
     "./domain/types": "./src/domain/types.ts",
     "./domain/item-category-mapping": "./src/domain/item-category-mapping.ts",
-    "./domain/sync": "./src/domain/sync.ts"
+    "./domain/sync": "./src/domain/sync.ts",
+    "./domain/berlin-time": "./src/domain/berlin-time.ts"
   },
   "engines": {
     "node": ">=24.0.0"

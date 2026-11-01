@@ -112,6 +112,10 @@ changes the UI and the check-off action (see `useAppState.ts` and `App.tsx`):
   saving an unchanged todo writes nothing. Deleting a todo (edit dialog) sets `deleted` like a shopping
   check-off.
 
+Due dates and recurrences are Berlin calendar days (`packages/shared/src/domain/berlin-time.ts`):
+a due date is Berlin midnight in epoch millis, so devices in different time zones agree on the
+due day, "today"/"overdue" and the next occurrence.
+
 Completed todos are hidden in both views, so switching a list's type keeps showing
 just its open entries.
 
