@@ -39,6 +39,18 @@
 ## Key behaviors
 - Backend sharing auth: protected sharing endpoints require an `X-Device-Id` header and a prior token redemption record for that device/token pair.
 - **Multi-list** support with a list selector and inline rename.
+- **List types**: every list is a `shopping` list (icon grid, check-off deletes the item and it comes back as a
+  suggestion) or a `todo` list (rows with due date, assignee, points and recurrence; check-off sets `completedAt`;
+  ported from the former DoList app). The type is chosen in the create dialog and switched from the header's inline
+  rename mode; it syncs with the list name as one metadata record (`listType`, missing = `shopping`). Both types share
+  the items table, store write paths and sync code; the todo fields are optional on every item and only included in
+  the item hash when set (so shopping-item hashes are unchanged). Todo UI: `TodoList.tsx`, `TodoFormModal.tsx`,
+  `RecurrenceInput.tsx`, `TodoStatsModal.tsx`, `hooks/useTodoDialog.ts`; todo logic: `domain/recurrence.ts`,
+  `domain/todoStats.ts`, `domain/todoSort.ts`, `domain/dueDate.ts`.
+- **Time zone**: due dates, recurrences, "today"/"overdue" labels and the stats weeks are always computed in
+  **Europe/Berlin**, whatever the device's time zone (`packages/shared/src/domain/berlin-time.ts`, built on
+  `Intl.DateTimeFormat`). A due date is stored as the epoch millis of Berlin midnight. Never use `Date`'s local-time
+  getters/setters (`getDate`, `setHours`, ...) for todo dates; tests must pass under any `TZ`.
 - **Item sorting** by grocery category order, fallback to created order.
 - **Item suggestions** are **list-specific**, ranked by frequency then recency.
 - **Realtime sync**: lists sync over a WebSocket (`/v1/ws`) using hash-diff reconciliation; offline changes are reconciled per list after reconnect. See `docs/websocket-sync-protocol.md` before touching `apps/web/src/sharing/socketSync.ts`.
@@ -47,7 +59,8 @@
   separate storage. So a `?shareToken=` link opened in an iOS browser tab (`apps/web/src/domain/iosBrowserTab.ts`)
   is not joined automatically; `InviteLandingModal` offers to copy the invite for the home-screen app (whose Join
   dialog has a one-tap "Paste from clipboard" button) or to use the list in the browser.
-- **Undo toasts** for item deletion and list rename (max 3 stacked, 5s timeout).
+- **Undo toasts** for item deletion, todo completion (also removes the next occurrence of a recurring todo) and list
+  rename (max 3 stacked, 5s timeout).
 - **Pull-to-refresh** forces a WebSocket reconnect; the pull distance is written straight to the DOM to avoid per-frame re-renders.
 - **Item grid animations**: `apps/web/src/hooks/useGridLayoutAnimation.ts` (FLIP via the Web Animations API) glides cards into new slots and pops in new cards; skipped on first render, on list switches and with reduced motion. A checked-off card leaves the grid as soon as its exit animation ends, without waiting for the IndexedDB write.
 - **Drawer swipe**: like pull-to-refresh, drag frames write the drawer transform and backdrop opacity straight to the DOM. The drawer only subscribes to `items` (for its "last updated" labels) while it is shown.
@@ -139,7 +152,8 @@
 - Specs: `lists.spec.ts`, `items.spec.ts`, `sync.spec.ts` (multi-device share/join, realtime
   propagation, offline reconciliation), `sync-conflicts.spec.ts` (concurrent offline edits, three
   devices, slow network), `ui.spec.ts` (i18n, language suggestion, stats, legal, back gesture,
-  join errors), `ios-invite.spec.ts` (iOS invite screen, join-dialog paste button).
+  join errors), `ios-invite.spec.ts` (iOS invite screen, join-dialog paste button), `todos.spec.ts`
+  (todo lists: details, completion + undo, recurrence, stats, type switch, multi-device sync).
 - Fixtures (`e2e/fixtures.ts`): `app` = primary device (already on `/`), `newDevice()` = extra
   isolated device (own browser context), `backend` = REST client to assert server state.
   `GoListApp` (`e2e/support/goListApp.ts`) is the page object; `disconnectBackend()` /

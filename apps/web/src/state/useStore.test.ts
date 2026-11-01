@@ -490,6 +490,43 @@ describe("useStore", () => {
     });
   });
 
+  it("does not write a todo when the edit dialog is saved unchanged", async () => {
+    const todo = {
+      id: "todo-1",
+      listId: "list-1",
+      name: "Vacuum",
+      iconName: "default",
+      category: "other",
+      deleted: false,
+      assignedTo: "Alex",
+      createdAt: 1,
+      updatedAt: 1,
+    };
+    useStore.setState({ items: [todo] });
+
+    await useStore.getState().updateTodo("todo-1", { title: "Vacuum", assignedTo: "Alex", description: "" });
+
+    expect(useStore.getState().items[0]).toBe(todo);
+    expect(socketQueueLocalItemPatchMock).not.toHaveBeenCalled();
+  });
+
+  it("keeps a type switch when a rename starts before the switch is saved", async () => {
+    listsData = [{ id: "list-1", name: "Old", createdAt: 1, updatedAt: 1 }];
+    useStore.setState({ lists: [...listsData] });
+
+    // Not awaited: the rename input blurs while the type switch is still writing.
+    const switching = useStore.getState().setListType("list-1", "todo");
+    await useStore.getState().renameList("list-1", "New");
+    await switching;
+
+    expect(useStore.getState().lists[0]).toMatchObject({ name: "New", listType: "todo" });
+    expect(listUpdate).toHaveBeenLastCalledWith("list-1", expect.objectContaining({ name: "New", listType: "todo" }));
+    expect(socketQueueLocalListMetadataPatchMock).toHaveBeenLastCalledWith(
+      "list-1",
+      expect.objectContaining({ name: "New", listType: "todo" }),
+    );
+  });
+
   it("adds an item to the list", async () => {
     const uuidSpy = vi
       .spyOn(globalThis.crypto, "randomUUID")

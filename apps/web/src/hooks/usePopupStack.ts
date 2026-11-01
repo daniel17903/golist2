@@ -10,7 +10,9 @@ export type PopupId =
   | "settings"
   | "list-stats"
   | "legal"
-  | "edit-item";
+  | "edit-item"
+  | "add-todo"
+  | "edit-todo";
 
 type PopupStack = {
   stack: PopupId[];

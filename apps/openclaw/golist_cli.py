@@ -218,11 +218,15 @@ def fetch_list(device_id: str, list_id: str) -> dict[str, Any]:
     return payload
 
 
-def create_list(state: RuntimeState, list_name: str) -> KnownList:
+def create_list(state: RuntimeState, list_name: str, list_type: str | None = None) -> KnownList:
     device_id = ensure_device_id(state)
     list_id = str(uuid.uuid4())
 
-    api_request("PUT", f"/v1/lists/{list_id}", device_id=device_id, body={"name": list_name})
+    body: dict[str, Any] = {"name": list_name}
+    if list_type:
+        # Omitted means the backend default ("shopping").
+        body["listType"] = list_type
+    api_request("PUT", f"/v1/lists/{list_id}", device_id=device_id, body=body)
 
     known_list = upsert_known_list(state, list_id, list_name)
     state.active_list_id = list_id
@@ -263,7 +267,7 @@ def cmd_bootstrap(state: RuntimeState, args: argparse.Namespace) -> None:
 
 
 def cmd_create_list(state: RuntimeState, args: argparse.Namespace) -> None:
-    known_list = create_list(state=state, list_name=args.name)
+    known_list = create_list(state=state, list_name=args.name, list_type=args.type)
     print(json.dumps({"deviceId": state.device_id, "activeList": {"id": known_list.id, "name": known_list.name}}, indent=2))
 
 
@@ -294,14 +298,25 @@ def cmd_show(state: RuntimeState, args: argparse.Namespace) -> None:
     payload = fetch_list(device_id=device_id, list_id=known_list.id)
 
     items = payload.get("items", [])
-    non_deleted_items = [item for item in items if not item.get("deleted")]
+    # Checked-off shopping items are deleted; completed todos have completedAt.
+    non_deleted_items = [item for item in items if not item.get("deleted") and not item.get("completedAt")]
 
     fetched_name = payload.get("name")
     if isinstance(fetched_name, str) and fetched_name:
         upsert_known_list(state, known_list.id, fetched_name)
         save_state(state)
 
-    print(json.dumps({"listId": known_list.id, "name": payload.get("name"), "items": non_deleted_items}, indent=2))
+    print(
+        json.dumps(
+            {
+                "listId": known_list.id,
+                "name": payload.get("name"),
+                "listType": payload.get("listType", "shopping"),
+                "items": non_deleted_items,
+            },
+            indent=2,
+        )
+    )
 
 
 def find_item_by_name(list_payload: dict[str, Any], name: str) -> dict[str, Any] | None:
@@ -310,13 +325,22 @@ def find_item_by_name(list_payload: dict[str, Any], name: str) -> dict[str, Any]
         return None
 
     normalized_name = name.strip().lower()
-    for item in items:
-        if not isinstance(item, dict):
-            continue
-        item_name = item.get("name")
-        if isinstance(item_name, str) and item_name.strip().lower() == normalized_name:
-            return item
-    return None
+    matches = [
+        item
+        for item in items
+        if isinstance(item, dict)
+        and isinstance(item.get("name"), str)
+        and item["name"].strip().lower() == normalized_name
+    ]
+    # Prefer an open entry (e.g. the next occurrence of a recurring todo), then
+    # a completed todo, then a checked-off/deleted item to revive.
+    for match in matches:
+        if not match.get("deleted") and not match.get("completedAt"):
+            return match
+    for match in matches:
+        if not match.get("deleted"):
+            return match
+    return matches[0] if matches else None
 
 
 def existing_quantity(item: dict[str, Any] | None) -> str | None:
@@ -345,6 +369,10 @@ def cmd_upsert(state: RuntimeState, args: argparse.Namespace) -> None:
     quantity = args.quantity if args.quantity is not None else existing_quantity(existing_item)
     if quantity:
         body["quantityOrUnit"] = quantity
+    # Re-adding a completed todo reopens it: the server keeps todo fields a
+    # write omits, so the completion has to be cleared explicitly.
+    if not args.deleted and isinstance(existing_item, dict) and existing_item.get("completedAt"):
+        body["completedAt"] = None
 
     payload = api_request("PUT", f"/v1/lists/{known_list.id}/items/{item_id}", device_id=device_id, body=body)
 
@@ -428,6 +456,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     create_list_parser = subparsers.add_parser("create-list", help="Create a new list and set it active")
     create_list_parser.add_argument("name", help="List name")
+    create_list_parser.add_argument(
+        "--type",
+        choices=["shopping", "todo"],
+        help="List type: shopping (default) or todo",
+    )
     create_list_parser.set_defaults(func=cmd_create_list)
 
     join_parser = subparsers.add_parser("join", help="Join an existing shared list with a share token")

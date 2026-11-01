@@ -1,11 +1,12 @@
 import type { SyncItemSnapshot } from "@golist/shared/domain/sync";
+import type { ListType } from "@golist/shared/domain/types";
 import { buildServer } from "../../../backend/src/server.js";
 import type { ListRepository } from "../../../backend/src/repositories/list-repository.js";
 import { InMemoryListRepository } from "../../../backend/src/test/in-memory-list-repository.js";
 
 type FastifyApp = ReturnType<typeof buildServer>;
 
-export type ServerListSnapshot = { name: string; items: SyncItemSnapshot[] };
+export type ServerListSnapshot = { name: string; listType: ListType; items: SyncItemSnapshot[] };
 
 /**
  * The real Fastify backend (REST + WebSocket sync) on a free local port.
@@ -57,8 +58,10 @@ export class SimServer {
       return null;
     }
     const items = await this.repository.listItems(listId);
+    const toMillis = (value: string | undefined) => (value === undefined ? undefined : Date.parse(value));
     return {
       name: list.name,
+      listType: list.listType,
       items: items.map((item) => ({
         id: item.id,
         listId: item.listId,
@@ -68,6 +71,12 @@ export class SimServer {
         category: item.category,
         deleted: item.deleted,
         updatedAt: Date.parse(item.updatedAt),
+        description: item.description,
+        points: item.points,
+        completedAt: toMillis(item.completedAt),
+        dueDate: toMillis(item.dueDate),
+        assignedTo: item.assignedTo,
+        recurrence: item.recurrence,
       })),
     };
   }

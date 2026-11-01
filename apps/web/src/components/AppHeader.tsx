@@ -1,14 +1,20 @@
 import { memo, useCallback, useEffect, useRef, useState } from "react";
+import type { ListType } from "@golist/shared/domain/types";
+import ListTypeToggle from "./ListTypeToggle";
 import { useI18n } from "../i18n";
 
 type AppHeaderProps = {
   activeListName: string;
+  activeListType: ListType;
+  onChangeListType: (listType: ListType) => void;
   onOpenStats: () => void;
   onSaveRename: (nextName: string) => void;
 };
 
 const AppHeader = memo(function AppHeader({
   activeListName,
+  activeListType,
+  onChangeListType,
   onOpenStats,
   onSaveRename,
 }: AppHeaderProps) {
@@ -53,18 +59,27 @@ const AppHeader = memo(function AppHeader({
       <div className="header-card">
         <div className="title-row">
           {isEditingName ? (
-            <div className="title-edit" role="group" aria-label={t("header.editListName")}>
+            <div
+              className="title-edit"
+              role="group"
+              aria-label={t("header.editListName")}
+              onBlur={(event) => {
+                // Moving focus between the name input and the type toggle
+                // (e.g. Tab) stays in edit mode; leaving the group saves.
+                if (event.relatedTarget instanceof Node && event.currentTarget.contains(event.relatedTarget)) {
+                  return;
+                }
+                if (skipBlurSaveRef.current) {
+                  skipBlurSaveRef.current = false;
+                  return;
+                }
+                handleSaveRename();
+              }}
+            >
               <input
                 ref={renameInputRef}
                 value={renameValue}
                 onChange={(event) => setRenameValue(event.target.value)}
-                onBlur={() => {
-                  if (skipBlurSaveRef.current) {
-                    skipBlurSaveRef.current = false;
-                    return;
-                  }
-                  handleSaveRename();
-                }}
                 onKeyDown={(event) => {
                   if (event.key === "Enter") {
                     event.preventDefault();
@@ -82,6 +97,8 @@ const AppHeader = memo(function AppHeader({
                 aria-label={t("modal.listName")}
                 maxLength={120}
               />
+              {/* Editing a list also lets you switch its type. */}
+              <ListTypeToggle value={activeListType} onChange={onChangeListType} />
             </div>
           ) : (
             <>

@@ -1,3 +1,4 @@
+import { isListType } from "@golist/shared/domain/types";
 import type {
   ApiListDocument,
   ApiListItem,
@@ -41,6 +42,14 @@ const readBoolean = (payload: unknown, key: string): boolean | null => {
   return typeof value === "boolean" ? value : null;
 };
 
+const readPositiveInteger = (payload: unknown, key: string): number | undefined => {
+  if (typeof payload !== "object" || payload === null) {
+    return undefined;
+  }
+  const value = Reflect.get(payload, key);
+  return typeof value === "number" && Number.isInteger(value) && value > 0 ? value : undefined;
+};
+
 const parseApiListItem = (payload: unknown): ApiListItem => {
   const id = readString(payload, "id");
   const name = readString(payload, "name");
@@ -56,7 +65,23 @@ const parseApiListItem = (payload: unknown): ApiListItem => {
     throw new Error("Invalid item payload");
   }
 
-  return { id, name, iconName, category, createdAt, updatedAt, deleted, quantityOrUnit, createdByDeviceId };
+  return {
+    id,
+    name,
+    iconName,
+    category,
+    createdAt,
+    updatedAt,
+    deleted,
+    quantityOrUnit,
+    createdByDeviceId,
+    description: readString(payload, "description") ?? undefined,
+    points: readPositiveInteger(payload, "points"),
+    completedAt: readString(payload, "completedAt") ?? undefined,
+    dueDate: readString(payload, "dueDate") ?? undefined,
+    assignedTo: readString(payload, "assignedTo") ?? undefined,
+    recurrence: readString(payload, "recurrence") ?? undefined,
+  };
 };
 
 const parseListUpsertResponse = (payload: unknown): ApiListUpsertResponse => {
@@ -100,9 +125,12 @@ const parseListDocumentResponse = (payload: unknown): ApiListDocument => {
     throw new Error("Invalid list document payload");
   }
 
+  const rawListType = typeof payload === "object" && payload !== null ? Reflect.get(payload, "listType") : undefined;
+
   return {
     listId,
     name,
+    listType: isListType(rawListType) ? rawListType : undefined,
     createdAt,
     updatedAt,
     items: rawItems.map((item) => parseApiListItem(item)),

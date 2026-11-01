@@ -72,7 +72,8 @@ export const calculateListStats = (items: Item[], listId?: string): ListStats =>
 
   return {
     totalItemsEver: statsHistory.length,
-    openItems: statsHistory.filter((item) => !item.deleted).length,
+    // Completed todos (a list switched from todo to shopping) are not open.
+    openItems: statsHistory.filter((item) => !item.deleted && item.completedAt === undefined).length,
     topItems,
     lastBoughtAt,
   };

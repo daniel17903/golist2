@@ -62,6 +62,11 @@ The API contract is maintained in `apps/api-spec/openapi.yaml` (and related file
    `metadata_updated_at` column for list-name conflict resolution. Aggregate
    item activity continues to update `updated_at` without changing the
    metadata version.
+7. Migration `005_add_list_type_and_todo_fields.sql` adds `shared_lists.list_type`
+   (`shopping` | `todo`, default `shopping`) and the nullable todo columns on
+   `list_items` (`description`, `points`, `completed_at`, `due_date`,
+   `assigned_to`, `recurrence`). Todo lists (the former DoList app) share the
+   items table and the whole sync path with shopping lists.
 
 ### Phase 2 — API v1 implementation ✅ Implemented
 1. API v1 endpoints from `apps/api-spec/openapi.yaml` are implemented in `apps/backend/src/server.ts`.

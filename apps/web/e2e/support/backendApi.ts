@@ -10,11 +10,18 @@ export type RemoteItem = {
   iconName: string;
   deleted: boolean;
   updatedAt: string;
+  description?: string;
+  points?: number;
+  completedAt?: string;
+  dueDate?: string;
+  assignedTo?: string;
+  recurrence?: string;
 };
 
 export type RemoteList = {
   listId: string;
   name: string;
+  listType: "shopping" | "todo";
   items: RemoteItem[];
 };
 

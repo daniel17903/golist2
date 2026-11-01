@@ -15,7 +15,15 @@ export type UndoRenameToast = {
   nextName: string;
 };
 
-export type UndoToast = UndoDeleteToast | UndoRenameToast;
+export type UndoCompleteToast = {
+  id: string;
+  kind: "todo-complete";
+  item: Item;
+  // Next occurrence created by completing a recurring todo; undo deletes it.
+  spawnedItemId?: string;
+};
+
+export type UndoToast = UndoDeleteToast | UndoRenameToast | UndoCompleteToast;
 
 export type AppToast = {
   id: string;
@@ -101,6 +109,15 @@ export const useToasts = () => {
     undoTimeoutsRef.current.set(toastId, timeout);
   }, [enqueueUndoToast, removeUndoToast]);
 
+  const showUndoComplete = useCallback((item: Item, spawnedItemId?: string) => {
+    const toastId = crypto.randomUUID();
+    enqueueUndoToast({ id: toastId, kind: "todo-complete", item, spawnedItemId });
+    const timeout = window.setTimeout(() => {
+      removeUndoToast(toastId);
+    }, UNDO_TOAST_TIMEOUT_MS);
+    undoTimeoutsRef.current.set(toastId, timeout);
+  }, [enqueueUndoToast, removeUndoToast]);
+
   const showUndoRename = useCallback((listId: string, previousName: string, nextName: string) => {
     const toastId = crypto.randomUUID();
     enqueueUndoToast(
@@ -128,6 +145,7 @@ export const useToasts = () => {
     appToasts,
     pushAppToast,
     showUndoDelete,
+    showUndoComplete,
     showUndoRename,
     removeUndoToast,
     removeAppToast,

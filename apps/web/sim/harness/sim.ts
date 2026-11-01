@@ -64,8 +64,8 @@ export class SyncSim {
   }
 
   /**
-   * Waits until the server and every device agree on the list: same name
-   * and the same item digest (ids, names, quantities, categories, icons,
+   * Waits until the server and every device agree on the list: same name,
+   * same list type and the same item digest (ids, names, quantities, categories, icons,
    * deleted flags and timestamps of every item, checked off or not). Every
    * checked device must also be fully booted and connected (`isSyncing`).
    */
@@ -83,7 +83,12 @@ export class SyncSim {
         const devices = pick();
         return devices.length > 0 && devices.every((device) => {
           const snapshot = device.isSyncing ? device.snapshot(listId) : null;
-          return snapshot !== null && snapshot.name === server.name && snapshot.digest === serverDigest;
+          return (
+            snapshot !== null &&
+            snapshot.name === server.name &&
+            snapshot.listType === server.listType &&
+            snapshot.digest === serverDigest
+          );
         });
       },
       {
@@ -98,7 +103,7 @@ export class SyncSim {
     const lines: string[] = [];
     if (listId) {
       const server = await this.server.listSnapshot(listId);
-      lines.push(`== server list ${listId}: ${server ? `"${server.name}"` : "missing"}`);
+      lines.push(`== server list ${listId}: ${server ? `"${server.name}" (${server.listType})` : "missing"}`);
       for (const item of server?.items ?? []) {
         lines.push(
           `     - ${item.deleted ? "[x]" : "[ ]"} ${item.name}${item.quantityOrUnit ? ` (${item.quantityOrUnit})` : ""} @${item.updatedAt} ${item.id}`,

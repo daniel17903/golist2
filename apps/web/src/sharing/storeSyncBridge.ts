@@ -31,7 +31,7 @@ export const createStoreSyncCallbacks = (deps: StoreSyncBridgeDeps): SocketSyncC
     getAllListIds: () => deps.getLists().map((list) => list.id),
     getListMetadata: (listId) => {
       const list = deps.getLists().find((entry) => entry.id === listId);
-      return list ? { name: list.name, updatedAt: list.updatedAt } : null;
+      return list ? { name: list.name, listType: list.listType, updatedAt: list.updatedAt } : null;
     },
     ensureListExists: async (listId) => {
       const list = deps.getLists().find((entry) => entry.id === listId);
@@ -44,7 +44,7 @@ export const createStoreSyncCallbacks = (deps: StoreSyncBridgeDeps): SocketSyncC
         await api.upsertList({
           deviceId,
           listId: list.id,
-          body: { name: list.name, updatedAt: new Date(list.updatedAt).toISOString() },
+          body: { name: list.name, listType: list.listType, updatedAt: new Date(list.updatedAt).toISOString() },
         });
         return true;
       } catch {
@@ -121,7 +121,13 @@ export const createStoreSyncCallbacks = (deps: StoreSyncBridgeDeps): SocketSyncC
         if (!stored || !shouldAcceptListMetadata(payload, stored)) {
           return null;
         }
-        const next = { ...stored, name: payload.name, updatedAt: payload.updatedAt };
+        // An incoming patch without a type (an older peer) keeps the local one.
+        const next = {
+          ...stored,
+          name: payload.name,
+          listType: payload.listType ?? stored.listType,
+          updatedAt: payload.updatedAt,
+        };
         await db.lists.put(next);
         return next;
       });

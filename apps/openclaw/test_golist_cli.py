@@ -193,6 +193,13 @@ class CreateListTest(CliTestCase):
         self.assertEqual(self.read_state()["device_id"], device_id)
 
 
+    def test_sends_the_list_type_when_given(self) -> None:
+        exit_code, _ = self.run_cli("create-list", "Chores", "--type", "todo", responses=[{"listId": "ignored"}])
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(self.requests[0].body, {"name": "Chores", "listType": "todo"})
+
+
 class JoinTest(CliTestCase):
     def test_redeems_token_then_fetches_list_name(self) -> None:
         exit_code, output = self.run_cli(
@@ -253,6 +260,19 @@ class ShowTest(CliTestCase):
         self.assertEqual([item["name"] for item in output["items"]], ["milk"])
 
 
+    def test_hides_completed_todos_and_reports_the_list_type(self) -> None:
+        self.write_state()
+        items = [
+            {"id": ITEM_ID, "name": "Vacuum", "deleted": False},
+            {"id": str(uuid.uuid4()), "name": "Mop", "deleted": False, "completedAt": "2026-03-01T10:00:00.000Z"},
+        ]
+        _, output = self.run_cli(
+            "show", responses=[{"listId": LIST_ID, "name": "Chores", "listType": "todo", "items": items}]
+        )
+
+        self.assertEqual(output["listType"], "todo")
+        self.assertEqual([item["name"] for item in output["items"]], ["Vacuum"])
+
 class UpsertTest(CliTestCase):
     def test_creates_new_item_with_generated_id_and_timestamp(self) -> None:
         self.write_state()
@@ -310,6 +330,29 @@ class UpsertTest(CliTestCase):
         self.assertEqual(exit_code, 1)
         self.assertEqual(self.requests, [])
         self.assertIn("No active list set", self.stderr)
+
+
+    def test_prefers_the_open_occurrence_of_a_recurring_todo(self) -> None:
+        self.write_state()
+        completed = {"id": str(uuid.uuid4()), "name": "Mop", "deleted": False, "completedAt": "2026-03-01T10:00:00.000Z"}
+        open_next = {"id": ITEM_ID, "name": "Mop", "deleted": False}
+
+        self.run_cli("upsert", "Mop", responses=[{"listId": LIST_ID, "name": "Chores", "items": [completed, open_next]}, None])
+
+        put = self.requests[1]
+        self.assertEqual(put.path, f"/api/v1/lists/{LIST_ID}/items/{ITEM_ID}")
+        self.assertNotIn("completedAt", put.body)
+
+    def test_reopens_a_completed_todo_with_the_same_name(self) -> None:
+        self.write_state()
+        completed = {"id": ITEM_ID, "name": "Vacuum", "deleted": False, "completedAt": "2026-03-01T10:00:00.000Z"}
+
+        self.run_cli("upsert", "Vacuum", responses=[{"listId": LIST_ID, "name": "Chores", "items": [completed]}, None])
+
+        put = self.requests[1]
+        self.assertEqual(put.path, f"/api/v1/lists/{LIST_ID}/items/{ITEM_ID}")
+        self.assertIsNone(put.body["completedAt"])
+        self.assertFalse(put.body["deleted"])
 
 
 class DeleteTest(CliTestCase):

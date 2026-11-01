@@ -53,10 +53,11 @@ Persisted state file (default):
 ## Core flows
 ### 1) Create a new list
 ```bash
-python3 apps/openclaw/golist_cli.py create-list "Weekend groceries"
+python3 apps/openclaw/golist_cli.py create-list "Weekend groceries" [--type shopping|todo]
 python3 apps/openclaw/golist_cli.py share
 ```
 Creates a list with a generated UUID, stores it in known lists, sets it as active, then immediately creates a share token and returns the share URL to the user.
+Lists are shopping lists unless `--type todo` is given (a todo list shows its entries as todos in the app).
 
 ### 2) Share a list with a user
 ```bash
@@ -85,12 +86,13 @@ python3 apps/openclaw/golist_cli.py delete "milk"
 
 ## Intent mapping for OpenClaw
 - “create a new list called X” → `create-list "X"`
+- “create a todo list called X” → `create-list "X" --type todo`
 - After `create-list`, always run `share` and send the URL/token to the user.
 - “share this list with me” → `share`
 - “join this token” → `join <token>`
 - “show my lists” → `lists`
 - “switch to list X” → `use-list "X"`
-- “show current list” → `show`
+- “show current list” → `show` (open entries only: checked-off items and completed todos are left out; `listType` says which kind of list it is)
 - “add X (qty)” → `upsert "X" [--quantity "..."]`
 - “remove X” → `delete "X"`
 
@@ -100,4 +102,5 @@ python3 apps/openclaw/golist_cli.py delete "milk"
 - If token redemption fails, return a clear auth/share error.
 - In user-facing responses, refer to lists by name only (never by raw ID).
 - Do not invent item quantities; only send `--quantity` when the user asked for one.
-- Never send item metadata fields outside `name`, `deleted`, and optional `quantityOrUnit`.
+- Never send item metadata fields outside `name`, `deleted`, and optional `quantityOrUnit`. (Todo fields such as due dates
+  or assignees are kept by the backend when the CLI rewrites an item.)

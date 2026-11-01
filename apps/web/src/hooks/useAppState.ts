@@ -1,5 +1,7 @@
 import { useMemo } from "react";
+import { resolveListType } from "@golist/shared/domain/types";
 import { sortItemsForList } from "../domain/sort";
+import { isOpenTodo, sortTodoItems } from "../domain/todoSort";
 import { useStore } from "../state/useStore";
 
 // Store-derived data shared across the app shell. Fine-grained selectors:
@@ -21,16 +23,27 @@ export const useAppState = () => {
     [lists, activeListId],
   );
 
+  const activeListType = resolveListType(activeList);
+
+  // Shopping lists show items that are not checked off (deleted); todo lists
+  // show open todos. Completed todos stay hidden in both views, so a list
+  // whose type is switched keeps showing just its open entries.
   const listItems = useMemo(() => {
-    const filtered = items.filter((item) => item.listId === activeListId && !item.deleted);
+    if (activeListType === "todo") {
+      return sortTodoItems(items.filter((item) => item.listId === activeListId && isOpenTodo(item)));
+    }
+    const filtered = items.filter(
+      (item) => item.listId === activeListId && !item.deleted && item.completedAt === undefined,
+    );
     return sortItemsForList(filtered);
-  }, [items, activeListId]);
+  }, [items, activeListId, activeListType]);
 
   return {
     lists,
     items,
     activeListId,
     activeList,
+    activeListType,
     listItems,
     backendConnection,
     backendBusyRequests,

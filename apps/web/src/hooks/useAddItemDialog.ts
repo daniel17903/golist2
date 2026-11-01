@@ -46,7 +46,7 @@ export const useAddItemDialog = ({ isOpen, openPopup, closePopup }: AddItemDialo
   const currentItemNames = useMemo(() => {
     const names = new Set<string>();
     items.forEach((item) => {
-      if (item.listId !== activeListId || item.deleted) {
+      if (item.listId !== activeListId || item.deleted || item.completedAt !== undefined) {
         return;
       }
       const key = item.name.trim().toLowerCase();

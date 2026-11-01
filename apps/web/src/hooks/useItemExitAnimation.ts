@@ -11,17 +11,19 @@ const withoutId = (ids: Set<string>, itemId: string) => {
   return next;
 };
 
-type ItemExitAnimationOptions = {
+type ItemExitAnimationOptions<TResult> = {
   items: Item[];
-  toggleItem: (itemId: string) => Promise<void>;
-  onItemDeleted: (item: Item) => void;
+  // Removes the item from the visible list: deleting a shopping item or
+  // completing a todo. Its result is handed to `onItemDeleted`.
+  toggleItem: (itemId: string) => Promise<TResult>;
+  onItemDeleted: (item: Item, result: TResult) => void;
 };
 
 // Plays the card exit animation before an item is toggled away, with a timer
 // fallback so the item is still removed when animationend never fires. Once
 // the animation is done the card is hidden right away (`removedItemIds`), so
 // the grid reflows without waiting for the IndexedDB write behind the toggle.
-export const useItemExitAnimation = ({ items, toggleItem, onItemDeleted }: ItemExitAnimationOptions) => {
+export const useItemExitAnimation = <TResult>({ items, toggleItem, onItemDeleted }: ItemExitAnimationOptions<TResult>) => {
   const [exitingItemIds, setExitingItemIds] = useState<Set<string>>(new Set());
   const [removedItemIds, setRemovedItemIds] = useState<Set<string>>(new Set());
 
@@ -52,13 +54,14 @@ export const useItemExitAnimation = ({ items, toggleItem, onItemDeleted }: ItemE
     const deletedItem = itemsRef.current.find((item) => item.id === itemId);
     setRemovedItemIds((current) => new Set(current).add(itemId));
     setExitingItemIds((current) => withoutId(current, itemId));
+    let result: TResult;
     try {
-      await toggleItem(itemId);
+      result = await toggleItem(itemId);
     } finally {
       setRemovedItemIds((current) => withoutId(current, itemId));
     }
     if (deletedItem) {
-      onItemDeletedRef.current(deletedItem);
+      onItemDeletedRef.current(deletedItem, result);
     }
   }, [toggleItem]);
 
@@ -68,8 +71,8 @@ export const useItemExitAnimation = ({ items, toggleItem, onItemDeleted }: ItemE
     if (!itemToDelete) {return;}
 
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      await toggleItem(itemId);
-      onItemDeletedRef.current(itemToDelete);
+      const result = await toggleItem(itemId);
+      onItemDeletedRef.current(itemToDelete, result);
       return;
     }
     const fallbackTimeout = window.setTimeout(() => {

@@ -4,6 +4,8 @@ import fc from 'fast-check'
 import { afterAll, describe, expect, it } from 'vitest'
 
 import { InMemoryListRepository } from '../test/in-memory-list-repository.js'
+import type { ListType, TodoFields } from '@golist/shared/domain/types'
+
 import { type ListRepository } from './list-repository.js'
 
 // Differential test: the in-memory repository (used by most tests, the web
@@ -22,8 +24,8 @@ const ITEM_SLOTS = 3
 const DEVICE_SLOTS = 2
 
 type Operation =
-  | { kind: 'putList'; device: number; name: string; at?: number }
-  | { kind: 'upsertItems'; device: number; items: Array<{ slot: number; name: string; deleted: boolean; quantity?: string; at: number }> }
+  | { kind: 'putList'; device: number; name: string; at?: number; listType?: ListType }
+  | { kind: 'upsertItems'; device: number; items: Array<{ slot: number; name: string; deleted: boolean; quantity?: string; todo: TodoFields<string>; at: number }> }
   | { kind: 'upsertItem'; device: number; slot: number; name: string; deleted: boolean; at: number }
   | { kind: 'share'; device: number; redeemer: number }
 
@@ -34,13 +36,23 @@ const itemInput = fc.record({
   name,
   deleted: fc.boolean(),
   quantity: fc.option(fc.constantFrom('1', '2L'), { nil: undefined }),
+  // Todo fields (todo-type lists); they take part in the equal-timestamp hash tie-break.
+  todo: fc.record(
+    {
+      points: fc.integer({ min: 1, max: 3 }),
+      completedAt: fc.constantFrom('2026-01-01T00:00:01.000Z', '2026-01-01T00:00:02.000Z'),
+      assignedTo: fc.constantFrom('Alex', 'alex'),
+      recurrence: fc.constant('{"every":1,"unit":"week","anchor":"from_due_date"}'),
+    },
+    { requiredKeys: [] },
+  ),
   at,
 })
 
 const operationArb: fc.Arbitrary<Operation> = fc.oneof(
   // Mostly explicit timestamps: a putList without one stamps "now", far after
   // the fixed timestamps used here, which makes later renames lose.
-  fc.record({ kind: fc.constant('putList' as const), device: fc.nat({ max: DEVICE_SLOTS - 1 }), name: fc.constantFrom('List', 'Groceries', 'groceries', 'Ünïcode'), at: fc.option(at, { nil: undefined, freq: 8 }) }),
+  fc.record({ kind: fc.constant('putList' as const), device: fc.nat({ max: DEVICE_SLOTS - 1 }), name: fc.constantFrom('List', 'Groceries', 'groceries', 'Ünïcode'), at: fc.option(at, { nil: undefined, freq: 8 }), listType: fc.option(fc.constantFrom<ListType>('shopping', 'todo'), { nil: undefined }) }),
   fc.record({ kind: fc.constant('upsertItems' as const), device: fc.nat({ max: DEVICE_SLOTS - 1 }), items: fc.array(itemInput, { minLength: 1, maxLength: 3 }) }),
   fc.record({ kind: fc.constant('upsertItem' as const), device: fc.nat({ max: DEVICE_SLOTS - 1 }), slot: fc.nat({ max: ITEM_SLOTS - 1 }), name, deleted: fc.boolean(), at }),
   fc.record({ kind: fc.constant('share' as const), device: fc.nat({ max: DEVICE_SLOTS - 1 }), redeemer: fc.nat({ max: DEVICE_SLOTS - 1 }) }),
@@ -70,7 +82,9 @@ const runSequence = async (repository: ListRepository, operations: Operation[], 
     const deviceId = devices[operation.device]
     switch (operation.kind) {
       case 'putList':
-        transcript.push(await repository.putList(listId, operation.name, deviceId, operation.at === undefined ? undefined : iso(operation.at)))
+        transcript.push(
+          await repository.putList(listId, operation.name, deviceId, operation.at === undefined ? undefined : iso(operation.at), operation.listType),
+        )
         break
       case 'upsertItems':
         transcript.push(
@@ -79,7 +93,7 @@ const runSequence = async (repository: ListRepository, operations: Operation[], 
             deviceId,
             operation.items.map((item) => ({
               itemId: itemIds[item.slot],
-              input: { name: item.name, iconName: 'default', category: 'other', quantityOrUnit: item.quantity, deleted: item.deleted, updatedAt: iso(item.at) },
+              input: { name: item.name, iconName: 'default', category: 'other', quantityOrUnit: item.quantity, deleted: item.deleted, updatedAt: iso(item.at), ...item.todo },
             })),
           ),
         )
@@ -114,7 +128,7 @@ const runSequence = async (repository: ListRepository, operations: Operation[], 
     transcript,
     // putList without an explicit updatedAt stamps "now", which differs
     // between the two runs; only compare explicit timestamps.
-    list: list && { name: list.name },
+    list: list && { name: list.name, listType: list.listType },
     access: await Promise.all(devices.map((device) => repository.hasListAccess(listId, device))),
     items: items
       .map((item) => ({
@@ -122,6 +136,10 @@ const runSequence = async (repository: ListRepository, operations: Operation[], 
         name: item.name,
         deleted: item.deleted,
         quantityOrUnit: item.quantityOrUnit ?? null,
+        points: item.points ?? null,
+        completedAt: item.completedAt ?? null,
+        assignedTo: item.assignedTo ?? null,
+        recurrence: item.recurrence ?? null,
         updatedAt: Date.parse(item.updatedAt),
       }))
       .sort((left, right) => left.slot - right.slot),
@@ -144,7 +162,18 @@ describe.skipIf(!hasDatabase)('list repository differential (in-memory vs Postgr
         const postgres = await runSequence(postgresListRepository, operations, ids)
         expect(postgres).toEqual(memory)
       }),
-      { seed, numRuns },
+      {
+        seed,
+        numRuns,
+        examples: [
+          // Same name and timestamp, only the list type differs: the
+          // equal-timestamp tie-break on the type (rare in random runs).
+          [[
+            { kind: 'putList', device: 0, name: 'List', at: 1 },
+            { kind: 'putList', device: 0, name: 'List', at: 1, listType: 'todo' },
+          ]],
+        ],
+      },
     )
   }, 120_000)
 })

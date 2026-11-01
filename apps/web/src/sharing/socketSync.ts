@@ -1,15 +1,21 @@
-import type { Item } from '@golist/shared/domain/types';
-import { buildItemHash, buildItemSummaries, buildListDigest, shouldAcceptListMetadata } from '@golist/shared/domain/sync';
+import { isListType, type Item, type ListType } from '@golist/shared/domain/types';
+import {
+  buildItemHash,
+  buildItemSummaries,
+  buildListDigest,
+  shouldAcceptListMetadata,
+  type ListMetadataSnapshot,
+} from '@golist/shared/domain/sync';
 
 import { isBackendSharingEnabled } from './apiClient';
 
 export type SocketSyncCallbacks = {
   getItemsForList: (listId: string) => Item[];
   getAllListIds: () => string[];
-  getListMetadata: (listId: string) => { name: string; updatedAt: number } | null;
+  getListMetadata: (listId: string) => ListMetadataSnapshot | null;
   ensureListExists: (listId: string) => Promise<boolean>;
   applyIncomingItems: (listId: string, items: Item[]) => Promise<void>;
-  applyIncomingListMetadata: (listId: string, payload: { name: string; updatedAt: number }) => Promise<void>;
+  applyIncomingListMetadata: (listId: string, payload: ListMetadataSnapshot) => Promise<void>;
   onConnectionState: (state: 'online' | 'offline') => void;
   onError: (message: string) => void;
 };
@@ -58,7 +64,7 @@ const registerBrowserOnlineListener = (listener: () => void) => {
 };
 
 type OutboundPatch = { listId: string; item: Item };
-type OutboundListMetadataPatch = { listId: string; name: string; updatedAt: number };
+type OutboundListMetadataPatch = { listId: string } & ListMetadataSnapshot;
 
 const createWebSocketUrl = (): string | null => {
   if (!isBackendSharingEnabled || typeof __API_BASE_URL__ !== 'string' || !__API_BASE_URL__) {
@@ -85,12 +91,13 @@ type ServerMessage =
       type: 'subscribed';
       listId: string;
       listName: string | null;
+      listType: ListType | undefined;
       listUpdatedAt: number | null;
       serverListDigest: string | null;
     }
   | { type: 'hash_diff'; listId: string; summaries: ItemSummary[] }
   | { type: 'item_patch'; listId: string; items: Item[] }
-  | { type: 'list_metadata_patch'; listId: string; name: string; updatedAt: number }
+  | { type: 'list_metadata_patch'; listId: string; name: string; listType: ListType | undefined; updatedAt: number }
   | { type: 'error'; message: string };
 
 const isItemSummary = (value: unknown): value is ItemSummary =>
@@ -126,6 +133,7 @@ const parseServerMessage = (value: unknown): ServerMessage | null => {
       type: 'subscribed',
       listId,
       listName: typeof value.listName === 'string' ? value.listName : null,
+      listType: isListType(value.listType) ? value.listType : undefined,
       listUpdatedAt: typeof value.listUpdatedAt === 'number' ? value.listUpdatedAt : null,
       serverListDigest: typeof value.serverListDigest === 'string' ? value.serverListDigest : null,
     };
@@ -156,7 +164,8 @@ const parseServerMessage = (value: unknown): ServerMessage | null => {
     if (!listId || !name || updatedAt === null) {
       return null;
     }
-    return { type: 'list_metadata_patch', listId, name, updatedAt };
+    const listType = isListType(value.listType) ? value.listType : undefined;
+    return { type: 'list_metadata_patch', listId, name, listType, updatedAt };
   }
 
   if (value.type === 'error') {
@@ -288,7 +297,7 @@ export class SocketSyncManager {
     this.flushQueue();
   }
 
-  queueLocalListMetadataPatch(listId: string, payload: { name: string; updatedAt: number }) {
+  queueLocalListMetadataPatch(listId: string, payload: ListMetadataSnapshot) {
     this.listMetadataQueue.push({ listId, ...payload });
     this.flushQueue();
   }
@@ -546,6 +555,7 @@ export class SocketSyncManager {
         await this.handleSubscribedMessage(
           message.listId,
           message.listName,
+          message.listType,
           message.listUpdatedAt,
           message.serverListDigest,
         );
@@ -557,7 +567,11 @@ export class SocketSyncManager {
         await this.handleItemPatchMessage(message.listId, message.items);
         return;
       case 'list_metadata_patch':
-        await this.handleListMetadataPatchMessage(message.listId, message.name, message.updatedAt);
+        await this.handleListMetadataPatchMessage(message.listId, {
+          name: message.name,
+          listType: message.listType,
+          updatedAt: message.updatedAt,
+        });
         return;
       case 'error':
         await this.handleErrorMessage(message.message);
@@ -567,6 +581,7 @@ export class SocketSyncManager {
   private async handleSubscribedMessage(
     listId: string,
     listName: string | null,
+    listType: ListType | undefined,
     listUpdatedAt: number | null,
     serverListDigest: string | null,
   ) {
@@ -593,11 +608,12 @@ export class SocketSyncManager {
       localMetadata !== null &&
       listName !== null &&
       listUpdatedAt !== null &&
-      shouldAcceptListMetadata(localMetadata, { name: listName, updatedAt: listUpdatedAt });
+      shouldAcceptListMetadata(localMetadata, { name: listName, listType, updatedAt: listUpdatedAt });
 
     if (listName && listUpdatedAt !== null) {
       await this.callbacks?.applyIncomingListMetadata(listId, {
         name: listName,
+        listType,
         updatedAt: listUpdatedAt,
       });
     }
@@ -609,6 +625,7 @@ export class SocketSyncManager {
         type: 'list_metadata_patch',
         listId,
         name: localMetadata!.name,
+        listType: localMetadata!.listType,
         updatedAt: localMetadata!.updatedAt,
       });
     }
@@ -668,8 +685,8 @@ export class SocketSyncManager {
     }
   }
 
-  private async handleListMetadataPatchMessage(listId: string, name: string, updatedAt: number) {
-    await this.callbacks?.applyIncomingListMetadata(listId, { name, updatedAt });
+  private async handleListMetadataPatchMessage(listId: string, metadata: ListMetadataSnapshot) {
+    await this.callbacks?.applyIncomingListMetadata(listId, metadata);
   }
 
   private async handleErrorMessage(message: string) {
@@ -874,6 +891,7 @@ export class SocketSyncManager {
         type: 'list_metadata_patch',
         listId: this.subscribedListId,
         name: latestMetadataPatch.name,
+        listType: latestMetadataPatch.listType,
         updatedAt: latestMetadataPatch.updatedAt,
       });
     }

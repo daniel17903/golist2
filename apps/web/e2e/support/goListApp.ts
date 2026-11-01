@@ -264,12 +264,15 @@ export class GoListApp {
     return this.drawer.locator(".drawer__item-label");
   }
 
-  async createList(name: string) {
+  async createList(name: string, options: { listType?: "shopping" | "todo" } = {}) {
     await this.openDrawer();
     await this.drawer.getByRole("button", { name: "Create new list" }).click();
     const dialog = this.page.getByRole("dialog");
     await expect(dialog.getByRole("heading", { name: "Create new list" })).toBeVisible();
     await dialog.getByRole("textbox", { name: "Name" }).fill(name);
+    if (options.listType === "todo") {
+      await dialog.getByRole("radio", { name: "Todo list" }).click();
+    }
     await dialog.getByRole("button", { name: "Create" }).click();
     await expect(this.listTitle).toHaveText(name);
   }
@@ -350,9 +353,102 @@ export class GoListApp {
     await this.page.mouse.up();
   }
 
+  // Switches the active list's type from the header's inline edit mode.
+  async setActiveListType(listType: "shopping" | "todo") {
+    await this.listTitle.click();
+    const option = this.page.getByRole("radio", { name: listType === "todo" ? "Todo list" : "Shopping list" });
+    await option.click();
+    await expect(option).toHaveAttribute("aria-checked", "true");
+    await this.page.getByRole("textbox", { name: "List name" }).press("Escape");
+    await expect(this.listTitle).toBeVisible();
+  }
+
+  // ---------- todos (todo-type lists) ----------
+
+  get todoRows(): Locator {
+    return this.page.locator("main.todo-list .todo-item");
+  }
+
+  todoRow(title: string): Locator {
+    return this.todoRows.filter({
+      has: this.page.locator(".todo-item__title", { hasText: new RegExp(`^${escapeRegExp(title)}$`) }),
+    });
+  }
+
+  async todoTitles(): Promise<string[]> {
+    return this.page.locator("main.todo-list .todo-item__title").allTextContents();
+  }
+
+  private async fillTodoForm(fields: TodoFields) {
+    const dialog = this.page.getByRole("dialog");
+    if (fields.title !== undefined) {
+      await dialog.getByLabel("Title").fill(fields.title);
+    }
+    if (fields.dueDate !== undefined) {
+      await dialog.getByLabel("Due date").fill(fields.dueDate);
+    }
+    if (fields.repeatEveryWeek) {
+      await dialog.getByText("Repeat").click();
+    }
+    if (fields.assignedTo !== undefined) {
+      await dialog.getByLabel("Assigned to").fill(fields.assignedTo);
+    }
+    if (fields.description !== undefined) {
+      await dialog.getByLabel("Description").fill(fields.description);
+    }
+    if (fields.points !== undefined) {
+      await dialog.getByLabel("Points").fill(String(fields.points));
+    }
+  }
+
+  async addTodo(fields: TodoFields & { title: string }) {
+    await this.page.getByRole("button", { name: "Add item" }).click();
+    const dialog = this.page.getByRole("dialog");
+    await expect(dialog.getByRole("heading", { name: "Add todo" })).toBeVisible();
+    await this.fillTodoForm(fields);
+    await dialog.getByRole("button", { name: "Add", exact: true }).click();
+    await expect(dialog).toHaveCount(0);
+    await expect(this.todoRow(fields.title)).toHaveCount(1);
+  }
+
+  async openTodo(title: string) {
+    const row = this.todoRow(title);
+    await row.hover();
+    await this.page.mouse.down();
+    await this.page.waitForTimeout(800);
+    await this.page.mouse.up();
+    await expect(this.page.getByRole("dialog").getByRole("heading", { name: "Edit todo" })).toBeVisible();
+  }
+
+  async editTodo(title: string, changes: TodoFields) {
+    await this.openTodo(title);
+    const dialog = this.page.getByRole("dialog");
+    await this.fillTodoForm(changes);
+    await dialog.getByRole("button", { name: "Save" }).click();
+    await expect(dialog).toHaveCount(0);
+  }
+
+  // Short press = complete the todo (it slides out, then disappears).
+  async completeTodo(title: string) {
+    const row = this.todoRow(title);
+    await row.click();
+    await expect(row).toHaveCount(0);
+  }
+
   undoToast(text: string | RegExp): Locator {
     return this.page.locator(".undo-toast", { hasText: text });
   }
 }
+
+export type TodoFields = {
+  title?: string;
+  /** `yyyy-mm-dd` */
+  dueDate?: string;
+  /** Turns on the default recurrence (every week, from the due date). */
+  repeatEveryWeek?: boolean;
+  assignedTo?: string;
+  description?: string;
+  points?: number;
+};
 
 export const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
