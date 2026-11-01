@@ -25,7 +25,8 @@ const checks = {
   lintBackend: { label: "backend lint", cmd: ["npm", "run", "lint", "-w", "apps/backend"] },
   typecheckBackend: { label: "backend typecheck", cmd: ["npm", "run", "typecheck", "-w", "apps/backend"] },
   testBackend: { label: "backend tests", cmd: ["npm", "run", "test", "-w", "apps/backend"] },
-  buildBackend: { label: "backend build", cmd: ["npm", "run", "build", "-w", "apps/backend"] },
+  // Builds the backend and smoke-tests the production build under plain Node.
+  buildBackend: { label: "backend build + production smoke", cmd: ["npm", "run", "smoke:dist", "-w", "apps/backend"] },
   lintApiSpec: { label: "API spec lint (openapi.yaml)", cmd: ["npm", "run", "lint", "-w", "apps/api-spec"] },
   testOpenclaw: {
     label: "openclaw CLI tests",
@@ -70,8 +71,9 @@ const checksForChanges = (files) => {
       add(...defaultChecks, "buildBackend", "e2eWeb");
     } else if (file.startsWith("apps/backend/")) {
       add("lintBackend", "typecheckBackend", "testBackend", "testWeb");
-      // Runtime code and build/packaging config must still compile to dist.
-      if (/apps\/backend\/(src\/|package\.json|tsconfig[^/]*\.json|Dockerfile)/.test(file) && !/\.test\.ts$/.test(file)) {
+      // Runtime code and build/packaging config must still compile to dist
+      // and load under plain Node (smoke:dist).
+      if (/apps\/backend\/(src\/|scripts\/|package\.json|tsconfig[^/]*\.json|Dockerfile)/.test(file) && !/\.test\.ts$/.test(file)) {
         add("buildBackend");
       }
       if (/src\/(routes|repositories|sync)\//.test(file)) {

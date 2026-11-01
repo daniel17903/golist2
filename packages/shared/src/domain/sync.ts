@@ -1,4 +1,9 @@
-import { defaultListType, type Item, type ListType } from './types';
+// Import through the package name, not './types': the backend's production
+// build runs this TypeScript source with plain Node (type stripping), whose
+// ESM resolver needs the exact file; the package exports map supplies it.
+// A relative import only works when it is type-only (`import type`), because
+// Node strips those. apps/backend/scripts/smoke-dist.mjs checks this.
+import { defaultListType, type Item, type ListType } from '@golist/shared/domain/types';
 
 export type SyncItemSnapshot = Pick<
   Item,

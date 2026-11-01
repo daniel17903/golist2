@@ -74,6 +74,9 @@
 
 ## Development commands
 - `npm run verify` — lint + typecheck + unit/sim tests for web and backend (~30s); `npm run verify:changed` picks only what the changed files need; `npm run verify:full` adds the web + backend builds and Playwright E2E. Prints a pass/fail summary.
+- `npm run smoke:dist -w apps/backend` — builds the backend and loads the production build the way the Docker image
+  runs it (compiled `dist/` + `packages/shared` TypeScript source under plain Node), then probes `/health` and
+  `/healthz`. Runs in CI and in `verify:changed` for backend/shared changes.
 - `npm install`
 - `npm run dev:web`
 - `npm run lint -w apps/web`
@@ -123,6 +126,13 @@
 - Dexie schema lives in `apps/web/src/storage/db.ts`. Keep migrations backward-compatible.
 
 ## Common pitfalls
+- **`packages/shared` runs as TypeScript under plain Node in production** (the backend image copies the source; Node
+  strips the types). Relative imports between shared files therefore only work as `import type`; for runtime values
+  import through the package name (`@golist/shared/domain/types`), which the `exports` map resolves to the `.ts`
+  file. vitest, tsx and Vite accept extensionless relative imports, so only `npm run smoke:dist -w apps/backend`
+  catches this (an extensionless import crashed the production backend once).
+- The deployment (Coolify) health check probes `GET /healthz`; keep that route (same handler as `/health`).
+
 - The PWA service worker can cache aggressively; use hard refresh or clear site data
   when debugging PWA changes.
 
