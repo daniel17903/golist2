@@ -13,8 +13,8 @@
   `X-Device-Id`/`Origin` headers, payload) and that every request path exists in `openapi.yaml`.
 - `packages/shared/` contains shared domain code that can be reused by web and backend (currently shared types).
 - `apps/web/sim/` is the in-process multi-device sync simulation (real web store + sync client against the real backend); see `apps/web/sim/README.md`.
-- `scripts/` holds repo tooling: `agent-setup.sh` (container setup, also run by the Claude Code SessionStart hook in `.claude/`), `local-postgres.sh` (throwaway local database), `verify.mjs` (runs the right checks).
-- `.claude/hooks/` holds Claude Code hooks: `session-start.sh` (runs `agent-setup.sh` in cloud sessions) and `pre-push-verify.sh` (a PreToolUse hook that blocks `git push` until `npm run verify:changed` passes; push detection in `is-git-push.mjs`, tested by `node --test .claude/hooks/is-git-push.test.mjs`). It is registered in `.claude/settings.json`, which also allowlists the routine check commands.
+- `scripts/` holds repo tooling: `agent-setup.sh` (container setup, also run by the Claude Code SessionStart hook in `.claude/`), `playwright-chromium.sh` (finds a usable Chromium when the pinned Playwright's build is missing), `local-postgres.sh` (throwaway local database), `verify.mjs` (runs the right checks).
+- `.claude/hooks/` holds Claude Code hooks: `session-start.sh` (runs `agent-setup.sh` in cloud sessions) and `pre-push-verify.sh` (a PreToolUse hook that blocks `git push` until `npm run verify:changed` passes; it sets `PLAYWRIGHT_CHROMIUM_EXECUTABLE` itself via `scripts/playwright-chromium.sh`, since hooks don't inherit the session env; push detection in `is-git-push.mjs`, tested by `node --test .claude/hooks/is-git-push.test.mjs`). It is registered in `.claude/settings.json`, which also allowlists the routine check commands.
 - Root `package.json` is a workspace manifest; run workspace commands with `-w apps/web` or `-w apps/backend`, or use root aliases like `npm run dev:web` and `npm run dev:backend`.
 
 ## Project snapshot (web app)
