@@ -279,7 +279,13 @@ export class GoListApp {
 
   async selectList(name: string) {
     await this.openDrawer();
-    await this.drawer.locator(".drawer__item-button", { hasText: name }).click();
+    // Match the name label exactly: the row also carries the list type as
+    // screen-reader text ("Shopping list"), which the default list's name equals.
+    await this.drawer
+      .locator(".drawer__item-button", {
+        has: this.page.locator(".drawer__item-label", { hasText: new RegExp(`^${escapeRegExp(name)}$`) }),
+      })
+      .click();
     await expect(this.listTitle).toHaveText(name);
   }
 

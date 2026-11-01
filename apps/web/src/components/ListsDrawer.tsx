@@ -1,5 +1,5 @@
 import { memo, useMemo, useRef, useState, type PointerEvent, type TransitionEvent } from "react";
-import type { Item, List } from "@golist/shared/domain/types";
+import { resolveListType, type Item, type List, type ListType } from "@golist/shared/domain/types";
 import { formatRelativeElapsedTime } from "../domain/relativeTime";
 import { useI18n } from "../i18n";
 import { useStore } from "../state/useStore";
@@ -33,6 +33,15 @@ type DragState = {
 const noItems: Item[] = [];
 
 const EDGE_SWIPE_WIDTH = 28;
+
+// Drawer row icon per list type: a shopping cart for shopping lists, a
+// checklist for todo lists.
+const listTypeIconPaths: Record<ListType, string> = {
+  shopping:
+    "M7 18c-1.1 0-1.99.9-1.99 2S5.9 22 7 22s2-.9 2-2-.9-2-2-2zM1 2v2h2l3.6 7.59-1.35 2.45c-.16.28-.25.61-.25.96 0 1.1.9 2 2 2h12v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63h7.45c.75 0 1.41-.41 1.75-1.03l3.58-6.49A1 1 0 0 0 20 4H5.21l-.94-2H1zm16 16c-1.1 0-1.99.9-1.99 2s.89 2 1.99 2 2-.9 2-2-.9-2-2-2z",
+  todo:
+    "M22 7h-9v2h9V7zm0 8h-9v2h9v-2zM5.54 11 2 7.46l1.41-1.41 2.12 2.12 4.24-4.24 1.41 1.41L5.54 11zm0 8L2 15.46l1.41-1.41 2.12 2.12 4.24-4.24 1.41 1.41L5.54 19z",
+};
 
 const getCurrentTimestamp = () => Date.now();
 
@@ -240,6 +249,7 @@ const ListsDrawer = memo(function ListsDrawer({
             <div className="drawer__list">
               {lists.map((list) => {
                 const isConfirmingDelete = confirmDeleteListId === list.id;
+                const listType = resolveListType(list);
 
                 return (
                   <div key={list.id} className="drawer__item">
@@ -250,16 +260,14 @@ const ListsDrawer = memo(function ListsDrawer({
                       }`}
                       onClick={() => onSelectList(list.id)}
                     >
-                      <span className="drawer__item-icon" aria-hidden="true">
+                      <span className="drawer__item-icon" aria-hidden="true" data-list-type={listType}>
                         <svg viewBox="0 0 24 24">
-                          <path
-                            d="M3 5h2v2H3V5zm0 6h2v2H3v-2zm0 6h2v2H3v-2zm4-12h14v2H7V5zm0 6h14v2H7v-2zm0 6h14v2H7v-2z"
-                            fill="currentColor"
-                          />
+                          <path d={listTypeIconPaths[listType]} fill="currentColor" />
                         </svg>
                       </span>
                       <span className="drawer__item-copy">
                         <span className="drawer__item-label">{list.name}</span>
+                        <span className="visually-hidden">{t(`listType.${listType}`)}</span>
                         <span className="drawer__item-meta">
                           {t("drawer.openUpdated", {
                             updated: formatLastUpdated(lastUpdatedAtByList.get(list.id) ?? list.updatedAt),
