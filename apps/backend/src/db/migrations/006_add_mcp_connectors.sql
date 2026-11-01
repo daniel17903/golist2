@@ -21,3 +21,6 @@ CREATE TABLE IF NOT EXISTS mcp_connector_lists (
   list_id UUID NOT NULL REFERENCES shared_lists(id) ON DELETE CASCADE,
   PRIMARY KEY (connector_id, list_id)
 );
+
+-- Listing a device's (or a connector owner's) lists looks lists up by creator.
+CREATE INDEX IF NOT EXISTS idx_shared_lists_created_by_device_id ON shared_lists(created_by_device_id);

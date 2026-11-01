@@ -321,6 +321,64 @@ describe.each(repositories)('MCP connectors (%s repository)', (_, makeRepository
       expect((await api('GET', `/v1/lists/${created.listId}`, owner)).body).toMatchObject({ name: 'Garden party', listType: 'todo' })
     })
 
+    it('a list it shared stops being reachable when the owner narrows the selection', async () => {
+      const owner = crypto.randomUUID()
+      const kept = await createList('Kept', owner)
+      const shared = await createList('Shared by the assistant', owner)
+      const { key, connector } = await createConnector({ includeAllLists: true }, owner)
+      const client = await connect(key)
+
+      await call(client, 'share_list', { listId: shared })
+      await api('PUT', `/v1/connectors/${connector.connectorId}`, owner, { label: 'Claude', includeAllLists: false, listIds: [kept] })
+
+      expect(await listNames(client)).toEqual(['Kept'])
+      expect(await callError(client, 'get_list', { listId: shared })).toContain('No list with this id')
+    })
+
+    it('adds a name repeated in one call once, with the last quantity', async () => {
+      const owner = crypto.randomUUID()
+      const listId = await createList('Repeats', owner)
+      const { key } = await createConnector({ includeAllLists: true }, owner)
+      const client = await connect(key)
+
+      expect(
+        await call(client, 'add_items', { listId, items: [{ name: 'Eggs', quantityOrUnit: '6' }, { name: 'eggs', quantityOrUnit: '12' }] }),
+      ).toMatchObject({ added: ['Eggs'], updated: [], alreadyOnList: [] })
+      const { items } = z
+        .object({ items: z.array(z.object({ name: z.string(), quantityOrUnit: z.string().optional() })) })
+        .parse(await call(client, 'get_list', { listId }))
+      expect(items).toEqual([expect.objectContaining({ name: 'Eggs', quantityOrUnit: '12' })])
+    })
+
+    it('can be called from a browser page on another origin', async () => {
+      const { key } = await createConnector({ includeAllLists: true })
+      const url = `${baseUrl}/v1/mcp/${key}`
+      const preflight = await fetch(url, {
+        method: 'OPTIONS',
+        headers: {
+          origin: 'https://inspector.example',
+          'access-control-request-method': 'POST',
+          'access-control-request-headers': 'content-type, mcp-protocol-version',
+        },
+      })
+      expect(preflight.status).toBe(204)
+      expect(preflight.headers.get('access-control-allow-origin')).toBe('https://inspector.example')
+      expect(preflight.headers.get('access-control-allow-headers')?.toLowerCase()).toContain('mcp-protocol-version')
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          origin: 'https://inspector.example',
+          'content-type': 'application/json',
+          accept: 'application/json, text/event-stream',
+          'mcp-protocol-version': '2025-06-18',
+        },
+        body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }),
+      })
+      expect(response.status).toBe(200)
+      expect(response.headers.get('access-control-allow-origin')).toBe('https://inspector.example')
+    })
+
     it('joins a list from a share link', async () => {
       const listId = await createList('From a friend', otherDeviceId)
       const token = await api('POST', `/v1/lists/${listId}/share-tokens`, otherDeviceId)

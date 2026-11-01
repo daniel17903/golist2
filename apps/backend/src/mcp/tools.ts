@@ -159,10 +159,14 @@ export function buildMcpServer(connectorDeviceId: string, deps: McpToolDeps): Mc
     return items.filter((item): item is ListItemRecord => item !== null)
   }
 
-  /** Stores the items and pushes the accepted versions to the open apps. */
-  const writeItems = async (listId: string, entries: ItemBatchUpsertEntry[]): Promise<void> => {
+  /**
+   * Stores the items and pushes the accepted versions to the open apps.
+   * Returns the ids of entries that lost last-write-wins against a newer
+   * stored version (e.g. an edit made in the app at the same moment).
+   */
+  const writeItems = async (listId: string, entries: ItemBatchUpsertEntry[]): Promise<Set<string>> => {
     if (entries.length === 0) {
-      return
+      return new Set()
     }
     const results = await listRepository.upsertListItems(listId, connectorDeviceId, entries)
     if (results.some((result) => result.outcome === 'conflict')) {
@@ -171,8 +175,9 @@ export function buildMcpServer(connectorDeviceId: string, deps: McpToolDeps): Mc
     const acceptedIds = entries
       .filter((_, index) => results[index].outcome === 'created' || results[index].outcome === 'updated')
       .map((entry) => entry.itemId)
+    const ignoredIds = new Set(entries.filter((_, index) => results[index].outcome === 'ignored').map((entry) => entry.itemId))
     if (acceptedIds.length === 0) {
-      return
+      return ignoredIds
     }
     listSyncCache.invalidate(listId)
     const stored = await Promise.all(acceptedIds.map((itemId) => listRepository.getListItem(listId, itemId)))
@@ -180,6 +185,15 @@ export function buildMcpServer(connectorDeviceId: string, deps: McpToolDeps): Mc
       listId,
       stored.filter((item): item is ListItemRecord => item !== null).map(toSyncItem),
     )
+    return ignoredIds
+  }
+
+  /** Names of the items whose write was discarded, for the tool result. */
+  const notApplied = (ignoredIds: Set<string>, items: Array<{ id: string; name: string }>) => {
+    const names = items.filter((item) => ignoredIds.has(item.id)).map((item) => item.name)
+    return names.length > 0
+      ? { notApplied: names, note: 'These items were changed elsewhere at the same time; call get_list to see their current state.' }
+      : {}
   }
 
   const categoryLanguageOf = async (listId: string, requested?: CategoryLanguage) => {
@@ -285,12 +299,22 @@ export function buildMcpServer(connectorDeviceId: string, deps: McpToolDeps): Mc
             .map((item) => [item.name.toLocaleLowerCase(), item]),
         )
         const entries: ItemBatchUpsertEntry[] = []
+        // Items written earlier in this call, so a repeated name updates the
+        // pending entry instead of writing the same id twice.
+        const pendingEntries = new Map<string, ItemBatchUpsertEntry>()
         const added: string[] = []
         const updated: string[] = []
         const alreadyOnList: string[] = []
 
         for (const item of items) {
           const existing = list.listType === 'shopping' ? openByName.get(item.name.toLocaleLowerCase()) : undefined
+          const pending = existing ? pendingEntries.get(existing.id) : undefined
+          if (pending) {
+            if (item.quantityOrUnit !== undefined) {
+              pending.input.quantityOrUnit = item.quantityOrUnit
+            }
+            continue
+          }
           if (existing) {
             if (item.quantityOrUnit === undefined || item.quantityOrUnit === existing.quantityOrUnit) {
               alreadyOnList.push(existing.name)
@@ -304,6 +328,7 @@ export function buildMcpServer(connectorDeviceId: string, deps: McpToolDeps): Mc
                 updatedAt: nextUpdatedAt(existing.updatedAt),
               },
             })
+            pendingEntries.set(existing.id, entries[entries.length - 1])
             updated.push(existing.name)
             continue
           }
@@ -331,7 +356,7 @@ export function buildMcpServer(connectorDeviceId: string, deps: McpToolDeps): Mc
               ...todoFields,
             },
           })
-          // Same name twice in one call: the second one updates the first.
+          pendingEntries.set(itemId, entries[entries.length - 1])
           openByName.set(item.name.toLocaleLowerCase(), {
             id: itemId,
             listId,
@@ -341,8 +366,9 @@ export function buildMcpServer(connectorDeviceId: string, deps: McpToolDeps): Mc
           added.push(item.name)
         }
 
-        await writeItems(listId, entries)
-        return { list: list.name, added, updated, alreadyOnList }
+        const ignoredIds = await writeItems(listId, entries)
+        const written = entries.map((entry) => ({ id: entry.itemId, name: entry.input.name }))
+        return { list: list.name, added, updated, alreadyOnList, ...notApplied(ignoredIds, written) }
       }),
   )
 
@@ -390,9 +416,13 @@ export function buildMcpServer(connectorDeviceId: string, deps: McpToolDeps): Mc
             next.recurrence = undefined
           }
         }
-        await writeItems(args.listId, [{ itemId: item.id, input: next }])
+        const ignoredIds = await writeItems(args.listId, [{ itemId: item.id, input: next }])
         const stored = await listRepository.getListItem(args.listId, item.id)
-        return { list: list.name, item: stored ? toItemView(stored, list.listType) : undefined }
+        return {
+          list: list.name,
+          item: stored ? toItemView(stored, list.listType) : undefined,
+          ...notApplied(ignoredIds, [item]),
+        }
       }),
   )
 
@@ -412,6 +442,8 @@ export function buildMcpServer(connectorDeviceId: string, deps: McpToolDeps): Mc
         const completedAt = new Date(now()).toISOString()
         const entries: ItemBatchUpsertEntry[] = []
         const nextOccurrences: Array<{ name: string; dueDate: string }> = []
+        const alreadyCompleted: string[] = []
+        const alreadyCompletedIds = new Set<string>()
 
         for (const item of items) {
           if (list.listType === 'shopping') {
@@ -419,6 +451,8 @@ export function buildMcpServer(connectorDeviceId: string, deps: McpToolDeps): Mc
             continue
           }
           if (item.completedAt !== undefined) {
+            alreadyCompleted.push(item.name)
+            alreadyCompletedIds.add(item.id)
             continue
           }
           entries.push({ itemId: item.id, input: { ...inputFromRecord(item), completedAt, updatedAt: nextUpdatedAt(item.updatedAt) } })
@@ -446,8 +480,15 @@ export function buildMcpServer(connectorDeviceId: string, deps: McpToolDeps): Mc
           }
         }
 
-        await writeItems(listId, entries)
-        return { list: list.name, completed: items.map((item) => item.name), nextOccurrences }
+        const ignoredIds = await writeItems(listId, entries)
+        const completed = items.filter((item) => !alreadyCompletedIds.has(item.id) && !ignoredIds.has(item.id))
+        return {
+          list: list.name,
+          completed: completed.map((item) => item.name),
+          ...(alreadyCompleted.length > 0 ? { alreadyCompleted } : {}),
+          nextOccurrences,
+          ...notApplied(ignoredIds, items),
+        }
       }),
   )
 
@@ -463,14 +504,18 @@ export function buildMcpServer(connectorDeviceId: string, deps: McpToolDeps): Mc
       runTool(async () => {
         const list = await requireList(listId)
         const items = await requireItems(listId, itemIds)
-        await writeItems(
+        const ignoredIds = await writeItems(
           listId,
           items.map((item) => ({
             itemId: item.id,
             input: { ...inputFromRecord(item), deleted: true, updatedAt: nextUpdatedAt(item.updatedAt) },
           })),
         )
-        return { list: list.name, deleted: items.map((item) => item.name) }
+        return {
+          list: list.name,
+          deleted: items.filter((item) => !ignoredIds.has(item.id)).map((item) => item.name),
+          ...notApplied(ignoredIds, items),
+        }
       }),
   )
 
@@ -499,6 +544,12 @@ export function buildMcpServer(connectorDeviceId: string, deps: McpToolDeps): Mc
           listSyncCache.invalidate(listId)
           broadcaster.broadcastListMetadataPatch(listId, { name: nextName, listType: nextType, updatedAt: Date.parse(updatedAt) })
         }
+        if (result.outcome === 'ignored') {
+          const stored = await listRepository.getList(listId)
+          throw new ToolError(
+            `The list was changed elsewhere at the same time and is now called "${stored?.name ?? list.name}". Try again.`,
+          )
+        }
         return { listId, name: nextName, listType: nextType }
       }),
   )
@@ -519,8 +570,8 @@ export function buildMcpServer(connectorDeviceId: string, deps: McpToolDeps): Mc
       runTool(async () => {
         const listId = crypto.randomUUID()
         await listRepository.putList(listId, name, connectorDeviceId, nextUpdatedAt(), listType ?? 'shopping')
+        // The connector created the list, so it has access without redeeming.
         const token = await listRepository.createShareToken(listId, connectorDeviceId)
-        await listRepository.recordShareTokenRedemption(token.tokenId, connectorDeviceId)
         return { listId, name, listType: listType ?? 'shopping', shareUrl: shareUrl(token.tokenId) }
       }),
   )
@@ -535,8 +586,10 @@ export function buildMcpServer(connectorDeviceId: string, deps: McpToolDeps): Mc
     ({ listId }) =>
       runTool(async () => {
         const list = await requireList(listId)
+        // No redemption for the connector itself (unlike the REST route): it
+        // would give the connector direct access that outlives a narrowed list
+        // selection or the owner losing access.
         const token = await listRepository.createShareToken(listId, connectorDeviceId)
-        await listRepository.recordShareTokenRedemption(token.tokenId, connectorDeviceId)
         return { list: list.name, shareUrl: shareUrl(token.tokenId) }
       }),
   )

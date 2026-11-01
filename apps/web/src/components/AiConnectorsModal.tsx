@@ -74,7 +74,9 @@ const AiConnectorsModal = memo(function AiConnectorsModal({ isOpen, deviceId, on
   const openForm = (connector?: ApiConnector) => {
     setLabel(connector?.label ?? "Claude");
     setIncludeAllLists(connector?.includeAllLists ?? true);
-    setSelectedListIds(connector?.listIds ?? []);
+    // Only lists still in this app: a picked list deleted here since would
+    // otherwise stay selected (and reachable) without showing in the form.
+    setSelectedListIds((connector?.listIds ?? []).filter((listId) => lists.some((list) => list.id === listId)));
     setError(null);
     setView({ kind: "form", connector });
   };

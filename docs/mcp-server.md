@@ -16,6 +16,12 @@ assistant that supports remote MCP servers can read and edit a user's lists. Use
   connector includes it (`include_all_lists`, or a row in `mcp_connector_lists`). The rule is checked on every
   request, so lists the owner adds later, a changed selection and a deleted connector apply immediately. A
   connector can only delete lists it created itself.
+- The tools never redeem a share token for the connector itself, except `join_list`: `share_list` would otherwise
+  give it direct access that outlives a narrowed selection. Lists the assistant creates or joins stay reachable for
+  the connector until it is deleted.
+- **CORS**: `/v1/mcp/*` accepts any origin (browser-based MCP clients such as the MCP Inspector); the key in the
+  path is the credential and no cookies are involved. The REST API keeps its origin allowlist.
+- Tool results list the items whose write lost last-write-wins against a concurrent change (`notApplied`).
 - **Writes reach the apps live**: the tools write through the repository and push the stored versions to the
   WebSocket subscribers of the list (`sync/list-broadcaster.ts`, shared with the sync route), like a device's
   `item_patch` would.

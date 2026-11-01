@@ -305,8 +305,10 @@ async function replaceConnectorLists(client: Queryable, connectorId: string, lis
   await client.query('DELETE FROM mcp_connector_lists WHERE connector_id = $1', [connectorId])
   if (listIds.length > 0) {
     await client.query(
+      // Joined with shared_lists: a picked list deleted since the access check
+      // is skipped instead of failing the foreign key.
       `INSERT INTO mcp_connector_lists(connector_id, list_id)
-       SELECT $1, list_id FROM unnest($2::uuid[]) AS list_id
+       SELECT $1, lists.id FROM shared_lists lists WHERE lists.id = ANY($2::uuid[])
        ON CONFLICT DO NOTHING`,
       [connectorId, listIds],
     )
@@ -324,10 +326,29 @@ export class PostgresListRepository implements ListRepository {
   }
 
   async listAccessibleLists(deviceId: string): Promise<ListRecord[]> {
+    // Candidates first (lists the device or, for a connector, its owner
+    // created or redeemed; all index lookups), then the exact access rule —
+    // instead of evaluating the rule for every list in the table.
     const result = await query<ListRow>(
-      `SELECT ${listColumns}
+      `WITH devices AS (
+         SELECT $1::uuid AS device_id
+         UNION
+         SELECT owner_device_id FROM mcp_connectors WHERE device_id = $1::uuid
+       ),
+       candidates AS (
+         SELECT owned.id AS list_id
+           FROM shared_lists owned
+           JOIN devices ON devices.device_id = owned.created_by_device_id
+         UNION
+         SELECT tokens.list_id
+           FROM share_token_redemptions redemptions
+           JOIN devices ON devices.device_id = redemptions.device_id
+           JOIN share_tokens tokens ON tokens.id = redemptions.token_id
+       )
+       SELECT ${listColumns}
          FROM shared_lists lists
-        WHERE ${accessCondition('lists.id', '$1::uuid')}
+        WHERE lists.id IN (SELECT list_id FROM candidates)
+          AND ${accessCondition('lists.id', '$1::uuid')}
         ORDER BY lists.id`,
       [deviceId],
     )

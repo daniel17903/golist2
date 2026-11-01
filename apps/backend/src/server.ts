@@ -77,8 +77,8 @@ export function buildServer(deps: BuildServerOptions = {}) {
   // and the MCP server pushes its writes to them too.
   const broadcaster = new ListBroadcaster()
 
-  void app.register(cors, {
-    origin: (origin, callback) => {
+  const appCorsOptions = {
+    origin: (origin: string | undefined, callback: (error: Error | null, allow: boolean) => void) => {
       // No Origin header (e.g. same-origin requests, curl) — allow, matching
       // the prior @fastify/cors default behavior for non-browser callers.
       if (!origin || isAllowedOrigin(origin)) {
@@ -90,6 +90,20 @@ export function buildServer(deps: BuildServerOptions = {}) {
     },
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'X-Device-Id'],
+  }
+  // The MCP endpoint is called by AI assistants, some of them from a browser
+  // page on their own origin (e.g. the MCP Inspector). The secret key in the
+  // path is the credential (no cookies), so any origin may call it.
+  const mcpCorsOptions = {
+    origin: true,
+    methods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Accept', 'Authorization', 'Mcp-Protocol-Version', 'Mcp-Session-Id', 'Last-Event-ID'],
+    exposedHeaders: ['Mcp-Session-Id', 'Mcp-Protocol-Version'],
+  }
+  void app.register(cors, {
+    delegator: (request, callback) => {
+      callback(null, request.url.startsWith('/v1/mcp/') ? mcpCorsOptions : appCorsOptions)
+    },
   })
 
   registerObservability(app)
