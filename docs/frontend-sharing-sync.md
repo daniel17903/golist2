@@ -24,7 +24,8 @@ The frontend reads backend sync configuration at build time (in `apps/web/vite.c
 
 For list/item mutations, the app writes to IndexedDB and updates Zustand state first.
 
-A local edit (item edit, check-off, recategorization, list rename) gets
+A local edit (item edit, check-off, todo completion, recategorization, list rename or
+list-type switch) gets
 `updatedAt = max(now, updatedAt of the edited version + 1)`: it must win
 last-write-wins against the version it was based on even when this device's
 clock is behind the device that wrote that version (otherwise the server
@@ -89,6 +90,24 @@ On subscription and manual resync:
    `updatedAt`, the lexicographically greater name wins (`shouldAcceptListMetadata` in
    `packages/shared/src/domain/sync.ts`), applied identically by
    `storeSyncBridge.ts` on the client and by both list repositories on the backend.
+   The list type (`shopping` | `todo`) travels with the name as one metadata record
+   (`setListType` and `renameList` in the store share `updateListMetadata`); a patch
+   without a type (an older peer) keeps the local one.
+
+## List types
+
+Shopping and todo lists use the same items, store paths and sync. The type only
+changes the UI and the check-off action (see `useAppState.ts` and `App.tsx`):
+
+- **shopping**: icon grid; tapping an item sets `deleted` (it returns as a suggestion).
+- **todo**: rows (`TodoList.tsx`) sorted by due date; tapping a todo sets `completedAt`
+  (`toggleTodoCompleted`), which also creates the next occurrence of a recurring todo
+  with a due date. The undo toast reopens it and deletes that occurrence
+  (`undoTodoCompleted`). Deleting a todo (edit dialog) sets `deleted` like a shopping
+  check-off.
+
+Completed todos are hidden in both views, so switching a list's type keeps showing
+just its open entries.
 
 Protocol details are documented in `docs/websocket-sync-protocol.md` and mirrored in `apps/api-spec/openapi.yaml` under `/v1/ws`.
 
@@ -105,7 +124,7 @@ Protocol details are documented in `docs/websocket-sync-protocol.md` and mirrore
 ## HTTP usage boundaries
 
 - HTTP remains used for list/share-token operations (`PUT /v1/lists/{listId}`, `GET /v1/lists/{listId}`, share-token create/redeem).
-- List PUTs include the local metadata `updatedAt`, so REST bootstrap/share
+- List PUTs include the local metadata `updatedAt` and `listType`, so REST bootstrap/share
   operations cannot bypass rename conflict resolution.
 - Item synchronization does **not** use item HTTP endpoints (`/v1/lists/{listId}/items...`) in frontend sync flow.
 

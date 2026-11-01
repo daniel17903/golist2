@@ -1,14 +1,20 @@
 import { memo, useCallback, useEffect, useRef, useState } from "react";
+import type { ListType } from "@golist/shared/domain/types";
+import ListTypeToggle from "./ListTypeToggle";
 import { useI18n } from "../i18n";
 
 type AppHeaderProps = {
   activeListName: string;
+  activeListType: ListType;
+  onChangeListType: (listType: ListType) => void;
   onOpenStats: () => void;
   onSaveRename: (nextName: string) => void;
 };
 
 const AppHeader = memo(function AppHeader({
   activeListName,
+  activeListType,
+  onChangeListType,
   onOpenStats,
   onSaveRename,
 }: AppHeaderProps) {
@@ -82,6 +88,8 @@ const AppHeader = memo(function AppHeader({
                 aria-label={t("modal.listName")}
                 maxLength={120}
               />
+              {/* Editing a list also lets you switch its type. */}
+              <ListTypeToggle value={activeListType} onChange={onChangeListType} />
             </div>
           ) : (
             <>

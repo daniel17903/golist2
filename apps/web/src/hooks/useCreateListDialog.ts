@@ -1,4 +1,5 @@
 import { useCallback, useState } from "react";
+import { defaultListType, type ListType } from "@golist/shared/domain/types";
 import { useStore } from "../state/useStore";
 import type { PopupId } from "./usePopupStack";
 
@@ -12,9 +13,11 @@ type CreateListDialogOptions = {
 
 export const useCreateListDialog = ({ openPopup, closePopup }: CreateListDialogOptions) => {
   const [createListName, setCreateListName] = useState("");
+  const [createListType, setCreateListType] = useState<ListType>(defaultListType);
 
   const openCreateList = useCallback(() => {
     setCreateListName("");
+    setCreateListType(defaultListType);
     closePopup("drawer");
     openPopup("create-list");
   }, [openPopup, closePopup]);
@@ -30,14 +33,16 @@ export const useCreateListDialog = ({ openPopup, closePopup }: CreateListDialogO
       return;
     }
 
-    await addList(trimmedName);
+    await addList(trimmedName, createListType);
     setCreateListName("");
     closePopup("create-list");
-  }, [createListName, closePopup]);
+  }, [createListName, createListType, closePopup]);
 
   return {
     createListName,
     setCreateListName,
+    createListType,
+    setCreateListType,
     openCreateList,
     cancelCreateList,
     handleConfirmCreateList,

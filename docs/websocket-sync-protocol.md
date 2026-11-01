@@ -39,14 +39,15 @@ the gone socket is never registered for broadcasts.
 - `item_patch`
   - `{ "type": "item_patch", "listId": "<uuid>", "items": [<item-state>] }`
 - `list_metadata_patch`
-  - `{ "type": "list_metadata_patch", "listId": "<uuid>", "name": "<string>", "updatedAt": <number> }`
+  - `{ "type": "list_metadata_patch", "listId": "<uuid>", "name": "<string>", "listType": "shopping" | "todo", "updatedAt": <number> }`
+  - `listType` is optional for clients that predate list types; when it is missing the server keeps the stored type.
 
 ### Server -> client
 
 - `hello_ack`
   - `{ "type": "hello_ack" }`
 - `subscribed`
-  - `{ "type": "subscribed", "listId": "<uuid>", "listName": "<string>", "listUpdatedAt": <number>, "serverListDigest": "<string>" }`
+  - `{ "type": "subscribed", "listId": "<uuid>", "listName": "<string>", "listType": "shopping" | "todo", "listUpdatedAt": <number>, "serverListDigest": "<string>" }`
   - `serverListDigest` is the same item digest computed for `list_digest`/`hash_diff`
     (see `buildListDigest` in `packages/shared/src/domain/sync.ts`). The client
     compares it against its own local digest for the list as a fast path. If
@@ -58,9 +59,25 @@ the gone socket is never registered for broadcasts.
 - `item_patch`
   - same shape as client `item_patch`
 - `list_metadata_patch`
-  - `{ "type": "list_metadata_patch", "listId": "<uuid>", "name": "<string>", "updatedAt": <number> }`
+  - `{ "type": "list_metadata_patch", "listId": "<uuid>", "name": "<string>", "listType": "shopping" | "todo", "updatedAt": <number> }`
+  - always carries the stored `listType`, also when the client patch omitted it.
 - `error`
   - `{ "type": "error", "message": "<string>" }`
+
+### Item state and list types
+
+`<item-state>` is the full item: `id`, `listId`, `name`, `iconName`, `quantityOrUnit?`,
+`category`, `deleted`, `createdAt`, `updatedAt`, plus the optional todo fields
+`description`, `points`, `completedAt`, `dueDate`, `assignedTo` and `recurrence`
+(timestamps in epoch millis). Shopping and todo lists share the same items and the
+same sync; the list type (`shopping` | `todo`, part of the list metadata) only
+changes how the app shows and checks off entries. Todo fields are optional on every
+item and survive a type switch. An `item_patch` carries the complete item, so a todo
+field missing from it is cleared.
+
+The item hash (`buildItemHash`) serializes the todo fields only when they are set, so
+an item without them hashes exactly as before todo lists existed — stored items and
+older clients keep agreeing with the server.
 
 ## Reconciliation and conflict resolution
 
@@ -83,14 +100,16 @@ the gone socket is never registered for broadcasts.
    identical rule via the shared `shouldAcceptListMetadata` helper
    (`packages/shared/src/domain/sync.ts`), so two devices renaming the same list to
    different names within the same millisecond still converge on one final name
-   regardless of which patch arrives first.
+   regardless of which patch arrives first. The list type is part of the same metadata
+   record: if `updatedAt` and `name` both tie, the greater `listType` wins (`todo` over
+   `shopping`; a missing type counts as `shopping`).
 
    A `list_metadata_patch` that loses only because the stored metadata is
    already identical (same name and `updatedAt` — the web client sends every
    rename over REST *and* the socket, and REST can land first) is still
    broadcast to the other subscribers, since the REST route does not notify
    them. A `list_metadata_patch` that loses to *different* stored metadata is
-   answered with a `list_metadata_patch` carrying the stored name/`updatedAt`,
+   answered with a `list_metadata_patch` carrying the stored name/type/`updatedAt`,
    sent to the sender only.
 
 8. Clients timestamp a local edit with `max(now, updatedAt of the edited version + 1)`,

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Item } from "@golist/shared/domain/types";
-import { isOpenTodo, sortTodoItems } from "./todoSort";
+import { dateInputToMillis, isOpenTodo, millisToDateInput, recentAssignees, sortTodoItems } from "./todoSort";
 
 const todo = (id: string, overrides: Partial<Item> = {}): Item => ({
   id,
@@ -36,5 +36,32 @@ describe("isOpenTodo", () => {
     expect(isOpenTodo(todo("open"))).toBe(true);
     expect(isOpenTodo(todo("done", { completedAt: 1 }))).toBe(false);
     expect(isOpenTodo(todo("gone", { deleted: true }))).toBe(false);
+  });
+});
+
+describe("recentAssignees", () => {
+  it("returns up to three distinct assignees of the list, most recently updated first", () => {
+    const assignees = recentAssignees(
+      [
+        todo("a", { assignedTo: "Alex", updatedAt: 1 }),
+        todo("b", { assignedTo: "sam", updatedAt: 5 }),
+        todo("c", { assignedTo: "ALEX", updatedAt: 4 }),
+        todo("d", { assignedTo: "Kim", updatedAt: 3 }),
+        todo("e", { assignedTo: "Lee", updatedAt: 2 }),
+        todo("f", { assignedTo: "Other list", updatedAt: 9, listId: "list-2" }),
+      ],
+      "list-1",
+    );
+    expect(assignees).toEqual(["sam", "ALEX", "Kim"]);
+  });
+});
+
+describe("date input conversion", () => {
+  it("round-trips local dates", () => {
+    const millis = dateInputToMillis("2026-03-07");
+    expect(millis).toBe(new Date(2026, 2, 7).getTime());
+    expect(millisToDateInput(millis)).toBe("2026-03-07");
+    expect(dateInputToMillis("")).toBeUndefined();
+    expect(millisToDateInput(undefined)).toBe("");
   });
 });

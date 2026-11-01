@@ -5,6 +5,8 @@ import BottomBar from "./components/BottomBar";
 import AddItemDialog, { type AddItemDialogHandle } from "./components/AddItemDialog";
 import EditItemModal from "./components/EditItemModal";
 import ItemGrid from "./components/ItemGrid";
+import TodoList from "./components/TodoList";
+import TodoFormModal from "./components/TodoFormModal";
 import ListsDrawer from "./components/ListsDrawer";
 import CreateListModal from "./components/CreateListModal";
 import BackendLogPanel from "./components/BackendLogPanel";
@@ -16,6 +18,7 @@ const InviteLandingModal = lazy(() => import("./components/InviteLandingModal"))
 const SettingsModal = lazy(() => import("./components/SettingsModal"));
 const LegalModal = lazy(() => import("./components/LegalModal"));
 const ListStatsModal = lazy(() => import("./components/ListStatsModal"));
+const TodoStatsModal = lazy(() => import("./components/TodoStatsModal"));
 import { useAppBootstrap } from "./hooks/useAppBootstrap";
 import { useAppState } from "./hooks/useAppState";
 import { useAddItemDialog } from "./hooks/useAddItemDialog";
@@ -32,15 +35,24 @@ import { usePopupStack } from "./hooks/usePopupStack";
 import { usePullToRefresh } from "./hooks/usePullToRefresh";
 import { useShareList } from "./hooks/useShareList";
 import { useToasts } from "./hooks/useToasts";
+import { useTodoDialog } from "./hooks/useTodoDialog";
 import { calculateListStats } from "./domain/listStats";
+import { calculateTodoStats } from "./domain/todoStats";
+import { recentAssignees } from "./domain/todoSort";
+import type { Item, ListType } from "@golist/shared/domain/types";
 import { useI18n } from "./i18n";
 import { useStore } from "./state/useStore";
 
 type LegalModalType = "imprint" | "privacy";
 
+const noAssignees: string[] = [];
+
 // Store actions are stable references — select them once at module scope.
 const {
   toggleItem,
+  toggleTodoCompleted,
+  undoTodoCompleted,
+  setListType,
   renameList,
   deleteList,
   setActiveList,
@@ -55,6 +67,7 @@ const App = () => {
     appToasts,
     pushAppToast,
     showUndoDelete,
+    showUndoComplete,
     showUndoRename,
     removeUndoToast,
     removeAppToast,
@@ -74,6 +87,7 @@ const App = () => {
     items,
     activeListId,
     activeList,
+    activeListType,
     listItems,
     backendConnection,
     backendBusyRequests,
@@ -92,6 +106,7 @@ const App = () => {
   const isListStatsOpen = stack.includes("list-stats");
   const isLegalModalOpen = stack.includes("legal");
   const isEditItemOpen = stack.includes("edit-item");
+  const isTodoDialogOpen = stack.includes("add-todo") || stack.includes("edit-todo");
 
   const {
     itemName,
@@ -117,6 +132,8 @@ const App = () => {
   const {
     createListName,
     setCreateListName,
+    createListType,
+    setCreateListType,
     openCreateList,
     cancelCreateList,
     handleConfirmCreateList,
@@ -142,11 +159,63 @@ const App = () => {
 
   useAppBootstrap({ onShareLinkJoinFailed: handleJoinFailed, onIosShareLink: showInviteLanding });
 
+  const activeListTypeRef = useRef(activeListType);
+  useEffect(() => { activeListTypeRef.current = activeListType; });
+
+  // Tapping an entry removes it from the visible list: a shopping item is
+  // checked off (deleted, comes back as a suggestion), a todo is completed.
+  const removeEntry = useCallback(async (itemId: string): Promise<{ spawnedItemId?: string }> => {
+    if (activeListTypeRef.current === "todo") {
+      return toggleTodoCompleted(itemId);
+    }
+    await toggleItem(itemId);
+    return {};
+  }, []);
+
+  const handleEntryRemoved = useCallback((item: Item, result: { spawnedItemId?: string }) => {
+    if (activeListTypeRef.current === "todo") {
+      showUndoComplete(item, result.spawnedItemId);
+    } else {
+      showUndoDelete(item);
+    }
+  }, [showUndoComplete, showUndoDelete]);
+
   const { exitingItemIds, removedItemIds, handleExitComplete, handleToggleItem } = useItemExitAnimation({
     items,
-    toggleItem,
-    onItemDeleted: showUndoDelete,
+    toggleItem: removeEntry,
+    onItemDeleted: handleEntryRemoved,
   });
+
+  const handleDeleteTodo = useCallback((itemId: string) => {
+    const item = items.find((entry) => entry.id === itemId);
+    if (!item || item.deleted) {
+      return;
+    }
+    void (async () => {
+      await toggleItem(itemId);
+      showUndoDelete(item);
+    })();
+  }, [items, showUndoDelete]);
+
+  const {
+    todoDialogMode,
+    todoFormValues,
+    changeTodoFormValues,
+    openAddTodo,
+    openEditTodo,
+    closeTodoDialog,
+    saveTodo,
+    deleteTodo,
+  } = useTodoDialog({ activeListId, items, openPopup, closePopup, onDelete: handleDeleteTodo });
+
+  // Long press edits the entry with the dialog matching the list type.
+  const handleLongPress = useCallback((itemId: string, name: string, quantityOrUnit?: string) => {
+    if (activeListTypeRef.current === "todo") {
+      openEditTodo(itemId);
+    } else {
+      openEditItem(itemId, name, quantityOrUnit);
+    }
+  }, [openEditTodo, openEditItem]);
 
   const { handleShareList } = useShareList({ activeList, pushAppToast });
 
@@ -160,7 +229,7 @@ const App = () => {
     longPressTriggeredRef,
     pressedItemId,
   } = useLongPressItem({
-    onLongPress: openEditItem,
+    onLongPress: handleLongPress,
     onShortPress: handleToggleItem,
   });
 
@@ -180,8 +249,19 @@ const App = () => {
   // Walks the item history of every list, so it is only computed while the
   // stats modal is actually showing.
   const listStats = useMemo(
-    () => (isListStatsOpen ? calculateListStats(items, activeListId) : null),
-    [isListStatsOpen, items, activeListId],
+    () => (isListStatsOpen && activeListType === "shopping" ? calculateListStats(items, activeListId) : null),
+    [isListStatsOpen, activeListType, items, activeListId],
+  );
+
+  const todoStats = useMemo(
+    () => (isListStatsOpen && activeListType === "todo" && activeListId ? calculateTodoStats(items, activeListId) : null),
+    [isListStatsOpen, activeListType, items, activeListId],
+  );
+
+  // Only computed while the todo dialog is showing.
+  const knownAssignees = useMemo(
+    () => (isTodoDialogOpen ? recentAssignees(items, activeListId) : noAssignees),
+    [isTodoDialogOpen, items, activeListId],
   );
 
   const activeListRef = useRef(activeList);
@@ -203,6 +283,18 @@ const App = () => {
     removeUndoToast(toastId);
     void toggleItem(itemId);
   }, [removeUndoToast]);
+
+  const handleUndoComplete = useCallback((toastId: string, itemId: string, spawnedItemId?: string) => {
+    removeUndoToast(toastId);
+    void undoTodoCompleted(itemId, spawnedItemId);
+  }, [removeUndoToast]);
+
+  const handleChangeListType = useCallback((listType: ListType) => {
+    const list = activeListRef.current;
+    if (list) {
+      void setListType(list.id, listType);
+    }
+  }, []);
 
   const handleUndoRename = useCallback((toastId: string, listId: string, previousName: string) => {
     removeUndoToast(toastId);
@@ -265,11 +357,15 @@ const App = () => {
   const addItemDialogRef = useRef<AddItemDialogHandle | null>(null);
 
   const handleOpenAddDialog = useCallback(() => {
+    if (activeListTypeRef.current === "todo") {
+      openAddTodo();
+      return;
+    }
     flushSync(() => {
       openAddDialog();
     });
     addItemDialogRef.current?.focusInput();
-  }, [openAddDialog]);
+  }, [openAddDialog, openAddTodo]);
 
   const handleSaveCreateList = useCallback(() => {
     void handleConfirmCreateList();
@@ -282,6 +378,10 @@ const App = () => {
   const handleSaveEditItem = useCallback(() => {
     void handleSaveItem();
   }, [handleSaveItem]);
+
+  const handleSaveTodo = useCallback(() => {
+    void saveTodo();
+  }, [saveTodo]);
 
   const showBackendLogs = __ENVIRONMENT__ !== "production";
 
@@ -297,6 +397,8 @@ const App = () => {
       </div>
       <AppHeader
         activeListName={activeList?.name ?? ""}
+        activeListType={activeListType}
+        onChangeListType={handleChangeListType}
         onOpenStats={handleOpenStats}
         onSaveRename={handleSaveRename}
       />
@@ -314,18 +416,38 @@ const App = () => {
         </Suspense>
       )}
 
-      <ItemGrid
-        items={visibleListItems}
-        listId={activeListId}
-        exitingItemIds={exitingItemIds}
-        onExitComplete={handleExitComplete}
-        longPressTriggeredRef={longPressTriggeredRef}
-        suppressItemPressRef={suppressItemPressRef}
-        pressedItemId={pressedItemId}
-        onPointerDown={handleGridPointerDown}
-        onPointerUp={handleGridPointerUp}
-        onPointerCancel={handlePointerCancel}
-      />
+      {todoStats && (
+        <Suspense fallback={null}>
+          <TodoStatsModal isOpen rows={todoStats} onClose={handleCloseStats} />
+        </Suspense>
+      )}
+
+      {activeListType === "todo" ? (
+        <TodoList
+          items={visibleListItems}
+          exitingItemIds={exitingItemIds}
+          onExitComplete={handleExitComplete}
+          longPressTriggeredRef={longPressTriggeredRef}
+          suppressItemPressRef={suppressItemPressRef}
+          pressedItemId={pressedItemId}
+          onPointerDown={handleGridPointerDown}
+          onPointerUp={handleGridPointerUp}
+          onPointerCancel={handlePointerCancel}
+        />
+      ) : (
+        <ItemGrid
+          items={visibleListItems}
+          listId={activeListId}
+          exitingItemIds={exitingItemIds}
+          onExitComplete={handleExitComplete}
+          longPressTriggeredRef={longPressTriggeredRef}
+          suppressItemPressRef={suppressItemPressRef}
+          pressedItemId={pressedItemId}
+          onPointerDown={handleGridPointerDown}
+          onPointerUp={handleGridPointerUp}
+          onPointerCancel={handlePointerCancel}
+        />
+      )}
 
       <BottomBar
         onOpenDrawer={handleOpenDrawer}
@@ -342,6 +464,7 @@ const App = () => {
         onCloseAppToast={removeAppToast}
         onUndoDelete={handleUndoDelete}
         onUndoRename={handleUndoRename}
+        onUndoComplete={handleUndoComplete}
       />
 
       {showBackendLogs ? <BackendLogPanel /> : null}
@@ -377,6 +500,8 @@ const App = () => {
         isOpen={isCreateListModalOpen}
         value={createListName}
         onChange={setCreateListName}
+        listType={createListType}
+        onListTypeChange={setCreateListType}
         onCancel={cancelCreateList}
         onSave={handleSaveCreateList}
       />
@@ -433,6 +558,17 @@ const App = () => {
         onQuantityChange={setEditItemQuantity}
         onCancel={cancelEditItem}
         onSave={handleSaveEditItem}
+      />
+
+      <TodoFormModal
+        isOpen={isTodoDialogOpen}
+        mode={todoDialogMode}
+        values={todoFormValues}
+        knownAssignees={knownAssignees}
+        onChange={changeTodoFormValues}
+        onCancel={closeTodoDialog}
+        onSave={handleSaveTodo}
+        onDelete={deleteTodo}
       />
 
       {languageSuggestion ? (

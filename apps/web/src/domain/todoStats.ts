@@ -12,7 +12,7 @@ export type PersonListStats = {
   plannedNextWeek: number;
 };
 
-const UNASSIGNED_KEY = "__unassigned__";
+export const UNASSIGNED_KEY = "__unassigned__";
 
 const normalizePerson = (assignedTo?: string): { key: string; label: string } => {
   const trimmed = assignedTo?.trim();

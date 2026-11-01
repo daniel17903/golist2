@@ -575,3 +575,84 @@ describe('sharing API contract basics', () => {
     await app.close()
   })
 })
+
+describe('list types and todo fields', () => {
+  const deviceId = '11111111-1111-4111-8111-111111111111'
+  const headers = { 'x-device-id': deviceId }
+
+  it('stores the list type, keeps it when a write omits it and defaults new lists to shopping', async () => {
+    const app = buildSpecCheckedServer({ listRepository: new InMemoryListRepository() })
+    const listId = crypto.randomUUID()
+    const getType = async () =>
+      (await app.inject({ method: 'GET', url: `/v1/lists/${listId}`, headers })).json().listType
+
+    expect((await app.inject({ method: 'PUT', url: `/v1/lists/${listId}`, headers, payload: { name: 'Chores', listType: 'todo' } })).statusCode).toBe(201)
+    expect(await getType()).toBe('todo')
+
+    // An older client renaming the list without a type keeps it.
+    await app.inject({ method: 'PUT', url: `/v1/lists/${listId}`, headers, payload: { name: 'Flat chores' } })
+    expect(await getType()).toBe('todo')
+
+    await app.inject({ method: 'PUT', url: `/v1/lists/${listId}`, headers, payload: { name: 'Flat chores', listType: 'shopping' } })
+    expect(await getType()).toBe('shopping')
+
+    const otherListId = crypto.randomUUID()
+    await app.inject({ method: 'PUT', url: `/v1/lists/${otherListId}`, headers, payload: { name: 'Groceries' } })
+    expect((await app.inject({ method: 'GET', url: `/v1/lists/${otherListId}`, headers })).json().listType).toBe('shopping')
+
+    const invalid = await app.inject({ method: 'PUT', url: `/v1/lists/${listId}`, headers, payload: { name: 'X', listType: 'wishlist' } })
+    expect(invalid.statusCode).toBe(400)
+
+    await app.close()
+  })
+
+  it('stores todo fields, keeps them when a write omits them and clears them on null', async () => {
+    const app = buildSpecCheckedServer({ listRepository: new InMemoryListRepository() })
+    const listId = crypto.randomUUID()
+    const itemId = crypto.randomUUID()
+    await app.inject({ method: 'PUT', url: `/v1/lists/${listId}`, headers, payload: { name: 'Chores', listType: 'todo' } })
+
+    const dueDate = '2026-03-27T00:00:00.000Z'
+    const recurrence = JSON.stringify({ every: 1, unit: 'week', anchor: 'from_due_date' })
+    const put = (payload: Record<string, unknown>) =>
+      app.inject({ method: 'PUT', url: `/v1/lists/${listId}/items/${itemId}`, headers, payload })
+    const getItem = async () =>
+      (await app.inject({ method: 'GET', url: `/v1/lists/${listId}/items/${itemId}`, headers })).json()
+
+    expect(
+      (
+        await put({
+          name: 'Clean bathroom',
+          deleted: false,
+          updatedAt: '2026-03-20T10:00:00.000Z',
+          description: 'Sink too',
+          points: 3,
+          dueDate,
+          assignedTo: 'Alex',
+          recurrence,
+        })
+      ).statusCode,
+    ).toBe(201)
+    expect(await getItem()).toEqual(
+      expect.objectContaining({ description: 'Sink too', points: 3, dueDate, assignedTo: 'Alex', recurrence }),
+    )
+
+    // A caller that predates todo lists (e.g. the openclaw CLI renaming an
+    // item) does not wipe the todo fields.
+    await put({ name: 'Clean the bathroom', deleted: false, updatedAt: '2026-03-20T11:00:00.000Z' })
+    expect(await getItem()).toEqual(
+      expect.objectContaining({ name: 'Clean the bathroom', points: 3, dueDate, assignedTo: 'Alex', recurrence }),
+    )
+
+    const completedAt = '2026-03-21T08:00:00.000Z'
+    await put({ name: 'Clean the bathroom', deleted: false, updatedAt: '2026-03-21T08:00:00.000Z', completedAt, assignedTo: null })
+    const completed = await getItem()
+    expect(completed.completedAt).toBe(completedAt)
+    expect(completed).not.toHaveProperty('assignedTo')
+
+    const invalid = await put({ name: 'x', deleted: false, updatedAt: '2026-03-22T08:00:00.000Z', points: 0 })
+    expect(invalid.statusCode).toBe(400)
+
+    await app.close()
+  })
+})

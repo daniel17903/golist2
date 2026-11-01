@@ -1,6 +1,7 @@
 import { IDBFactory, IDBKeyRange } from "fake-indexeddb";
 import { buildListDigest } from "@golist/shared/domain/sync";
-import type { Item } from "@golist/shared/domain/types";
+import { resolveListType, type Item, type ListType } from "@golist/shared/domain/types";
+import type { TodoInput } from "../../src/state/useStore";
 import { createSharingApiClient } from "../../src/sharing/apiClient";
 import { SocketSyncManager } from "../../src/sharing/socketSync";
 import { createGoListStore, type GoListStore } from "../../src/state/useStore";
@@ -10,7 +11,14 @@ import { DeviceNetwork } from "./network";
 import type { SimServer } from "./server";
 import { createNodeTimers, waitUntil } from "./timers";
 
-export type DeviceListSnapshot = { name: string; items: Item[]; digest: string };
+const itemMarker = (item: Item) => {
+  if (item.deleted) {
+    return "[x]";
+  }
+  return item.completedAt !== undefined ? "[done]" : "[ ]";
+};
+
+export type DeviceListSnapshot = { name: string; listType: ListType; items: Item[]; digest: string };
 
 const createMapStorage = () => {
   const data = new Map<string, string>();
@@ -136,9 +144,13 @@ export class SimDevice {
 
   // ---------- lists ----------
 
-  async createList(name: string): Promise<string> {
-    await this.state.addList(name);
+  async createList(name: string, listType?: ListType): Promise<string> {
+    await this.state.addList(name, listType);
     return this.activeListId;
+  }
+
+  async setActiveListType(listType: ListType) {
+    await this.state.setListType(this.activeListId, listType);
   }
 
   async renameActiveList(name: string) {
@@ -197,6 +209,49 @@ export class SimDevice {
     await this.state.updateItem(this.requireItem(name).id, nextName, quantityOrUnit);
   }
 
+  // ---------- todos (active list) ----------
+
+  async addTodo(title: string, fields: Omit<TodoInput, "title"> = {}) {
+    await this.state.addTodo(this.activeListId, { title, ...fields });
+  }
+
+  async editTodo(title: string, input: TodoInput) {
+    await this.state.updateTodo(this.requireItem(title, false).id, input);
+  }
+
+  private requireOpenTodo(title: string): Item {
+    const match = this.itemsOf(this.activeListId).find(
+      (item) => item.name === title && !item.deleted && item.completedAt === undefined,
+    );
+    if (!match) {
+      throw new Error(`device ${this.name}: no open todo "${title}" in the active list`);
+    }
+    return match;
+  }
+
+  /** Completes an open todo; returns what an undo needs. */
+  async completeTodo(title: string) {
+    const todo = this.requireOpenTodo(title);
+    const { spawnedItemId } = await this.state.toggleTodoCompleted(todo.id);
+    return { itemId: todo.id, spawnedItemId };
+  }
+
+  async undoCompleteTodo(completion: { itemId: string; spawnedItemId?: string }) {
+    await this.state.undoTodoCompleted(completion.itemId, completion.spawnedItemId);
+  }
+
+  // Titles of the open todos of a list, sorted.
+  openTodoTitles(listId = this.activeListId): string[] {
+    return this.itemsOf(listId)
+      .filter((item) => !item.deleted && item.completedAt === undefined)
+      .map((item) => item.name)
+      .sort();
+  }
+
+  listType(listId = this.activeListId): ListType {
+    return resolveListType(this.state.lists.find((list) => list.id === listId));
+  }
+
   // ---------- inspection ----------
 
   itemsOf(listId: string): Item[] {
@@ -221,7 +276,7 @@ export class SimDevice {
       return null;
     }
     const items = this.itemsOf(listId);
-    return { name: list.name, items, digest: buildListDigest(items) };
+    return { name: list.name, listType: resolveListType(list), items, digest: buildListDigest(items) };
   }
 
   // Persisted (IndexedDB) items of a list, to check that what the UI shows
@@ -252,10 +307,10 @@ export class SimDevice {
     for (const list of state?.lists ?? []) {
       const items = state?.items.filter((item) => item.listId === list.id) ?? [];
       lines.push(
-        `   list ${list.id} "${list.name}" @${list.updatedAt}${list.id === state?.activeListId ? " (active)" : ""}`,
+        `   list ${list.id} "${list.name}" (${resolveListType(list)}) @${list.updatedAt}${list.id === state?.activeListId ? " (active)" : ""}`,
         ...items.map(
           (item) =>
-            `     - ${item.deleted ? "[x]" : "[ ]"} ${item.name}${item.quantityOrUnit ? ` (${item.quantityOrUnit})` : ""} @${item.updatedAt} ${item.id}`,
+            `     - ${itemMarker(item)} ${item.name}${item.quantityOrUnit ? ` (${item.quantityOrUnit})` : ""} @${item.updatedAt} ${item.id}`,
         ),
       );
     }

@@ -1,10 +1,11 @@
 # 🛒 GoList
 
-[GoList](https://golist2.vercel.app/) is a grocery-list PWA with optional backend sharing and real-time sync. The web app in [`apps/web`](./apps/web) is offline-first, storing list data locally in IndexedDB. The backend in [`apps/backend`](./apps/backend) provides list APIs, token-based sharing, and WebSocket sync.
+[GoList](https://golist2.vercel.app/) is a grocery- and todo-list PWA with optional backend sharing and real-time sync. The web app in [`apps/web`](./apps/web) is offline-first, storing list data locally in IndexedDB. The backend in [`apps/backend`](./apps/backend) provides list APIs, token-based sharing, and WebSocket sync.
 
 ## ✨ Features
 
 - simplistic icons for many items
+- shopping lists and todo lists (due dates, assignees, points, recurring todos) in one app
 - real time sync with friends
 - no user accounts needed
 - offline first (everything except the sync works offline)

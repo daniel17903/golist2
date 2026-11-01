@@ -1335,3 +1335,476 @@ body {
     width: min(336px, 88vw);
   }
 }
+
+/* ── List type picker (create list dialog + header rename mode) ── */
+
+.list-type-toggle {
+  display: inline-flex;
+  border-radius: 999px;
+  background: rgba(47, 36, 51, 0.08);
+  padding: 3px;
+  gap: 2px;
+}
+
+.list-type-toggle__option {
+  border: none;
+  background: transparent;
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 14px;
+  color: #2f2433;
+  cursor: pointer;
+}
+
+.list-type-toggle__option--active {
+  background: #005382;
+  color: #f3f8f6;
+}
+
+.title-edit {
+  flex-wrap: wrap;
+}
+
+.title-edit .list-type-toggle {
+  margin-top: 8px;
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.modal__body textarea {
+  border: 1px solid rgba(47, 36, 51, 0.25);
+  border-radius: 10px;
+  padding: 8px;
+  font-size: 16px;
+  font-family: inherit;
+  background: transparent;
+  color: #2f2433;
+  outline: none;
+  resize: vertical;
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.modal__body select {
+  border: none;
+  border-bottom: 1px solid rgba(47, 36, 51, 0.4);
+  padding: 6px 2px 8px;
+  font-size: 16px;
+  background: transparent;
+  color: #2f2433;
+}
+
+/* ── Todo list (todo-type lists, ported from DoList) ── */
+
+.todo-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 16px;
+  padding: 0;
+}
+
+.todo-list__empty {
+  margin: 24px 0;
+  text-align: center;
+  color: #0b1f2a;
+  opacity: 0.7;
+}
+
+.todo-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  border: none;
+  text-align: left;
+  font: inherit;
+  background: rgba(2, 68, 97, 0.58);
+  color: #f3f8f6;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  padding: 14px 16px;
+  transition: transform 110ms ease;
+  touch-action: manipulation;
+}
+
+.todo-item > * {
+  pointer-events: none;
+}
+
+.todo-item--pressing {
+  transform: scale(0.98);
+}
+
+.todo-item--exit {
+  animation: todo-slide-out 220ms ease-in forwards;
+  pointer-events: none;
+}
+
+@keyframes todo-slide-out {
+  0% {
+    transform: translateX(0) scaleY(1);
+    opacity: 1;
+    max-height: 80px;
+  }
+  40% {
+    transform: translateX(12px) scaleY(0.9);
+    opacity: 0.6;
+  }
+  100% {
+    transform: translateX(48px) scaleY(0.5);
+    opacity: 0;
+    max-height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .todo-item,
+  .todo-item--exit {
+    animation: none;
+    transition: none;
+  }
+}
+
+.todo-item__checkbox {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.todo-item__checkbox svg {
+  width: 26px;
+  height: 26px;
+}
+
+.todo-item__content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.todo-item__title {
+  font-size: 16px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.todo-item__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.todo-item__due-date,
+.todo-item__assigned-to,
+.todo-item__recurrence {
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(243, 248, 246, 0.8);
+  display: inline-flex;
+  align-items: center;
+}
+
+.todo-item__due-date--overdue {
+  color: #ffb4a8;
+}
+
+/* ── Todo stats (ported from DoList) ── */
+.stats-empty {
+  margin: 4px 0;
+  color: #6f6a77;
+}
+
+/* Stats Cards Layout */
+.stats-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.stats-card {
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: 0 2px 8px rgba(26, 46, 26, 0.08);
+  border: 1px solid rgba(26, 46, 26, 0.08);
+}
+
+.stats-card__header {
+  font-size: 17px;
+  font-weight: 600;
+  color: #1a2e1a;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(26, 46, 26, 0.1);
+}
+
+/* Stats Rows - Simplified Layout */
+.stats-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.stats-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.stats-row__label {
+  font-size: 14px;
+  color: #6f6a77;
+  min-width: 110px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.stats-row__icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+/* Row-specific label colors */
+.stats-row--last-week .stats-row__label {
+  color: #8b7fa8;
+}
+
+.stats-row--this-week .stats-row__label {
+  color: #2e7d52;
+}
+
+.stats-row--next-week .stats-row__label {
+  color: #2e7d8a;
+}
+
+.stats-row--overall .stats-row__label {
+  color: #b8860b;
+}
+
+.stats-row__bar-wrap {
+  flex: 1;
+  height: 10px;
+  background: rgba(26, 46, 26, 0.08);
+  border-radius: 5px;
+  overflow: hidden;
+  min-width: 60px;
+}
+
+.stats-row__bar {
+  height: 100%;
+  border-radius: 5px;
+  transition: width 200ms ease-out;
+}
+
+.stats-row__bar--last-week {
+  background: linear-gradient(90deg, #9b8fb8 0%, #8b7fa8 100%);
+}
+
+.stats-row__bar--this-week {
+  background: linear-gradient(90deg, #2e7d52 0%, #005382 100%);
+}
+
+.stats-row__bar--next-week {
+  background: linear-gradient(90deg, #3e8d9a 0%, #2e7d8a 100%);
+}
+
+.stats-row__bar--overall {
+  background: linear-gradient(90deg, #e4b028 0%, #d4a017 100%);
+}
+
+.stats-row__value {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1a2e1a;
+  min-width: 50px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.stats-row__value--progress {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Row-specific value colors */
+.stats-row--last-week .stats-row__value {
+  color: #8b7fa8;
+}
+
+.stats-row--this-week .stats-row__value {
+  color: #2e7d52;
+}
+
+.stats-row--next-week .stats-row__value {
+  color: #2e7d8a;
+}
+
+.stats-row--overall .stats-row__value {
+  color: #d4a017;
+}
+
+.assignee-suggestions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+
+.assignee-suggestions__option {
+  border: 1px solid rgba(26, 46, 26, 0.35);
+  background: rgba(26, 107, 60, 0.08);
+  color: #1a2e1a;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 12px;
+}
+
+.assignee-suggestions__option--active {
+  background: #005382;
+  border-color: #005382;
+  color: #f4f7f2;
+}
+
+/* ── Recurrence input (ported from DoList) ── */
+
+.recurrence-input__controls {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.recurrence-input__toggle-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  color: #4e7a5e;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Visually-hidden real checkbox — accessible but invisible */
+.recurrence-input__toggle-checkbox {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Pill track */
+.recurrence-input__toggle-track {
+  display: inline-flex;
+  align-items: center;
+  width: 36px;
+  height: 20px;
+  border-radius: 999px;
+  background: rgba(26, 46, 26, 0.18);
+  flex-shrink: 0;
+  transition: background 150ms ease;
+  position: relative;
+}
+
+/* Knob */
+.recurrence-input__toggle-knob {
+  position: absolute;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  transition: left 150ms ease, background 150ms ease;
+}
+
+/* Checked state — track turns green */
+.recurrence-input__toggle-checkbox:checked + .recurrence-input__toggle-track {
+  background: #005382;
+}
+
+/* Checked state — knob slides right */
+.recurrence-input__toggle-checkbox:checked + .recurrence-input__toggle-track .recurrence-input__toggle-knob {
+  left: 18px;
+}
+
+/* Focus ring for keyboard users */
+.recurrence-input__toggle-checkbox:focus-visible + .recurrence-input__toggle-track {
+  outline: 2px solid #005382;
+  outline-offset: 2px;
+}
+
+.modal__field--recurrence {
+  margin-top: -6px;
+}
+
+.recurrence-input__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.recurrence-input__number {
+  width: 60px;
+}
+
+.recurrence-input__anchor {
+  display: flex;
+  gap: 12px;
+  font-size: 13px;
+}
+
+.recurrence-input__anchor label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+}
+
+.recurrence-input__anchor input[type="radio"] {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  flex-shrink: 0;
+  accent-color: #005382;
+  appearance: auto;
+  -webkit-appearance: auto;
+  border: none;
+}
+
+.text-button--danger {
+  color: #d32f2f;
+  font-size: 16px;
+}
+
+/* `.modal__body input` would otherwise restyle the recurrence controls. */
+.modal__body .recurrence-input__toggle-checkbox {
+  padding: 0;
+  border: 0;
+}
+
+.modal__body .recurrence-input__number {
+  width: 60px;
+}
+
+.modal__body .recurrence-input__anchor input[type="radio"] {
+  padding: 0;
+  border: none;
+}

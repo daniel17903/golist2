@@ -8,6 +8,18 @@ type ToastStacksProps = {
   onCloseAppToast: (toastId: string) => void;
   onUndoDelete: (toastId: string, itemId: string) => void;
   onUndoRename: (toastId: string, listId: string, previousName: string) => void;
+  onUndoComplete: (toastId: string, itemId: string, spawnedItemId?: string) => void;
+};
+
+const undoToastText = (toast: UndoToast, t: (key: string, values?: Record<string, string | number>) => string) => {
+  switch (toast.kind) {
+    case "item-delete":
+      return t("toast.undoDeleted", { name: toast.item.name });
+    case "todo-complete":
+      return t("toast.undoCompleted", { name: toast.item.name });
+    case "list-rename":
+      return t("toast.undoRenamed", { name: toast.nextName });
+  }
 };
 
 const ToastStacks = memo(function ToastStacks({
@@ -16,6 +28,7 @@ const ToastStacks = memo(function ToastStacks({
   onCloseAppToast,
   onUndoDelete,
   onUndoRename,
+  onUndoComplete,
 }: ToastStacksProps) {
   const { t } = useI18n();
 
@@ -35,19 +48,19 @@ const ToastStacks = memo(function ToastStacks({
       <div className="undo-toast-stack" aria-live="polite" aria-atomic="false">
         {undoToasts.map((toast) => (
           <div key={toast.id} className="undo-toast" role="status">
-            <span className="undo-toast__text">
-              {toast.kind === "item-delete"
-                ? t("toast.undoDeleted", { name: toast.item.name })
-                : t("toast.undoRenamed", { name: toast.nextName })}
-            </span>
+            <span className="undo-toast__text">{undoToastText(toast, t)}</span>
             <button
               type="button"
               className="undo-toast__action"
-              onClick={() =>
-                toast.kind === "item-delete"
-                  ? onUndoDelete(toast.id, toast.item.id)
-                  : onUndoRename(toast.id, toast.listId, toast.previousName)
-              }
+              onClick={() => {
+                if (toast.kind === "item-delete") {
+                  onUndoDelete(toast.id, toast.item.id);
+                } else if (toast.kind === "todo-complete") {
+                  onUndoComplete(toast.id, toast.item.id, toast.spawnedItemId);
+                } else {
+                  onUndoRename(toast.id, toast.listId, toast.previousName);
+                }
+              }}
             >
               {t("toast.undo")}
             </button>

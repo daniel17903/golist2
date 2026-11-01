@@ -494,6 +494,65 @@ describe('backend runtime integration', () => {
     }
   })
 
+  it('syncs the list type and todo fields over the websocket', async () => {
+    const listId = crypto.randomUUID()
+    const createResponse = await fetch(`${baseUrl}/v1/lists/${listId}`, {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json', 'x-device-id': testDeviceId },
+      body: JSON.stringify({ name: 'Chores', listType: 'todo' }),
+    })
+    expect(createResponse.status).toBe(201)
+
+    const clientA = await openSyncSocket()
+    const clientB = await openSyncSocket()
+
+    try {
+      for (const client of [clientA, clientB]) {
+        client.send({ type: 'hello', deviceId: testDeviceId })
+        await client.waitForMessage((message) => message.type === 'hello_ack')
+        client.send({ type: 'subscribe_list', listId })
+        const subscribed = await client.waitForMessage((message) => message.type === 'subscribed')
+        expect(subscribed.listType).toBe('todo')
+      }
+
+      const now = Date.now()
+      const todo = {
+        id: crypto.randomUUID(),
+        listId,
+        name: 'Water plants',
+        iconName: 'default',
+        category: 'other',
+        deleted: false,
+        createdAt: now,
+        updatedAt: now,
+        points: 2,
+        dueDate: now + 86_400_000,
+        completedAt: now,
+        assignedTo: 'Kim',
+        description: 'Balcony',
+        recurrence: JSON.stringify({ every: 3, unit: 'day', anchor: 'from_completion' }),
+      }
+      clientB.send({ type: 'item_patch', listId, items: [todo] })
+      const itemPatch = await clientA.waitForMessage((message) => message.type === 'item_patch')
+      expect(itemPatch.items).toEqual([expect.objectContaining({ ...todo, createdAt: expect.any(Number) })])
+
+      clientB.send({ type: 'list_metadata_patch', listId, name: 'Chores', listType: 'shopping', updatedAt: now + 5_000 })
+      const metadata = await clientA.waitForMessage((message) => message.type === 'list_metadata_patch')
+      expect(metadata).toEqual({ type: 'list_metadata_patch', listId, name: 'Chores', listType: 'shopping', updatedAt: now + 5_000 })
+
+      const listResponse = await fetch(`${baseUrl}/v1/lists/${listId}`, { headers: { 'x-device-id': testDeviceId } })
+      expect(await listResponse.json()).toEqual(
+        expect.objectContaining({
+          listType: 'shopping',
+          items: [expect.objectContaining({ points: 2, assignedTo: 'Kim', description: 'Balcony' })],
+        }),
+      )
+    } finally {
+      clientA.socket.close()
+      clientB.socket.close()
+    }
+  })
+
   it('does not rebroadcast websocket item patches that lose conflict resolution', async () => {
     const listId = crypto.randomUUID()
     const createResponse = await fetch(`${baseUrl}/v1/lists/${listId}`, {
