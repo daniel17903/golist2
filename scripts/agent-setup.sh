@@ -25,9 +25,9 @@ emit_env() {
 
 cd "$repo_root"
 
-node_major="$(node -p 'process.versions.node.split(".")[0]')"
-if (( node_major < 24 )); then
-  log "warning: Node $(node -v) is older than the required >=24 (package.json engines); things usually still work."
+# 24.22.1 is the first Node 24 release with the fix for CVE-2026-111497 (Broccoli2Shell, Brotli decoder RCE).
+if ! node -e 'const [a, b, c] = process.versions.node.split(".").map(Number); process.exit(a > 24 || (a === 24 && (b > 22 || (b === 22 && c >= 1))) ? 0 : 1)'; then
+  log "warning: Node $(node -v) is older than the required >=24.22.1 (package.json engines); upgrade it (CVE-2026-111497)."
 fi
 
 # `npm install` (not `npm ci`) so a cached container state is reused.

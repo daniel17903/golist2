@@ -29,7 +29,9 @@
 - **localStorage keys**: `golist.deviceId`, `golist.selectedListId`, plus the i18n keys defined in `apps/web/src/i18n/config.ts`.
 
 ## Quickstart
-- Requires Node `>= 24` (see `engines` in the root `package.json`).
+- Requires Node `>= 24.22.1` (see `engines` in the root `package.json`): the first Node 24 release with the fix for
+  CVE-2026-111497 (Broccoli2Shell, Brotli decoder RCE). CI workflows and Dockerfiles pin an exact patched version;
+  bump them together when a newer Node security release lands.
 - Fresh (agent) container: `scripts/agent-setup.sh` installs deps and sets up the Playwright browser (prints `export` lines to eval when not run from the SessionStart hook).
 - `npm install`
 - `npm run dev:web` (runs web app dev server from root, default http://localhost:5173)
