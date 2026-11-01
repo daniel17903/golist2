@@ -1,5 +1,6 @@
 import crypto from 'node:crypto'
 
+import { nextOccurrenceId } from '@golist/shared/domain/recurrence'
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { z } from 'zod'
@@ -351,6 +352,34 @@ describe.each(repositories)('MCP connectors (%s repository)', (_, makeRepository
       expect((await api('GET', `/v1/lists/${created.listId}`, owner)).body).toMatchObject({ name: 'Garden party', listType: 'todo' })
     })
 
+    it('keeps a next occurrence another device already created', async () => {
+      const owner = crypto.randomUUID()
+      const listId = await createList('Chores', owner, 'todo')
+      const { key } = await createConnector({ includeAllLists: true }, owner)
+      const client = await connect(key)
+      await call(client, 'add_items', {
+        listId,
+        items: [{ name: 'Bins', dueDate: '2026-03-02', recurrence: { every: 1, unit: 'week', anchor: 'from_due_date' } }],
+      })
+      const [todo] = z.object({ items: z.array(z.object({ itemId: z.string() })) }).parse(await call(client, 'get_list', { listId })).items
+
+      // Another device completed the todo's next occurrence already (with a
+      // clock behind the server's), before this completion arrives.
+      const occurrenceId = nextOccurrenceId(todo.itemId)
+      await api('PUT', `/v1/lists/${listId}/items/${occurrenceId}`, owner, {
+        name: 'Bins',
+        deleted: false,
+        dueDate: '2026-03-08T23:00:00.000Z',
+        completedAt: '2026-03-09T08:00:00.000Z',
+        recurrence: JSON.stringify({ every: 1, unit: 'week', anchor: 'from_due_date' }),
+        updatedAt: '2020-01-01T00:00:00.000Z',
+      })
+
+      expect(await call(client, 'complete_items', { listId, itemIds: [todo.itemId] })).toMatchObject({ nextOccurrences: [] })
+      const stored = await api('GET', `/v1/lists/${listId}/items/${occurrenceId}`, owner)
+      expect(stored.body).toMatchObject({ completedAt: '2026-03-09T08:00:00.000Z' })
+    })
+
     it('a list it shared stops being reachable when the owner narrows the selection', async () => {
       const owner = crypto.randomUUID()
       const kept = await createList('Kept', owner)
@@ -475,5 +504,45 @@ describe.each(repositories)('MCP connectors (%s repository)', (_, makeRepository
       expect((await fetch(`${baseUrl}/v1/mcp/${key}`, { method: 'POST' })).status).toBe(404)
       await connect(newKey)
     })
+  })
+})
+
+describe('MCP connectors under concurrency', () => {
+  // Reads take a while, so two calls on the same list would both decide
+  // before either writes unless the tools serialize per list.
+  class SlowRepository extends InMemoryListRepository {
+    override async listItems(listId: string) {
+      const items = await super.listItems(listId)
+      await new Promise((resolve) => setTimeout(resolve, 30))
+      return items
+    }
+  }
+
+  it('does not add the same item twice from concurrent calls', async () => {
+    const slowApp = buildServer({ listRepository: new SlowRepository(), logger: false })
+    await slowApp.listen({ host: '127.0.0.1', port: 0 })
+    const address = slowApp.server.address()
+    if (!address || typeof address === 'string') {
+      throw new Error('server did not bind a port')
+    }
+    const previousBaseUrl = baseUrl
+    baseUrl = `http://127.0.0.1:${address.port}`
+    try {
+      const owner = crypto.randomUUID()
+      const listId = await createList('Concurrent', owner)
+      const { key } = await createConnector({ includeAllLists: true }, owner)
+      const [first, second] = await Promise.all([connect(key), connect(key)])
+
+      await Promise.all([
+        call(first, 'add_items', { listId, items: [{ name: 'Milk' }] }),
+        call(second, 'add_items', { listId, items: [{ name: 'Milk' }] }),
+      ])
+      const { items } = z.object({ items: z.array(z.object({ name: z.string() })) }).parse(await call(first, 'get_list', { listId }))
+      expect(items.map((item) => item.name)).toEqual(['Milk'])
+    } finally {
+      await Promise.all(clients.splice(0).map((client) => client.close()))
+      baseUrl = previousBaseUrl
+      await slowApp.close()
+    }
   })
 })

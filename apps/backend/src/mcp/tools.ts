@@ -34,6 +34,30 @@ export type McpToolDeps = {
   now?: () => number
 }
 
+// Serializes the read-decide-write of the writing tools per list in this
+// process, so two concurrent calls (an assistant may run tools in parallel)
+// cannot both add "Milk" or both spawn a next occurrence.
+const listLocks = new Map<string, Promise<void>>()
+
+async function withListLock<T>(listId: string, work: () => Promise<T>): Promise<T> {
+  const previous = listLocks.get(listId) ?? Promise.resolve()
+  let release = () => {}
+  const current = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  const tail = previous.then(() => current)
+  listLocks.set(listId, tail)
+  await previous
+  try {
+    return await work()
+  } finally {
+    release()
+    if (listLocks.get(listId) === tail) {
+      listLocks.delete(listId)
+    }
+  }
+}
+
 /** A failure the assistant should read (bad id, wrong list type, ...). */
 class ToolError extends Error {}
 
@@ -290,7 +314,7 @@ export function buildMcpServer(connectorDeviceId: string, deps: McpToolDeps): Mc
       }),
     },
     ({ listId, items, language }) =>
-      runTool(async () => {
+      runTool(() => withListLock(listId, async () => {
         const list = await requireList(listId)
         const categoryLanguage = await categoryLanguageOf(listId, language)
         const openByName = new Map(
@@ -369,7 +393,7 @@ export function buildMcpServer(connectorDeviceId: string, deps: McpToolDeps): Mc
         const ignoredIds = await writeItems(listId, entries)
         const written = entries.map((entry) => ({ id: entry.itemId, name: entry.input.name }))
         return { list: list.name, added, updated, alreadyOnList, ...notApplied(ignoredIds, written) }
-      }),
+      })),
   )
 
   server.registerTool(
@@ -392,7 +416,7 @@ export function buildMcpServer(connectorDeviceId: string, deps: McpToolDeps): Mc
       }),
     },
     (args) =>
-      runTool(async () => {
+      runTool(() => withListLock(args.listId, async () => {
         const list = await requireList(args.listId)
         const [item] = await requireItems(args.listId, [args.itemId])
         const pick = <T>(value: T | null | undefined, existing: T | undefined): T | undefined =>
@@ -423,7 +447,7 @@ export function buildMcpServer(connectorDeviceId: string, deps: McpToolDeps): Mc
           item: stored ? toItemView(stored, list.listType) : undefined,
           ...notApplied(ignoredIds, [item]),
         }
-      }),
+      })),
   )
 
   server.registerTool(
@@ -436,7 +460,7 @@ export function buildMcpServer(connectorDeviceId: string, deps: McpToolDeps): Mc
       inputSchema: z.object({ listId: listIdSchema, itemIds: itemIdsSchema }),
     },
     ({ listId, itemIds }) =>
-      runTool(async () => {
+      runTool(() => withListLock(listId, async () => {
         const list = await requireList(listId)
         const items = await requireItems(listId, itemIds)
         const completedAt = new Date(now()).toISOString()
@@ -456,31 +480,45 @@ export function buildMcpServer(connectorDeviceId: string, deps: McpToolDeps): Mc
             continue
           }
           entries.push({ itemId: item.id, input: { ...inputFromRecord(item), completedAt, updatedAt: nextUpdatedAt(item.updatedAt) } })
+        }
+        const ignoredIds = await writeItems(listId, entries)
 
+        // Next occurrences only for completions that were stored, and never
+        // over an occurrence that already exists: another device that
+        // completed the todo meanwhile created it (and may have advanced it).
+        // Same deterministic id the app uses, so a completion made here and
+        // one made in the app never create two next occurrences.
+        const occurrences: ItemBatchUpsertEntry[] = []
+        for (const item of items) {
+          if (list.listType !== 'todo' || alreadyCompletedIds.has(item.id) || ignoredIds.has(item.id)) {
+            continue
+          }
           const nextDueDate =
             item.recurrence && item.dueDate !== undefined
               ? computeNextDueDate(item.recurrence, Date.parse(item.dueDate), Date.parse(completedAt))
               : null
-          if (nextDueDate !== null) {
-            // Same deterministic id the app uses, so a completion made here
-            // and one made in the app never create two next occurrences.
-            const occurrenceId = nextOccurrenceId(item.id)
-            const previous = await listRepository.getListItem(listId, occurrenceId)
-            entries.push({
-              itemId: occurrenceId,
-              input: {
-                ...inputFromRecord(item),
-                deleted: false,
-                completedAt: undefined,
-                dueDate: new Date(nextDueDate).toISOString(),
-                updatedAt: nextUpdatedAt(previous?.updatedAt),
-              },
-            })
-            nextOccurrences.push({ name: item.name, dueDate: formatCalendarDate(berlinDateOf(nextDueDate)) })
+          if (nextDueDate === null) {
+            continue
           }
+          const occurrenceId = nextOccurrenceId(item.id)
+          const previous = await listRepository.getListItem(listId, occurrenceId)
+          if (previous && !previous.deleted) {
+            continue
+          }
+          occurrences.push({
+            itemId: occurrenceId,
+            input: {
+              ...inputFromRecord(item),
+              deleted: false,
+              completedAt: undefined,
+              dueDate: new Date(nextDueDate).toISOString(),
+              updatedAt: nextUpdatedAt(previous?.updatedAt),
+            },
+          })
+          nextOccurrences.push({ name: item.name, dueDate: formatCalendarDate(berlinDateOf(nextDueDate)) })
         }
+        await writeItems(listId, occurrences)
 
-        const ignoredIds = await writeItems(listId, entries)
         const completed = items.filter((item) => !alreadyCompletedIds.has(item.id) && !ignoredIds.has(item.id))
         return {
           list: list.name,
@@ -489,7 +527,7 @@ export function buildMcpServer(connectorDeviceId: string, deps: McpToolDeps): Mc
           nextOccurrences,
           ...notApplied(ignoredIds, items),
         }
-      }),
+      })),
   )
 
   server.registerTool(
@@ -501,7 +539,7 @@ export function buildMcpServer(connectorDeviceId: string, deps: McpToolDeps): Mc
       annotations: { destructiveHint: true },
     },
     ({ listId, itemIds }) =>
-      runTool(async () => {
+      runTool(() => withListLock(listId, async () => {
         const list = await requireList(listId)
         const items = await requireItems(listId, itemIds)
         const ignoredIds = await writeItems(
@@ -516,7 +554,7 @@ export function buildMcpServer(connectorDeviceId: string, deps: McpToolDeps): Mc
           deleted: items.filter((item) => !ignoredIds.has(item.id)).map((item) => item.name),
           ...notApplied(ignoredIds, items),
         }
-      }),
+      })),
   )
 
   server.registerTool(
@@ -531,7 +569,7 @@ export function buildMcpServer(connectorDeviceId: string, deps: McpToolDeps): Mc
       }),
     },
     ({ listId, name, listType }) =>
-      runTool(async () => {
+      runTool(() => withListLock(listId, async () => {
         const list = await requireList(listId)
         const nextName = name ?? list.name
         const nextType = listType ?? list.listType
@@ -551,7 +589,7 @@ export function buildMcpServer(connectorDeviceId: string, deps: McpToolDeps): Mc
           )
         }
         return { listId, name: nextName, listType: nextType }
-      }),
+      })),
   )
 
   server.registerTool(

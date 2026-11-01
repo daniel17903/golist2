@@ -27,6 +27,10 @@ assistant that supports remote MCP servers can read and edit a user's lists. Use
 - **CORS**: `/v1/mcp/*` accepts any origin (browser-based MCP clients such as the MCP Inspector); the key in the
   path is the credential and no cookies are involved. The REST API keeps its origin allowlist.
 - Tool results list the items whose write lost last-write-wins against a concurrent change (`notApplied`).
+- The writing tools serialize per list within the backend process (`withListLock` in `tools.ts`), so concurrent calls
+  cannot both add the same item or both spawn a next occurrence. This assumes a single backend instance. Completing
+  a recurring todo spawns the next occurrence only when the completion was stored and the occurrence does not exist
+  yet (another device may already have created or advanced it).
 - **Writes reach the apps live**: the tools write through the repository and push the stored versions to the
   WebSocket subscribers of the list (`sync/list-broadcaster.ts`, shared with the sync route), like a device's
   `item_patch` would.
