@@ -127,7 +127,9 @@ test.describe("todo lists", () => {
     await app.createList("Chores", { listType: "todo" });
 
     const drawerRow = (name: string) =>
-      app.drawer.locator(".drawer__item-button", { has: app.page.locator(".drawer__item-label", { hasText: name }) });
+      app.drawer.locator(".drawer__item-button", {
+        has: app.page.locator(".drawer__item-label", { hasText: new RegExp(`^${name}$`) }),
+      });
     await app.openDrawer();
     await expect(drawerRow("Chores")).toHaveAccessibleName(/Chores\s*Todo list/);
     await expect(drawerRow("Chores").locator(".drawer__item-icon")).toHaveAttribute("data-list-type", "todo");
