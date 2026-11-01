@@ -21,6 +21,14 @@ if [ "$is_push" != "yes" ]; then
   exit 0
 fi
 
+# The hook runs in Claude Code's own environment, which does not see the
+# exports the SessionStart hook wrote for the Bash tool (e.g. the Chromium
+# path the E2E suite needs). Re-derive them; agent-setup.sh is idempotent and
+# skips `npm install` when node_modules is up to date.
+if [ -z "${PLAYWRIGHT_CHROMIUM_EXECUTABLE:-}" ]; then
+  eval "$(cd "$project_dir" && scripts/agent-setup.sh 2>/dev/null)" || true
+fi
+
 log_file="$(mktemp -t golist-verify.XXXXXX)"
 if (cd "$project_dir" && npm run --silent verify:changed) >"$log_file" 2>&1; then
   rm -f "$log_file"

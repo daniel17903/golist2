@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // One command to run the right checks, for agents and humans.
 //
-//   node scripts/verify.mjs            # lint + typecheck + unit/sim tests (web + backend), API spec lint, openclaw CLI tests
+//   node scripts/verify.mjs            # lint + typecheck + unit/sim tests (web + backend), API spec lint
 //   node scripts/verify.mjs --changed  # only the checks the changed paths need (AGENTS.md matrix)
 //   node scripts/verify.mjs --full     # everything, including Playwright E2E
 //   node scripts/verify.mjs --changed --base origin/main
@@ -28,11 +28,6 @@ const checks = {
   // Builds the backend and smoke-tests the production build under plain Node.
   buildBackend: { label: "backend build + production smoke", cmd: ["npm", "run", "smoke:dist", "-w", "apps/backend"] },
   lintApiSpec: { label: "API spec lint (openapi.yaml)", cmd: ["npm", "run", "lint", "-w", "apps/api-spec"] },
-  testOpenclaw: {
-    label: "openclaw CLI tests",
-    cmd: ["python3", "-m", "unittest", "discover", "-s", "apps/openclaw"],
-    skipIfMissing: "install Python 3 to run them; CI runs them on every PR",
-  },
 };
 
 const order = Object.keys(checks);
@@ -44,7 +39,6 @@ const defaultChecks = [
   "typecheckBackend",
   "testBackend",
   "lintApiSpec",
-  "testOpenclaw",
 ];
 
 const changedFiles = () => {
@@ -80,9 +74,9 @@ const checksForChanges = (files) => {
         add("e2eWeb");
       }
       // Route changes must stay in sync with openapi.yaml (checked by the
-      // backend tests) and with the openclaw CLI written against it.
+      // backend tests).
       if (/apps\/backend\/src\/(routes\/|server\.ts|auth\.ts)/.test(file)) {
-        add("lintApiSpec", "testOpenclaw");
+        add("lintApiSpec");
       }
     } else if (file.startsWith("apps/web/")) {
       add("lintWeb", "typecheckWeb");
@@ -100,11 +94,8 @@ const checksForChanges = (files) => {
         add("buildWeb");
       }
     } else if (file.startsWith("apps/api-spec/")) {
-      // The backend tests check routes and responses against the spec, and
-      // the openclaw CLI tests check its requests against the spec's paths.
-      add("lintApiSpec", "testBackend", "testOpenclaw");
-    } else if (file.startsWith("apps/openclaw/")) {
-      add("testOpenclaw");
+      // The backend tests check routes and responses against the spec.
+      add("lintApiSpec", "testBackend");
     } else if (file.startsWith("scripts/") || file.startsWith(".github/") || file.startsWith(".claude/")) {
       // Tooling and CI: re-run the standard checks they drive.
       add(...defaultChecks);
@@ -141,18 +132,12 @@ for (const name of selected) {
   console.log(`\n[verify] ▶ ${label}: ${cmd.join(" ")}`);
   const startedAt = Date.now();
   const outcome = spawnSync(cmd[0], cmd.slice(1), { stdio: "inherit" });
-  if (outcome.error?.code === "ENOENT" && checks[name].skipIfMissing) {
-    // Optional toolchain (python3 for the openclaw CLI tests); CI always runs it.
-    console.log(`[verify] ${cmd[0]} not found; skipping (${checks[name].skipIfMissing})`);
-    results.push({ label, ok: true, skipped: true, seconds: 0 });
-    continue;
-  }
   results.push({ label, ok: outcome.status === 0, seconds: (Date.now() - startedAt) / 1000 });
 }
 
 console.log("\n[verify] summary");
-for (const { label, ok, skipped, seconds } of results) {
-  console.log(`  ${skipped ? "SKIP" : ok ? "PASS" : "FAIL"}  ${label} (${seconds.toFixed(1)}s)`);
+for (const { label, ok, seconds } of results) {
+  console.log(`  ${ok ? "PASS" : "FAIL"}  ${label} (${seconds.toFixed(1)}s)`);
 }
 const failures = results.filter((result) => !result.ok);
 if (failures.some((result) => result.label.startsWith("web E2E"))) {

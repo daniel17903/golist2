@@ -8,7 +8,7 @@ import { registeredOperations, responseViolations, specOperations } from './test
 // apps/api-spec/openapi.yaml must describe exactly the routes buildServer
 // registers. Response bodies are checked against the spec's schemas by the
 // contract tests (server.contract.test.ts). When this fails after a route
-// change, update openapi.yaml and check apps/openclaw/golist_cli.py.
+// change, update openapi.yaml.
 describe('openapi.yaml', () => {
   it('documents exactly the routes the server registers', async () => {
     const routes: RouteOptions[] = []

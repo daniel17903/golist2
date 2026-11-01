@@ -7,6 +7,8 @@ import { z } from 'zod'
 import { query, withTransaction } from '../db/client.js'
 import { toItemSnapshot } from './item-snapshot.js'
 import {
+  type ConnectorInput,
+  type ConnectorRecord,
   type ItemBatchUpsertEntry,
   type ItemUpsertInput,
   type ListItemRecord,
@@ -20,22 +22,50 @@ type Queryable = {
   query: (text: string, values?: unknown[]) => Promise<{ rows: unknown[]; rowCount: number | null }>
 }
 
-const listAccessQuery = `SELECT EXISTS(
-   SELECT 1
-     FROM shared_lists
-    WHERE id = $1
-      AND created_by_device_id = $2
- )
- OR EXISTS(
-   SELECT 1
-     FROM share_token_redemptions redemptions
-     JOIN share_tokens tokens
-       ON tokens.id = redemptions.token_id
-    WHERE redemptions.device_id = $2
-      AND tokens.list_id = $1
-      AND tokens.revoked_at IS NULL
-      AND (tokens.expires_at IS NULL OR tokens.expires_at > NOW())
- ) AS has_access`
+// SQL condition: the device `device` created the list `list` or redeemed a
+// valid share token for it.
+const directAccessCondition = (list: string, device: string) => `(
+  EXISTS(
+    SELECT 1
+      FROM shared_lists owned
+     WHERE owned.id = ${list}
+       AND owned.created_by_device_id = ${device}
+  )
+  OR EXISTS(
+    SELECT 1
+      FROM share_token_redemptions redemptions
+      JOIN share_tokens tokens
+        ON tokens.id = redemptions.token_id
+     WHERE redemptions.device_id = ${device}
+       AND tokens.list_id = ${list}
+       AND tokens.revoked_at IS NULL
+       AND (tokens.expires_at IS NULL OR tokens.expires_at > NOW())
+  )
+)`
+
+// SQL condition for `ListRepository.hasListAccess`: direct access, or the
+// device is a connector that includes the list and whose owner has direct
+// access to it.
+const accessCondition = (list: string, device: string) => `(
+  ${directAccessCondition(list, device)}
+  OR EXISTS(
+    SELECT 1
+      FROM mcp_connectors connectors
+     WHERE connectors.device_id = ${device}
+       AND (
+         connectors.include_all_lists
+         OR EXISTS(
+           SELECT 1
+             FROM mcp_connector_lists picked
+            WHERE picked.connector_id = connectors.id
+              AND picked.list_id = ${list}
+         )
+       )
+       AND ${directAccessCondition(list, 'connectors.owner_device_id')}
+  )
+)`
+
+const listAccessQuery = `SELECT ${accessCondition('$1::uuid', '$2::uuid')} AS has_access`
 
 const accessRowSchema = z.object({ has_access: z.boolean() })
 
@@ -217,6 +247,72 @@ async function upsertListItemWithClient(
   return { outcome: 'updated' }
 }
 
+type ListRow = {
+  id: string
+  name: string
+  list_type: string
+  created_at: TimestampColumn
+  updated_at: TimestampColumn
+}
+
+const listColumns = 'id, name, list_type, created_at, metadata_updated_at AS updated_at'
+
+function toListRecord(row: ListRow): ListRecord {
+  return {
+    id: row.id,
+    name: row.name,
+    listType: isListType(row.list_type) ? row.list_type : 'shopping',
+    createdAt: toIsoTimestamp(row.created_at),
+    updatedAt: toIsoTimestamp(row.updated_at),
+  }
+}
+
+type ConnectorRow = {
+  id: string
+  label: string
+  device_id: string
+  owner_device_id: string
+  include_all_lists: boolean
+  list_ids: string[]
+  created_at: TimestampColumn
+  last_used_at: TimestampColumn | null
+}
+
+const selectConnectors = `SELECT connectors.id, connectors.label, connectors.device_id, connectors.owner_device_id,
+       connectors.include_all_lists, connectors.created_at, connectors.last_used_at,
+       ARRAY(
+         SELECT picked.list_id::text
+           FROM mcp_connector_lists picked
+          WHERE picked.connector_id = connectors.id
+          ORDER BY picked.list_id
+       ) AS list_ids
+  FROM mcp_connectors connectors`
+
+function toConnectorRecord(row: ConnectorRow): ConnectorRecord {
+  return {
+    id: row.id,
+    label: row.label,
+    deviceId: row.device_id,
+    ownerDeviceId: row.owner_device_id,
+    includeAllLists: row.include_all_lists,
+    listIds: row.list_ids,
+    createdAt: toIsoTimestamp(row.created_at),
+    lastUsedAt: optionalIso(row.last_used_at),
+  }
+}
+
+async function replaceConnectorLists(client: Queryable, connectorId: string, listIds: string[]) {
+  await client.query('DELETE FROM mcp_connector_lists WHERE connector_id = $1', [connectorId])
+  if (listIds.length > 0) {
+    await client.query(
+      `INSERT INTO mcp_connector_lists(connector_id, list_id)
+       SELECT $1, list_id FROM unnest($2::uuid[]) AS list_id
+       ON CONFLICT DO NOTHING`,
+      [connectorId, listIds],
+    )
+  }
+}
+
 export class PostgresListRepository implements ListRepository {
   async ping(): Promise<void> {
     await query('SELECT 1')
@@ -225,6 +321,17 @@ export class PostgresListRepository implements ListRepository {
   async hasListAccess(listId: string, deviceId: string): Promise<boolean> {
     const accessResult = await query<{ has_access: boolean }>(listAccessQuery, [listId, deviceId])
     return Boolean(accessResult.rows[0]?.has_access)
+  }
+
+  async listAccessibleLists(deviceId: string): Promise<ListRecord[]> {
+    const result = await query<ListRow>(
+      `SELECT ${listColumns}
+         FROM shared_lists lists
+        WHERE ${accessCondition('lists.id', '$1::uuid')}
+        ORDER BY lists.id`,
+      [deviceId],
+    )
+    return result.rows.map(toListRecord)
   }
 
   async findValidShareToken(shareToken: string): Promise<{ tokenId: string; listId: string } | null> {
@@ -318,29 +425,8 @@ export class PostgresListRepository implements ListRepository {
   }
 
   async getList(listId: string): Promise<ListRecord | null> {
-    const listResult = await query<{
-      id: string
-      name: string
-      list_type: string
-      created_at: TimestampColumn
-      updated_at: TimestampColumn
-    }>(
-      'SELECT id, name, list_type, created_at, metadata_updated_at AS updated_at FROM shared_lists WHERE id = $1 LIMIT 1',
-      [listId],
-    )
-
-    if (!listResult.rowCount) {
-      return null
-    }
-
-    const row = listResult.rows[0]
-    return {
-      id: row.id,
-      name: row.name,
-      listType: isListType(row.list_type) ? row.list_type : 'shopping',
-      createdAt: toIsoTimestamp(row.created_at),
-      updatedAt: toIsoTimestamp(row.updated_at),
-    }
+    const listResult = await query<ListRow>(`SELECT ${listColumns} FROM shared_lists WHERE id = $1 LIMIT 1`, [listId])
+    return listResult.rowCount ? toListRecord(listResult.rows[0]) : null
   }
 
   async deleteList(listId: string, deviceId: string): Promise<boolean> {
@@ -441,6 +527,68 @@ export class PostgresListRepository implements ListRepository {
       [tokenId, deviceId],
     )
   }
+
+  async createConnector(ownerDeviceId: string, keyHash: string, input: ConnectorInput): Promise<ConnectorRecord> {
+    const connectorId = crypto.randomUUID()
+    return withTransaction(async (client) => {
+      await client.query(
+        `INSERT INTO mcp_connectors(id, key_hash, device_id, owner_device_id, label, include_all_lists, created_at)
+         VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
+        [connectorId, keyHash, crypto.randomUUID(), ownerDeviceId, input.label, input.includeAllLists],
+      )
+      await replaceConnectorLists(client, connectorId, input.listIds)
+      const result = await client.query<ConnectorRow>(`${selectConnectors} WHERE connectors.id = $1`, [connectorId])
+      return toConnectorRecord(result.rows[0])
+    })
+  }
+
+  async listConnectors(ownerDeviceId: string): Promise<ConnectorRecord[]> {
+    const result = await query<ConnectorRow>(
+      `${selectConnectors} WHERE connectors.owner_device_id = $1 ORDER BY connectors.created_at, connectors.id`,
+      [ownerDeviceId],
+    )
+    return result.rows.map(toConnectorRecord)
+  }
+
+  async findConnectorByKeyHash(keyHash: string): Promise<ConnectorRecord | null> {
+    const result = await query<ConnectorRow>(`${selectConnectors} WHERE connectors.key_hash = $1`, [keyHash])
+    return result.rowCount ? toConnectorRecord(result.rows[0]) : null
+  }
+
+  async updateConnector(connectorId: string, ownerDeviceId: string, input: ConnectorInput): Promise<ConnectorRecord | null> {
+    return withTransaction(async (client) => {
+      const updated = await client.query(
+        `UPDATE mcp_connectors SET label = $3, include_all_lists = $4
+          WHERE id = $1 AND owner_device_id = $2`,
+        [connectorId, ownerDeviceId, input.label, input.includeAllLists],
+      )
+      if (!updated.rowCount) {
+        return null
+      }
+      await replaceConnectorLists(client, connectorId, input.listIds)
+      const result = await client.query<ConnectorRow>(`${selectConnectors} WHERE connectors.id = $1`, [connectorId])
+      return toConnectorRecord(result.rows[0])
+    })
+  }
+
+  async rotateConnectorKey(connectorId: string, ownerDeviceId: string, keyHash: string): Promise<boolean> {
+    const result = await query('UPDATE mcp_connectors SET key_hash = $3 WHERE id = $1 AND owner_device_id = $2', [
+      connectorId,
+      ownerDeviceId,
+      keyHash,
+    ])
+    return Boolean(result.rowCount)
+  }
+
+  async deleteConnector(connectorId: string, ownerDeviceId: string): Promise<boolean> {
+    const result = await query('DELETE FROM mcp_connectors WHERE id = $1 AND owner_device_id = $2', [connectorId, ownerDeviceId])
+    return Boolean(result.rowCount)
+  }
+
+  async markConnectorUsed(connectorId: string): Promise<void> {
+    await query('UPDATE mcp_connectors SET last_used_at = NOW() WHERE id = $1', [connectorId])
+  }
 }
+
 
 export const postgresListRepository: ListRepository = new PostgresListRepository()

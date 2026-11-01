@@ -6,12 +6,14 @@ import { useI18n } from "../i18n";
 type SettingsModalProps = {
   isOpen: boolean;
   onClose: () => void;
+  // Unset when the app runs without a backend (no AI assistant connections).
+  onOpenAiConnectors?: () => void;
 };
 
 const toLocale = (value: string): Locale | undefined =>
   supportedLocales.find((locale) => locale === value);
 
-const SettingsModal = memo(function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
+const SettingsModal = memo(function SettingsModal({ isOpen, onClose, onOpenAiConnectors }: SettingsModalProps) {
   const { locale, t, setLanguagePreference } = useI18n();
 
   if (!isOpen) {return null;}
@@ -46,6 +48,15 @@ const SettingsModal = memo(function SettingsModal({ isOpen, onClose }: SettingsM
           ))}
         </select>
       </div>
+      {onOpenAiConnectors ? (
+        <div className="modal__field">
+          <span className="ai-connectors__heading">{t("aiConnectors.title")}</span>
+          <p className="ai-connectors__hint">{t("aiConnectors.settingsHint")}</p>
+          <button type="button" className="text-button settings-ai-connectors" onClick={onOpenAiConnectors}>
+            {t("aiConnectors.manage")}
+          </button>
+        </div>
+      ) : null}
     </Modal>
   );
 });

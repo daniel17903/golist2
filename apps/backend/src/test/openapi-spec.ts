@@ -8,7 +8,7 @@ import { z } from 'zod'
 
 // Test helpers that check the backend against apps/api-spec/openapi.yaml, so
 // route or response changes cannot silently drift from the published spec
-// (which the openclaw CLI and other API clients are written against).
+// (which API clients are written against).
 
 const responseSchema = z.object({
   $ref: z.string().optional(),

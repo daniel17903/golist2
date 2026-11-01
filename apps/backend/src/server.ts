@@ -2,15 +2,18 @@ import Fastify, { type FastifyRequest, type RouteOptions } from 'fastify'
 import cors from '@fastify/cors'
 
 import { env } from './config/env.js'
-import { redactShareTokenUrl } from './lib/redact-url.js'
+import { redactUrlSecrets } from './lib/redact-url.js'
 import { registerErrorHandler } from './plugins/error-handler.js'
 import { registerObservability } from './plugins/observability.js'
 import { type ListRepository } from './repositories/list-repository.js'
 import { postgresListRepository } from './repositories/postgres-list-repository.js'
+import { registerConnectorRoutes } from './routes/connectors.js'
 import { registerHealthRoutes } from './routes/health.js'
 import { registerListRoutes } from './routes/lists.js'
+import { registerMcpRoutes } from './routes/mcp.js'
 import { registerShareTokenRoutes } from './routes/share-tokens.js'
 import { registerSyncWebsocketRoute } from './routes/sync-websocket.js'
+import { ListBroadcaster } from './sync/list-broadcaster.js'
 import { ListSyncCache } from './sync/list-sync-cache.js'
 
 const PRODUCTION_ORIGIN = 'https://go-list.app'
@@ -35,6 +38,8 @@ export type BuildServerOptions = {
   // Test-only: called for every route as it is registered (the OpenAPI spec
   // test uses it to compare the registered routes with openapi.yaml).
   onRoute?: (route: RouteOptions) => void
+  // Origin of the web app for share links (defaults to PUBLIC_APP_URL).
+  appUrl?: string
 }
 
 export function buildServer(deps: BuildServerOptions = {}) {
@@ -51,7 +56,7 @@ export function buildServer(deps: BuildServerOptions = {}) {
         req(request: FastifyRequest) {
           return {
             method: request.method,
-            url: redactShareTokenUrl(request.url),
+            url: redactUrlSecrets(request.url),
             hostname: request.hostname,
             remoteAddress: request.ip,
             remotePort: request.socket?.remotePort,
@@ -68,6 +73,9 @@ export function buildServer(deps: BuildServerOptions = {}) {
   // that a write made over either transport invalidates the same cached
   // digest/summaries snapshot (see sync/list-sync-cache.ts).
   const listSyncCache = new ListSyncCache()
+  // The sockets subscribed to each list: the WebSocket route registers them,
+  // and the MCP server pushes its writes to them too.
+  const broadcaster = new ListBroadcaster()
 
   void app.register(cors, {
     origin: (origin, callback) => {
@@ -89,7 +97,9 @@ export function buildServer(deps: BuildServerOptions = {}) {
   registerHealthRoutes(app, listRepository)
   registerListRoutes(app, listRepository, listSyncCache)
   registerShareTokenRoutes(app, listRepository)
-  void registerSyncWebsocketRoute(app, listRepository, listSyncCache)
+  registerConnectorRoutes(app, listRepository)
+  registerMcpRoutes(app, { listRepository, listSyncCache, broadcaster, appUrl: deps.appUrl ?? env.PUBLIC_APP_URL })
+  void registerSyncWebsocketRoute(app, listRepository, listSyncCache, broadcaster)
 
   return app
 }

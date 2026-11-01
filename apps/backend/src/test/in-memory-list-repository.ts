@@ -6,6 +6,8 @@ import type { ListType } from '@golist/shared/domain/types'
 import { toItemSnapshot } from '../repositories/item-snapshot.js'
 
 import {
+  type ConnectorInput,
+  type ConnectorRecord,
   type ItemUpsertInput,
   type ItemBatchUpsertEntry,
   type ListItemRecord,
@@ -40,6 +42,7 @@ export class InMemoryListRepository implements ListRepository {
   private readonly items = new Map<string, ListItemRecord>()
   private readonly shareTokens = new Map<string, ShareToken>()
   private readonly redemptions = new Set<string>()
+  private readonly connectors = new Map<string, ConnectorRecord & { keyHash: string }>()
   private pingError: Error | null = null
 
   setPingError(error: Error | null) {
@@ -52,7 +55,7 @@ export class InMemoryListRepository implements ListRepository {
     }
   }
 
-  async hasListAccess(listId: string, deviceId: string): Promise<boolean> {
+  private hasDirectListAccess(listId: string, deviceId: string): boolean {
     const list = this.lists.get(listId)
     if (!list) {
       return false
@@ -77,6 +80,30 @@ export class InMemoryListRepository implements ListRepository {
     }
 
     return false
+  }
+
+  async hasListAccess(listId: string, deviceId: string): Promise<boolean> {
+    if (this.hasDirectListAccess(listId, deviceId)) {
+      return true
+    }
+
+    const connector = [...this.connectors.values()].find((entry) => entry.deviceId === deviceId)
+    return (
+      connector !== undefined &&
+      (connector.includeAllLists || connector.listIds.includes(listId)) &&
+      this.hasDirectListAccess(listId, connector.ownerDeviceId)
+    )
+  }
+
+  async listAccessibleLists(deviceId: string): Promise<ListRecord[]> {
+    const accessible: ListRecord[] = []
+    for (const [listId, list] of this.lists) {
+      if (await this.hasListAccess(listId, deviceId)) {
+        accessible.push({ ...list.data })
+      }
+    }
+    // Plain code-unit order, like ORDER BY on the uuid column.
+    return accessible.sort((a, b) => Number(a.id > b.id) - Number(a.id < b.id))
   }
 
   async findValidShareToken(shareToken: string): Promise<{ tokenId: string; listId: string } | null> {
@@ -156,6 +183,9 @@ export class InMemoryListRepository implements ListRepository {
     }
 
     this.lists.delete(listId)
+    for (const connector of this.connectors.values()) {
+      connector.listIds = connector.listIds.filter((id) => id !== listId)
+    }
     for (const [itemId, item] of this.items.entries()) {
       if (item.listId === listId) {
         this.items.delete(itemId)
@@ -284,5 +314,73 @@ export class InMemoryListRepository implements ListRepository {
 
   async recordShareTokenRedemption(tokenId: string, deviceId: string): Promise<void> {
     this.redemptions.add(`${tokenId}:${deviceId}`)
+  }
+
+  private toConnectorRecord({ keyHash, ...connector }: ConnectorRecord & { keyHash: string }): ConnectorRecord {
+    void keyHash
+    return { ...connector, listIds: [...connector.listIds] }
+  }
+
+  async createConnector(ownerDeviceId: string, keyHash: string, input: ConnectorInput): Promise<ConnectorRecord> {
+    const connector = {
+      id: crypto.randomUUID(),
+      keyHash,
+      label: input.label,
+      deviceId: crypto.randomUUID(),
+      ownerDeviceId,
+      includeAllLists: input.includeAllLists,
+      listIds: [...new Set(input.listIds)].sort(),
+      createdAt: new Date().toISOString(),
+    }
+    this.connectors.set(connector.id, connector)
+    return this.toConnectorRecord(connector)
+  }
+
+  async listConnectors(ownerDeviceId: string): Promise<ConnectorRecord[]> {
+    return [...this.connectors.values()]
+      .filter((connector) => connector.ownerDeviceId === ownerDeviceId)
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id))
+      .map((connector) => this.toConnectorRecord(connector))
+  }
+
+  async findConnectorByKeyHash(keyHash: string): Promise<ConnectorRecord | null> {
+    const connector = [...this.connectors.values()].find((entry) => entry.keyHash === keyHash)
+    return connector ? this.toConnectorRecord(connector) : null
+  }
+
+  async updateConnector(connectorId: string, ownerDeviceId: string, input: ConnectorInput): Promise<ConnectorRecord | null> {
+    const connector = this.connectors.get(connectorId)
+    if (!connector || connector.ownerDeviceId !== ownerDeviceId) {
+      return null
+    }
+    connector.label = input.label
+    connector.includeAllLists = input.includeAllLists
+    connector.listIds = [...new Set(input.listIds)].sort()
+    return this.toConnectorRecord(connector)
+  }
+
+  async rotateConnectorKey(connectorId: string, ownerDeviceId: string, keyHash: string): Promise<boolean> {
+    const connector = this.connectors.get(connectorId)
+    if (!connector || connector.ownerDeviceId !== ownerDeviceId) {
+      return false
+    }
+    connector.keyHash = keyHash
+    return true
+  }
+
+  async deleteConnector(connectorId: string, ownerDeviceId: string): Promise<boolean> {
+    const connector = this.connectors.get(connectorId)
+    if (!connector || connector.ownerDeviceId !== ownerDeviceId) {
+      return false
+    }
+    this.connectors.delete(connectorId)
+    return true
+  }
+
+  async markConnectorUsed(connectorId: string): Promise<void> {
+    const connector = this.connectors.get(connectorId)
+    if (connector) {
+      connector.lastUsedAt = new Date().toISOString()
+    }
   }
 }

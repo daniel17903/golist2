@@ -37,7 +37,6 @@
 │   │       ├── repositories
 │   │       ├── routes
 │   │       └── test
-│   ├── openclaw
 │   └── web
 │       ├── public
 │       │   └── icons

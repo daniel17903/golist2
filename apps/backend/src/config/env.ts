@@ -7,6 +7,9 @@ const envSchema = z.object({
   PORT: z.coerce.number().int().positive().default(3000),
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   DATABASE_URL: z.string().min(1).optional(),
+  // Where the web app is served; share links handed out by the MCP server
+  // (`/?shareToken=...`) point here.
+  PUBLIC_APP_URL: z.url().default('https://go-list.app'),
   // No .default() here on purpose: falling back silently to
   // localhost/golist/golist/golist is only safe in local development. See
   // the production guard below, which fails fast instead of letting a
@@ -106,6 +109,7 @@ export const env: Env = {
   PORT: parsed.PORT,
   NODE_ENV: parsed.NODE_ENV,
   DATABASE_URL: parsed.DATABASE_URL,
+  PUBLIC_APP_URL: parsed.PUBLIC_APP_URL,
   PGHOST: parsed.PGHOST ?? DEV_ONLY_PG_DEFAULTS.PGHOST,
   PGUSER: parsed.PGUSER ?? DEV_ONLY_PG_DEFAULTS.PGUSER,
   PGDATABASE: parsed.PGDATABASE ?? DEV_ONLY_PG_DEFAULTS.PGDATABASE,

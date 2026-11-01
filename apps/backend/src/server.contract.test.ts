@@ -639,7 +639,7 @@ describe('list types and todo fields', () => {
       expect.objectContaining({ description: 'Sink too', points: 3, dueDate, assignedTo: 'Alex', recurrence }),
     )
 
-    // A caller that predates todo lists (e.g. the openclaw CLI renaming an
+    // A caller that predates todo lists (e.g. a script renaming an
     // item) does not wipe the todo fields.
     await put({ name: 'Clean the bathroom', deleted: false, updatedAt: '2026-03-20T11:00:00.000Z' })
     expect(await getItem()).toEqual(

@@ -8,10 +8,10 @@
   `apps/backend/src/openapi-spec.test.ts` fails when the registered Fastify routes and the spec's paths diverge, and
   the contract tests (`server.contract.test.ts`) validate every response against the spec's schemas
   (helpers in `apps/backend/src/test/openapi-spec.ts`).
-- `apps/openclaw/` is an OpenClaw skill (`SKILL.md`) plus a stdlib-only Python CLI (`golist_cli.py`) that calls the
-  **production** API. `test_golist_cli.py` (unittest, mocked HTTP) checks each command's requests (URL, method,
-  `X-Device-Id`/`Origin` headers, payload) and that every request path exists in `openapi.yaml`.
-- `packages/shared/` contains shared domain code that can be reused by web and backend (currently shared types).
+- The backend also serves a remote **MCP server** (`/v1/mcp/{key}`) so AI assistants (Claude custom connectors,
+  ChatGPT, ...) can read and edit lists; see `docs/mcp-server.md`.
+- `packages/shared/` contains shared domain code that can be reused by web and backend (types, sync hashing, item
+  category mapping, Berlin time, recurrence).
 - `apps/web/sim/` is the in-process multi-device sync simulation (real web store + sync client against the real backend); see `apps/web/sim/README.md`.
 - `scripts/` holds repo tooling: `agent-setup.sh` (container setup, also run by the Claude Code SessionStart hook in `.claude/`), `local-postgres.sh` (throwaway local database), `verify.mjs` (runs the right checks).
 - `.claude/hooks/` holds Claude Code hooks: `session-start.sh` (runs `agent-setup.sh` in cloud sessions) and `pre-push-verify.sh` (a PreToolUse hook that blocks `git push` until `npm run verify:changed` passes; push detection in `is-git-push.mjs`, tested by `node --test .claude/hooks/is-git-push.test.mjs`). It is registered in `.claude/settings.json`, which also allowlists the routine check commands.
@@ -59,6 +59,9 @@
   separate storage. So a `?shareToken=` link opened in an iOS browser tab (`apps/web/src/domain/iosBrowserTab.ts`)
   is not joined automatically; `InviteLandingModal` offers to copy the invite for the home-screen app (whose Join
   dialog has a one-tap "Paste from clipboard" button) or to use the list in the browser.
+- **AI assistant connections (MCP)**: Settings → AI assistants creates a connector URL (`/v1/mcp/{key}`; the key is
+  the only credential and is shown once). Each connector has its own device id and reaches all of the owner device's
+  lists or the picked ones; its writes are broadcast to the open apps. Details in `docs/mcp-server.md`.
 - **Undo toasts** for item deletion, todo completion (also removes the next occurrence of a recurring todo) and list
   rename (max 3 stacked, 5s timeout).
 - **Pull-to-refresh** forces a WebSocket reconnect; the pull distance is written straight to the DOM to avoid per-frame re-renders.
@@ -90,8 +93,7 @@
 
 ## CI/CD
 - GitHub Actions `ci.yml` workflow validates `lint`, `typecheck`, `test` (incl. the sync simulation) and `build` for the web workspace plus backend `lint`/`typecheck`/`test` on PRs, and runs the Playwright E2E suite against both the in-memory and the Postgres backend. Failed E2E runs upload traces, per-device WebSocket frames/console logs and the backend log as the `e2e-<backend>-artifacts` artifact.
-- `ci.yml` also lints `apps/api-spec/openapi.yaml` (in the `validate` job) and runs the openclaw CLI tests
-  (`openclaw-cli` job, Python via `actions/setup-python`).
+- `ci.yml` also lints `apps/api-spec/openapi.yaml` (in the `validate` job).
 - GitHub Actions `backend-bootstrap.yml` runs backend `lint` + `typecheck` + `db:migrate` + `test` (against ephemeral Postgres) on PRs that touch `apps/backend/**`.
 - Deploy workflow builds on `main`.
 
@@ -106,10 +108,11 @@
 - Run `npm run test:e2e -w apps/web` for changes to UI flows, the store, sync or backend routes
   (with `E2E_BACKEND=postgres` too when touching the Postgres repository).
 - **When changing backend routes** (paths, methods, status codes, request or response shapes): update
-  `apps/api-spec/openapi.yaml` in the same PR, run `npm run lint -w apps/api-spec` and `npm run test -w apps/backend`,
-  and check `apps/openclaw/golist_cli.py` (+ `SKILL.md`) still matches — then run
-  `python3 -m unittest discover -s apps/openclaw`. `npm run verify:changed` picks these up for spec, openclaw and
-  backend route changes.
+  `apps/api-spec/openapi.yaml` in the same PR, run `npm run lint -w apps/api-spec` and `npm run test -w apps/backend`.
+  `npm run verify:changed` picks these up for spec and backend route changes.
+- **When changing what lists/items look like or how they are written**, check the MCP tools
+  (`apps/backend/src/mcp/tools.ts`) still follow the app's rules; `apps/backend/src/mcp.test.ts` runs against both
+  repositories (Postgres when `PGHOST` is set).
 - Run `npm run db:migrate -w apps/backend` for backend schema/migration changes.
 - Run `npm run build -w apps/web` for changes that touch PWA assets or build config; run `npm run build -w apps/backend` when backend runtime/build config changes.
 
