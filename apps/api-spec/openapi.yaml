@@ -87,21 +87,51 @@ components:
           description: Item category id (derived by the server from the item name when a write omits it).
         deleted:
           type: boolean
+        description:
+          type: string
+          description: 'Todo lists: free-text notes.'
+        points:
+          type: integer
+          minimum: 1
+          description: 'Todo lists: effort points used by the stats (unset means 1).'
+        completedAt:
+          type: string
+          format: date-time
+          description: 'Todo lists: when the todo was checked off (unset while open).'
+        dueDate:
+          type: string
+          format: date-time
+          description: 'Todo lists: due date.'
+        assignedTo:
+          type: string
+          description: 'Todo lists: free-text assignee.'
+        recurrence:
+          type: string
+          description: 'Todo lists: JSON-encoded recurrence rule `{"every":n,"unit":"day|week|month","weekday"?,"anchor":"from_due_date|from_completion"}`.'
         createdAt:
           type: string
           format: date-time
         updatedAt:
           type: string
           format: date-time
+    ListType:
+      type: string
+      enum: [shopping, todo]
+      description: |
+        What the list is for. `shopping` lists show the icon grid; `todo` lists show todos with due
+        dates, assignees, points and recurrence. Both use the same items (todo fields are optional on
+        every item). Lists created without a type are `shopping`.
     ListDocument:
       type: object
-      required: [listId, name, items, createdAt, updatedAt]
+      required: [listId, name, listType, items, createdAt, updatedAt]
       properties:
         listId:
           type: string
           format: uuid
         name:
           type: string
+        listType:
+          $ref: "#/components/schemas/ListType"
         items:
           type: array
           items:
@@ -119,6 +149,9 @@ components:
         name:
           type: string
           minLength: 1
+        listType:
+          $ref: "#/components/schemas/ListType"
+          description: Omitted keeps the stored type (new lists default to `shopping`).
         updatedAt:
           type: string
           format: date-time
@@ -158,6 +191,30 @@ components:
         updatedAt:
           type: string
           format: date-time
+        description:
+          type: [string, 'null']
+          minLength: 1
+          description: 'Omitted keeps the stored value, null clears it. Todo lists: free-text notes.'
+        points:
+          type: [integer, 'null']
+          minimum: 1
+          description: 'Omitted keeps the stored value, null clears it. Todo lists: effort points used by the stats (unset means 1).'
+        completedAt:
+          type: [string, 'null']
+          format: date-time
+          description: 'Omitted keeps the stored value, null clears it. Todo lists: when the todo was checked off (unset while open).'
+        dueDate:
+          type: [string, 'null']
+          format: date-time
+          description: 'Omitted keeps the stored value, null clears it. Todo lists: due date.'
+        assignedTo:
+          type: [string, 'null']
+          minLength: 1
+          description: 'Omitted keeps the stored value, null clears it. Todo lists: free-text assignee.'
+        recurrence:
+          type: [string, 'null']
+          minLength: 1
+          description: 'Omitted keeps the stored value, null clears it. Todo lists: JSON-encoded recurrence rule `{"every":n,"unit":"day|week|month","weekday"?,"anchor":"from_due_date|from_completion"}`.'
     UpdatedItemsResponse:
       type: object
       required: [items]
@@ -232,6 +289,28 @@ components:
           minLength: 1
         deleted:
           type: boolean
+        description:
+          type: string
+          minLength: 1
+          description: 'Todo lists: free-text notes.'
+        points:
+          type: integer
+          minimum: 1
+          description: 'Todo lists: effort points used by the stats (unset means 1).'
+        completedAt:
+          type: integer
+          description: 'Todo lists: when the todo was checked off (unset while open).'
+        dueDate:
+          type: integer
+          description: 'Todo lists: due date.'
+        assignedTo:
+          type: string
+          minLength: 1
+          description: 'Todo lists: free-text assignee.'
+        recurrence:
+          type: string
+          minLength: 1
+          description: 'Todo lists: JSON-encoded recurrence rule `{"every":n,"unit":"day|week|month","weekday"?,"anchor":"from_due_date|from_completion"}`.'
         createdAt:
           type: integer
         updatedAt:
@@ -299,6 +378,9 @@ components:
               format: uuid
             name:
               type: string
+            listType:
+              $ref: "#/components/schemas/ListType"
+              description: Omitted keeps the stored type.
             updatedAt:
               type: integer
     WebSocketServerMessage:
@@ -310,7 +392,7 @@ components:
             type:
               const: hello_ack
         - type: object
-          required: [type, listId, listName, listUpdatedAt, serverListDigest]
+          required: [type, listId, listName, listType, listUpdatedAt, serverListDigest]
           properties:
             type:
               const: subscribed
@@ -319,6 +401,8 @@ components:
               format: uuid
             listName:
               type: string
+            listType:
+              $ref: "#/components/schemas/ListType"
             listUpdatedAt:
               type: integer
             serverListDigest:
@@ -348,7 +432,7 @@ components:
               items:
                 $ref: "#/components/schemas/SyncItem"
         - type: object
-          required: [type, listId, name, updatedAt]
+          required: [type, listId, name, listType, updatedAt]
           properties:
             type:
               const: list_metadata_patch
@@ -357,6 +441,8 @@ components:
               format: uuid
             name:
               type: string
+            listType:
+              $ref: "#/components/schemas/ListType"
             updatedAt:
               type: integer
         - type: object

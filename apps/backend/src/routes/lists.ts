@@ -1,4 +1,5 @@
 import { defaultCategoryLanguage, detectCategoryLanguageForNames, getCategoryAndIconForItemName, supportedCategoryLanguages } from '@golist/shared/domain/item-category-mapping'
+import { listTypes, type TodoFields } from '@golist/shared/domain/types'
 import { type FastifyInstance } from 'fastify'
 import { z } from 'zod'
 
@@ -9,6 +10,7 @@ import { ListSyncCache } from '../sync/list-sync-cache.js'
 const listIdParamsSchema = z.object({ listId: z.uuid() })
 const listPutBodySchema = z.object({
   name: z.string().min(1),
+  listType: z.enum(listTypes).optional(),
   updatedAt: z.iso.datetime({ offset: true }).optional(),
 })
 const listCreateHeadersSchema = z.object({ 'x-device-id': z.uuid() })
@@ -21,6 +23,30 @@ const itemUpsertSchema = z.object({
   language: z.enum(supportedCategoryLanguages).optional(),
   deleted: z.boolean(),
   updatedAt: z.iso.datetime({ offset: true }),
+  // Todo fields: omitted keeps the stored value (so callers that predate
+  // todo lists never wipe them), null clears it.
+  description: z.string().min(1).nullable().optional(),
+  points: z.number().int().positive().nullable().optional(),
+  completedAt: z.iso.datetime({ offset: true }).nullable().optional(),
+  dueDate: z.iso.datetime({ offset: true }).nullable().optional(),
+  assignedTo: z.string().min(1).nullable().optional(),
+  recurrence: z.string().min(1).nullable().optional(),
+})
+
+/** `undefined` (omitted) keeps the stored value, `null` clears it. */
+const pick = <T>(value: T | null | undefined, existing: T | undefined): T | undefined =>
+  value === undefined ? existing : (value ?? undefined)
+
+const mergeTodoFields = (
+  body: z.infer<typeof itemUpsertSchema>,
+  existing: TodoFields<string> | null,
+): TodoFields<string> => ({
+  description: pick(body.description, existing?.description),
+  points: pick(body.points, existing?.points),
+  completedAt: pick(body.completedAt, existing?.completedAt),
+  dueDate: pick(body.dueDate, existing?.dueDate),
+  assignedTo: pick(body.assignedTo, existing?.assignedTo),
+  recurrence: pick(body.recurrence, existing?.recurrence),
 })
 
 export function registerListRoutes(
@@ -35,7 +61,13 @@ export function registerListRoutes(
     const body = listPutBodySchema.parse(request.body)
     const headers = listCreateHeadersSchema.parse(request.headers)
 
-    const result = await listRepository.putList(params.listId, body.name, headers['x-device-id'], body.updatedAt)
+    const result = await listRepository.putList(
+      params.listId,
+      body.name,
+      headers['x-device-id'],
+      body.updatedAt,
+      body.listType,
+    )
 
     if (result.outcome === 'forbidden') {
       reply.code(403)
@@ -65,6 +97,7 @@ export function registerListRoutes(
     return {
       listId: list.id,
       name: list.name,
+      listType: list.listType,
       createdAt: list.createdAt,
       updatedAt: list.updatedAt,
       items,
@@ -138,6 +171,7 @@ export function registerListRoutes(
       category,
       deleted: body.deleted,
       updatedAt: body.updatedAt,
+      ...mergeTodoFields(body, existingItem),
     })
 
     if (result.outcome === 'conflict') {

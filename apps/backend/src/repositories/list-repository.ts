@@ -1,6 +1,9 @@
+import type { ListType, TodoFields } from '@golist/shared/domain/types'
+
 export type ListRecord = {
   id: string
   name: string
+  listType: ListType
   createdAt: string
   updatedAt: string
 }
@@ -15,7 +18,7 @@ export type ListItemRecord = {
   deleted: boolean
   createdAt: string
   updatedAt: string
-}
+} & TodoFields<string>
 
 export type ItemUpsertInput = {
   name: string
@@ -24,7 +27,7 @@ export type ItemUpsertInput = {
   category: string
   deleted: boolean
   updatedAt: string
-}
+} & TodoFields<string>
 
 export type ItemBatchUpsertEntry = {
   itemId: string
@@ -47,7 +50,12 @@ export interface ListRepository {
   ping(): Promise<void>
   hasListAccess(listId: string, deviceId: string): Promise<boolean>
   findValidShareToken(shareToken: string): Promise<{ tokenId: string; listId: string } | null>
-  putList(listId: string, name: string, deviceId: string, updatedAt?: string): Promise<PutListResult>
+  /**
+   * Creates or renames a list. `listType` unset keeps the stored type (or
+   * creates a `shopping` list), so clients and API callers that predate list
+   * types never reset it.
+   */
+  putList(listId: string, name: string, deviceId: string, updatedAt?: string, listType?: ListType): Promise<PutListResult>
   getList(listId: string): Promise<ListRecord | null>
   deleteList(listId: string, deviceId: string): Promise<boolean>
   listItems(listId: string): Promise<ListItemRecord[]>

@@ -1,11 +1,12 @@
 import { buildItemHash } from '@golist/shared/domain/sync'
-import type { Item } from '@golist/shared/domain/types'
+import { listTypes, type Item, type ListType } from '@golist/shared/domain/types'
 import websocket from '@fastify/websocket'
 import type { RawData, WebSocket } from 'ws'
 import { type FastifyInstance } from 'fastify'
 import { z } from 'zod'
 
-import { type ListRepository, type ListItemRecord } from '../repositories/list-repository.js'
+import { todoFieldsToIso, toSyncItem } from '../repositories/item-snapshot.js'
+import { type ListRepository } from '../repositories/list-repository.js'
 import { ListSyncCache } from '../sync/list-sync-cache.js'
 
 declare module 'fastify' {
@@ -23,14 +24,21 @@ type ClientMessage =
   | { type: 'list_digest'; listId: string; digest: string }
   | { type: 'hash_diff'; listId: string; summaries: Array<{ itemId: string; itemHash: string; updatedAt: number }> }
   | { type: 'item_patch'; listId: string; items: Item[] }
-  | { type: 'list_metadata_patch'; listId: string; name: string; updatedAt: number }
+  | { type: 'list_metadata_patch'; listId: string; name: string; listType?: ListType; updatedAt: number }
 
 type ServerMessage =
   | { type: 'hello_ack' }
-  | { type: 'subscribed'; listId: string; listName: string; listUpdatedAt: number; serverListDigest: string }
+  | {
+      type: 'subscribed'
+      listId: string
+      listName: string
+      listType: ListType
+      listUpdatedAt: number
+      serverListDigest: string
+    }
   | { type: 'hash_diff'; listId: string; summaries: Array<{ itemId: string; itemHash: string; updatedAt: number }> }
   | { type: 'item_patch'; listId: string; items: Item[] }
-  | { type: 'list_metadata_patch'; listId: string; name: string; updatedAt: number }
+  | { type: 'list_metadata_patch'; listId: string; name: string; listType: ListType; updatedAt: number }
   | { type: 'error'; message: string }
 
 const helloSchema = z.object({ type: z.literal('hello'), deviceId: z.uuid() })
@@ -57,6 +65,12 @@ const itemPatchSchema = z.object({
       deleted: z.boolean(),
       createdAt: dateMillisSchema,
       updatedAt: dateMillisSchema,
+      description: z.string().min(1).optional(),
+      points: z.number().int().positive().optional(),
+      completedAt: dateMillisSchema.optional(),
+      dueDate: dateMillisSchema.optional(),
+      assignedTo: z.string().min(1).optional(),
+      recurrence: z.string().min(1).optional(),
     }),
   ),
 }).superRefine((payload, context) => {
@@ -74,6 +88,8 @@ const listMetadataPatchSchema = z.object({
   type: z.literal('list_metadata_patch'),
   listId: z.uuid(),
   name: z.string().min(1),
+  // Optional for clients that predate list types; unset keeps the stored type.
+  listType: z.enum(listTypes).optional(),
   updatedAt: dateMillisSchema,
 })
 
@@ -150,18 +166,6 @@ const rawDataToString = (raw: RawData): string => {
   return raw.toString('utf8')
 }
 
-const toSyncItem = (item: ListItemRecord): Item => ({
-  id: item.id,
-  listId: item.listId,
-  name: item.name,
-  iconName: item.iconName,
-  quantityOrUnit: item.quantityOrUnit,
-  category: item.category,
-  deleted: item.deleted,
-  createdAt: Date.parse(item.createdAt),
-  updatedAt: Date.parse(item.updatedAt),
-})
-
 export function registerSyncWebsocketRoute(
   app: FastifyInstance,
   listRepository: ListRepository,
@@ -212,7 +216,7 @@ export function registerSyncWebsocketRoute(
 
   const broadcastListMetadataPatch = (
     listId: string,
-    payload: { name: string; updatedAt: number },
+    payload: { name: string; listType: ListType; updatedAt: number },
     sender: ServerSocket,
   ) => {
     const listSockets = subscribers.get(listId)
@@ -229,6 +233,7 @@ export function registerSyncWebsocketRoute(
         type: 'list_metadata_patch',
         listId,
         name: payload.name,
+        listType: payload.listType,
         updatedAt: payload.updatedAt,
       })
     }
@@ -314,6 +319,7 @@ export function registerSyncWebsocketRoute(
               type: 'subscribed',
               listId: parsedPayload.listId,
               listName: listRecord?.name ?? '',
+              listType: listRecord?.listType ?? 'shopping',
               listUpdatedAt,
               serverListDigest: snapshot.digest,
             })
@@ -378,6 +384,7 @@ export function registerSyncWebsocketRoute(
                   category: item.category,
                   deleted: item.deleted,
                   updatedAt: new Date(item.updatedAt).toISOString(),
+                  ...todoFieldsToIso(item),
                 },
               })),
             )
@@ -441,6 +448,7 @@ export function registerSyncWebsocketRoute(
               parsedPayload.name,
               state.deviceId,
               new Date(parsedPayload.updatedAt).toISOString(),
+              parsedPayload.listType,
             )
             if (listResult.outcome === 'forbidden') {
               send(socket, { type: 'error', message: 'forbidden' })
@@ -458,6 +466,7 @@ export function registerSyncWebsocketRoute(
               const alreadyStored =
                 storedList !== null &&
                 storedList.name === parsedPayload.name &&
+                (parsedPayload.listType === undefined || storedList.listType === parsedPayload.listType) &&
                 Date.parse(storedList.updatedAt) === parsedPayload.updatedAt
               if (!alreadyStored) {
                 // Tell the sender which name won so it does not keep its
@@ -467,6 +476,7 @@ export function registerSyncWebsocketRoute(
                     type: 'list_metadata_patch',
                     listId: parsedPayload.listId,
                     name: storedList.name,
+                    listType: storedList.listType,
                     updatedAt: Date.parse(storedList.updatedAt),
                   })
                 }
@@ -479,10 +489,15 @@ export function registerSyncWebsocketRoute(
             // that predates an accepted write to the list.
             listSyncCache.invalidate(parsedPayload.listId)
 
+            // Broadcast the stored type: a patch without `listType` (an
+            // older client) kept it, and subscribers need the full metadata.
+            const storedListType =
+              parsedPayload.listType ?? (await listRepository.getList(parsedPayload.listId))?.listType ?? 'shopping'
             broadcastListMetadataPatch(
               parsedPayload.listId,
               {
                 name: parsedPayload.name,
+                listType: storedListType,
                 updatedAt: parsedPayload.updatedAt,
               },
               socket,

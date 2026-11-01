@@ -291,7 +291,7 @@ describe('backend runtime integration', () => {
 
       const patch = await clientA.waitForMessage((message) => message.type === 'list_metadata_patch')
 
-      expect(patch).toEqual({ type: 'list_metadata_patch', listId, name: 'Fresh Name', updatedAt: freshUpdatedAt })
+      expect(patch).toEqual({ type: 'list_metadata_patch', listId, name: 'Fresh Name', listType: 'shopping', updatedAt: freshUpdatedAt })
       expect(clientA.messages.filter((message) => message.type === 'list_metadata_patch')).toHaveLength(1)
 
       const listResponse = await fetch(`${baseUrl}/v1/lists/${listId}`, {
@@ -446,7 +446,7 @@ describe('backend runtime integration', () => {
 
       client.send({ type: 'list_metadata_patch', listId, name: 'Stale name', updatedAt: 1_000 })
       const metadata = await client.waitForMessage((message) => message.type === 'list_metadata_patch')
-      expect(metadata).toEqual({ type: 'list_metadata_patch', listId, name: 'Winner name', updatedAt: 5_000 })
+      expect(metadata).toEqual({ type: 'list_metadata_patch', listId, name: 'Winner name', listType: 'shopping', updatedAt: 5_000 })
     } finally {
       client.socket.close()
     }
@@ -487,7 +487,7 @@ describe('backend runtime integration', () => {
       clientB.send({ type: 'list_metadata_patch', listId, name: 'After Rename', updatedAt: renamedAt })
 
       const patch = await clientA.waitForMessage((message) => message.type === 'list_metadata_patch')
-      expect(patch).toEqual({ type: 'list_metadata_patch', listId, name: 'After Rename', updatedAt: renamedAt })
+      expect(patch).toEqual({ type: 'list_metadata_patch', listId, name: 'After Rename', listType: 'shopping', updatedAt: renamedAt })
     } finally {
       clientA.socket.close()
       clientB.socket.close()

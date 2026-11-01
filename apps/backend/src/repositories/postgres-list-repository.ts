@@ -1,9 +1,11 @@
 import crypto from 'node:crypto'
 
 import { buildItemHash } from '@golist/shared/domain/sync'
+import { isListType, type ListType } from '@golist/shared/domain/types'
 import { z } from 'zod'
 
 import { query, withTransaction } from '../db/client.js'
+import { toItemSnapshot } from './item-snapshot.js'
 import {
   type ItemBatchUpsertEntry,
   type ItemUpsertInput,
@@ -37,6 +39,25 @@ const listAccessQuery = `SELECT EXISTS(
 
 const accessRowSchema = z.object({ has_access: z.boolean() })
 
+const timestampSchema = z.union([z.string(), z.date()])
+const existingItemRowSchema = z.object({
+  id: z.string(),
+  list_id: z.string(),
+  name: z.string(),
+  icon_name: z.string(),
+  quantity_or_unit: z.string().nullable(),
+  category: z.string(),
+  deleted: z.boolean(),
+  description: z.string().nullable(),
+  points: z.number().nullable(),
+  completed_at: timestampSchema.nullable(),
+  due_date: timestampSchema.nullable(),
+  assigned_to: z.string().nullable(),
+  recurrence: z.string().nullable(),
+  created_at: timestampSchema,
+  updated_at: timestampSchema,
+})
+
 // node-postgres returns timestamptz columns as Date objects at runtime.
 // Normalize to ISO strings here so millisecond precision survives later
 // Date.parse calls (a Date coerced via toString() loses milliseconds).
@@ -46,7 +67,7 @@ function toIsoTimestamp(value: TimestampColumn): string {
   return (value instanceof Date ? value : new Date(value)).toISOString()
 }
 
-function toItemRecord(item: {
+type ItemRow = {
   id: string
   list_id: string
   name: string
@@ -54,9 +75,23 @@ function toItemRecord(item: {
   quantity_or_unit: string | null
   category: string
   deleted: boolean
+  description: string | null
+  points: number | null
+  completed_at: TimestampColumn | null
+  due_date: TimestampColumn | null
+  assigned_to: string | null
+  recurrence: string | null
   created_at: TimestampColumn
   updated_at: TimestampColumn
-}): ListItemRecord {
+}
+
+const itemColumns = `id, list_id, name, icon_name, quantity_or_unit, category, deleted,
+       description, points, completed_at, due_date, assigned_to, recurrence, created_at, updated_at`
+
+const optionalIso = (value: TimestampColumn | null): string | undefined =>
+  value === null ? undefined : toIsoTimestamp(value)
+
+function toItemRecord(item: ItemRow): ListItemRecord {
   return {
     id: item.id,
     listId: item.list_id,
@@ -65,10 +100,26 @@ function toItemRecord(item: {
     quantityOrUnit: item.quantity_or_unit ?? undefined,
     category: item.category,
     deleted: item.deleted,
+    description: item.description ?? undefined,
+    points: item.points ?? undefined,
+    completedAt: optionalIso(item.completed_at),
+    dueDate: optionalIso(item.due_date),
+    assignedTo: item.assigned_to ?? undefined,
+    recurrence: item.recurrence ?? undefined,
     createdAt: toIsoTimestamp(item.created_at),
     updatedAt: toIsoTimestamp(item.updated_at),
   }
 }
+
+/** Parameters $1..$6 shared by the item INSERT and UPDATE statements. */
+const todoFieldValues = (input: ItemUpsertInput): unknown[] => [
+  input.description ?? null,
+  input.points ?? null,
+  input.completedAt ?? null,
+  input.dueDate ?? null,
+  input.assignedTo ?? null,
+  input.recurrence ?? null,
+]
 
 async function touchListUpdatedAt(client: Queryable, listId: string, updatedAt: string) {
   await client.query('UPDATE shared_lists SET updated_at = GREATEST(updated_at, $2::timestamptz) WHERE id = $1', [listId, updatedAt])
@@ -88,60 +139,45 @@ async function upsertListItemWithClient(
   input: ItemUpsertInput,
 ): Promise<UpsertListItemResult> {
   const existingItemResult = await client.query(
-    'SELECT list_id, name, icon_name, quantity_or_unit, category, deleted, updated_at FROM list_items WHERE id = $1 FOR UPDATE',
+    `SELECT ${itemColumns} FROM list_items WHERE id = $1 FOR UPDATE`,
     [itemId],
   )
 
   if (!existingItemResult.rowCount) {
     await client.query(
-      `INSERT INTO list_items(id, list_id, name, icon_name, quantity_or_unit, category, deleted, created_by_device_id, created_at, updated_at, deleted_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), $9, CASE WHEN $7 THEN NOW() ELSE NULL END)`,
-      [itemId, listId, input.name, input.iconName, input.quantityOrUnit ?? null, input.category, input.deleted, deviceId, input.updatedAt],
+      `INSERT INTO list_items(id, list_id, name, icon_name, quantity_or_unit, category, deleted, created_by_device_id, created_at, updated_at, deleted_at,
+                              description, points, completed_at, due_date, assigned_to, recurrence)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), $9, CASE WHEN $7 THEN NOW() ELSE NULL END, $10, $11, $12, $13, $14, $15)`,
+      [
+        itemId,
+        listId,
+        input.name,
+        input.iconName,
+        input.quantityOrUnit ?? null,
+        input.category,
+        input.deleted,
+        deviceId,
+        input.updatedAt,
+        ...todoFieldValues(input),
+      ],
     )
 
     await touchListUpdatedAt(client, listId, input.updatedAt)
     return { outcome: 'created' }
   }
 
-  const existing = z.object({
-    list_id: z.string(),
-    name: z.string(),
-    icon_name: z.string(),
-    quantity_or_unit: z.string().nullable(),
-    category: z.string(),
-    deleted: z.boolean(),
-    updated_at: z.union([z.string(), z.date()]),
-  }).parse(existingItemResult.rows[0])
+  const existing = toItemRecord(existingItemRowSchema.parse(existingItemResult.rows[0]))
 
-  if (existing.list_id !== listId) {
+  if (existing.listId !== listId) {
     return { outcome: 'conflict' }
   }
 
   const incomingUpdatedAt = Date.parse(input.updatedAt)
-  const existingUpdatedAt = Date.parse(toIsoTimestamp(existing.updated_at))
+  const existingUpdatedAt = Date.parse(existing.updatedAt)
   const shouldUpdate =
     incomingUpdatedAt > existingUpdatedAt ||
     (incomingUpdatedAt === existingUpdatedAt &&
-      buildItemHash({
-        id: itemId,
-        listId,
-        name: input.name,
-        iconName: input.iconName,
-        quantityOrUnit: input.quantityOrUnit,
-        category: input.category,
-        deleted: input.deleted,
-        updatedAt: incomingUpdatedAt,
-      }) >
-        buildItemHash({
-          id: itemId,
-          listId,
-          name: existing.name,
-          iconName: existing.icon_name,
-          quantityOrUnit: existing.quantity_or_unit ?? undefined,
-          category: existing.category,
-          deleted: existing.deleted,
-          updatedAt: existingUpdatedAt,
-        }))
+      buildItemHash(toItemSnapshot(itemId, listId, input)) > buildItemHash(toItemSnapshot(itemId, listId, existing)))
 
   if (!shouldUpdate) {
     return { outcome: 'ignored' }
@@ -155,10 +191,26 @@ async function upsertListItemWithClient(
             category = $4,
             deleted = $5,
             updated_at = $6,
-            deleted_at = CASE WHEN $5 THEN NOW() ELSE NULL END
+            deleted_at = CASE WHEN $5 THEN NOW() ELSE NULL END,
+            description = $9,
+            points = $10,
+            completed_at = $11,
+            due_date = $12,
+            assigned_to = $13,
+            recurrence = $14
       WHERE id = $7
         AND list_id = $8`,
-    [input.name, input.iconName, input.quantityOrUnit ?? null, input.category, input.deleted, input.updatedAt, itemId, listId],
+    [
+      input.name,
+      input.iconName,
+      input.quantityOrUnit ?? null,
+      input.category,
+      input.deleted,
+      input.updatedAt,
+      itemId,
+      listId,
+      ...todoFieldValues(input),
+    ],
   )
 
   await touchListUpdatedAt(client, listId, input.updatedAt)
@@ -196,14 +248,21 @@ export class PostgresListRepository implements ListRepository {
     }
   }
 
-  async putList(listId: string, name: string, deviceId: string, updatedAt?: string): Promise<PutListResult> {
+  async putList(
+    listId: string,
+    name: string,
+    deviceId: string,
+    updatedAt?: string,
+    listType?: ListType,
+  ): Promise<PutListResult> {
     return withTransaction(async (client) => {
       const existingListResult = await client.query<{ id: string }>('SELECT id FROM shared_lists WHERE id = $1 FOR UPDATE', [listId])
 
       if (!existingListResult.rowCount) {
         await client.query(
-          'INSERT INTO shared_lists(id, name, created_by_device_id, created_at, updated_at, metadata_updated_at) VALUES ($1, $2, $3, NOW(), COALESCE($4::timestamptz, NOW()), COALESCE($4::timestamptz, NOW()))',
-          [listId, name, deviceId, updatedAt ?? null],
+          `INSERT INTO shared_lists(id, name, list_type, created_by_device_id, created_at, updated_at, metadata_updated_at)
+           VALUES ($1, $2, $5, $3, NOW(), COALESCE($4::timestamptz, NOW()), COALESCE($4::timestamptz, NOW()))`,
+          [listId, name, deviceId, updatedAt ?? null, listType ?? 'shopping'],
         )
         return { outcome: 'created' }
       }
@@ -213,23 +272,31 @@ export class PostgresListRepository implements ListRepository {
       }
 
       if (updatedAt === undefined) {
-        await client.query('UPDATE shared_lists SET name = $1, updated_at = NOW(), metadata_updated_at = NOW() WHERE id = $2', [name, listId])
+        await client.query(
+          `UPDATE shared_lists
+              SET name = $1, list_type = COALESCE($3::text, list_type), updated_at = NOW(), metadata_updated_at = NOW()
+            WHERE id = $2`,
+          [name, listId, listType ?? null],
+        )
         return { outcome: 'updated' }
       }
 
       // Mirrors the client's metadata LWW rule (`shouldAcceptListMetadata` in
       // `@golist/shared/domain/sync`): apply when the incoming change is
       // newer, or — on an equal millisecond timestamp — when it carries a
-      // lexicographically greater name. The name comparison is done on raw
-      // UTF-8 bytes (`convert_to`) rather than `<`/`>` so the result never
-      // depends on the database collation and always matches the client's
-      // plain JS string comparison, guaranteeing both sides pick the same
-      // winner. `$1` must be typed as text explicitly: a bare `$1::bytea`
-      // makes Postgres infer the parameter as bytea, and `SET name = $1` then
-      // stores its hex text form ("\x4d696c6b") instead of the name.
+      // lexicographically greater name, or the same name and a greater list
+      // type. The name comparison is done on raw UTF-8 bytes (`convert_to`)
+      // rather than `<`/`>` so the result never depends on the database
+      // collation and always matches the client's plain JS string comparison,
+      // guaranteeing both sides pick the same winner. `$1` must be typed as
+      // text explicitly: a bare `$1::bytea` makes Postgres infer the parameter
+      // as bytea, and `SET name = $1` then stores its hex text form
+      // ("\x4d696c6b") instead of the name. An unset `$4` (a client that
+      // predates list types) keeps the stored type.
       const updateResult = await client.query(
         `UPDATE shared_lists
             SET name = $1::text,
+                list_type = COALESCE($4::text, list_type),
                 updated_at = GREATEST(updated_at, $3::timestamptz),
                 metadata_updated_at = $3
           WHERE id = $2
@@ -237,10 +304,13 @@ export class PostgresListRepository implements ListRepository {
               date_trunc('milliseconds', metadata_updated_at) < $3::timestamptz
               OR (
                 date_trunc('milliseconds', metadata_updated_at) = $3::timestamptz
-                AND convert_to(name, 'UTF8') < convert_to($1::text, 'UTF8')
+                AND (
+                  convert_to(name, 'UTF8') < convert_to($1::text, 'UTF8')
+                  OR (name = $1::text AND list_type < COALESCE($4::text, list_type))
+                )
               )
             )`,
-        [name, listId, updatedAt],
+        [name, listId, updatedAt, listType ?? null],
       )
 
       return { outcome: updateResult.rowCount ? 'updated' : 'ignored' }
@@ -248,8 +318,14 @@ export class PostgresListRepository implements ListRepository {
   }
 
   async getList(listId: string): Promise<ListRecord | null> {
-    const listResult = await query<{ id: string; name: string; created_at: TimestampColumn; updated_at: TimestampColumn }>(
-      'SELECT id, name, created_at, metadata_updated_at AS updated_at FROM shared_lists WHERE id = $1 LIMIT 1',
+    const listResult = await query<{
+      id: string
+      name: string
+      list_type: string
+      created_at: TimestampColumn
+      updated_at: TimestampColumn
+    }>(
+      'SELECT id, name, list_type, created_at, metadata_updated_at AS updated_at FROM shared_lists WHERE id = $1 LIMIT 1',
       [listId],
     )
 
@@ -257,11 +333,13 @@ export class PostgresListRepository implements ListRepository {
       return null
     }
 
+    const row = listResult.rows[0]
     return {
-      id: listResult.rows[0].id,
-      name: listResult.rows[0].name,
-      createdAt: toIsoTimestamp(listResult.rows[0].created_at),
-      updatedAt: toIsoTimestamp(listResult.rows[0].updated_at),
+      id: row.id,
+      name: row.name,
+      listType: isListType(row.list_type) ? row.list_type : 'shopping',
+      createdAt: toIsoTimestamp(row.created_at),
+      updatedAt: toIsoTimestamp(row.updated_at),
     }
   }
 
@@ -275,18 +353,8 @@ export class PostgresListRepository implements ListRepository {
   }
 
   async listItems(listId: string): Promise<ListItemRecord[]> {
-    const itemsResult = await query<{
-      id: string
-      list_id: string
-      name: string
-      icon_name: string
-      quantity_or_unit: string | null
-      category: string
-      deleted: boolean
-      created_at: TimestampColumn
-      updated_at: TimestampColumn
-    }>(
-      `SELECT id, list_id, name, icon_name, quantity_or_unit, category, deleted, created_at, updated_at
+    const itemsResult = await query<ItemRow>(
+      `SELECT ${itemColumns}
          FROM list_items
         WHERE list_id = $1
         ORDER BY created_at ASC, id ASC`,
@@ -297,18 +365,8 @@ export class PostgresListRepository implements ListRepository {
   }
 
   async listItemsUpdatedAfter(listId: string, updatedAfter: string): Promise<ListItemRecord[]> {
-    const itemsResult = await query<{
-      id: string
-      list_id: string
-      name: string
-      icon_name: string
-      quantity_or_unit: string | null
-      category: string
-      deleted: boolean
-      created_at: TimestampColumn
-      updated_at: TimestampColumn
-    }>(
-      `SELECT id, list_id, name, icon_name, quantity_or_unit, category, deleted, created_at, updated_at
+    const itemsResult = await query<ItemRow>(
+      `SELECT ${itemColumns}
          FROM list_items
         WHERE list_id = $1 AND updated_at > $2
         ORDER BY updated_at ASC, id ASC`,
@@ -319,18 +377,8 @@ export class PostgresListRepository implements ListRepository {
   }
 
   async getListItem(listId: string, itemId: string): Promise<ListItemRecord | null> {
-    const itemResult = await query<{
-      id: string
-      list_id: string
-      name: string
-      icon_name: string
-      quantity_or_unit: string | null
-      category: string
-      deleted: boolean
-      created_at: TimestampColumn
-      updated_at: TimestampColumn
-    }>(
-      `SELECT id, list_id, name, icon_name, quantity_or_unit, category, deleted, created_at, updated_at
+    const itemResult = await query<ItemRow>(
+      `SELECT ${itemColumns}
          FROM list_items
         WHERE id = $1 AND list_id = $2
         LIMIT 1`,

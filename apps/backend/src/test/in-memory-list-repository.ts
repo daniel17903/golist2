@@ -1,6 +1,9 @@
 import crypto from 'node:crypto'
 
 import { buildItemHash, shouldAcceptListMetadata } from '@golist/shared/domain/sync'
+import type { ListType } from '@golist/shared/domain/types'
+
+import { toItemSnapshot } from '../repositories/item-snapshot.js'
 
 import {
   type ItemUpsertInput,
@@ -11,6 +14,17 @@ import {
   type PutListResult,
   type UpsertListItemResult,
 } from '../repositories/list-repository.js'
+
+// Spread explicitly (all keys, `undefined` included) so an update clears
+// todo fields the incoming version no longer has, like the Postgres UPDATE.
+const todoFieldsOf = (input: ItemUpsertInput) => ({
+  description: input.description,
+  points: input.points,
+  completedAt: input.completedAt,
+  dueDate: input.dueDate,
+  assignedTo: input.assignedTo,
+  recurrence: input.recurrence,
+})
 
 type ShareToken = {
   id: string
@@ -78,14 +92,20 @@ export class InMemoryListRepository implements ListRepository {
     return { tokenId: token.id, listId: token.listId }
   }
 
-  async putList(listId: string, name: string, deviceId: string, updatedAt?: string): Promise<PutListResult> {
+  async putList(
+    listId: string,
+    name: string,
+    deviceId: string,
+    updatedAt?: string,
+    listType?: ListType,
+  ): Promise<PutListResult> {
     const existing = this.lists.get(listId)
     const now = new Date().toISOString()
 
     if (!existing) {
       this.lists.set(listId, {
         createdByDeviceId: deviceId,
-        data: { id: listId, name, createdAt: now, updatedAt: updatedAt ?? now },
+        data: { id: listId, name, listType: listType ?? 'shopping', createdAt: now, updatedAt: updatedAt ?? now },
       })
       return { outcome: 'created' }
     }
@@ -94,8 +114,12 @@ export class InMemoryListRepository implements ListRepository {
       return { outcome: 'forbidden' }
     }
 
+    // An unset type (a client that predates list types) keeps the stored one.
+    const nextListType = listType ?? existing.data.listType
+
     if (updatedAt === undefined) {
       existing.data.name = name
+      existing.data.listType = nextListType
       existing.data.updatedAt = now
       return { outcome: 'updated' }
     }
@@ -107,14 +131,15 @@ export class InMemoryListRepository implements ListRepository {
     const existingUpdatedAt = Date.parse(existing.data.updatedAt)
     if (
       !shouldAcceptListMetadata(
-        { name, updatedAt: incomingUpdatedAt },
-        { name: existing.data.name, updatedAt: existingUpdatedAt },
+        { name, listType: nextListType, updatedAt: incomingUpdatedAt },
+        { name: existing.data.name, listType: existing.data.listType, updatedAt: existingUpdatedAt },
       )
     ) {
       return { outcome: 'ignored' }
     }
 
     existing.data.name = name
+    existing.data.listType = nextListType
     existing.data.updatedAt = updatedAt
     return { outcome: 'updated' }
   }
@@ -179,6 +204,7 @@ export class InMemoryListRepository implements ListRepository {
         quantityOrUnit: input.quantityOrUnit,
         category: input.category,
         deleted: input.deleted,
+        ...todoFieldsOf(input),
         createdAt: new Date().toISOString(),
         updatedAt: input.updatedAt,
       })
@@ -197,26 +223,7 @@ export class InMemoryListRepository implements ListRepository {
     const shouldUpdate =
       incomingUpdatedAt > existingUpdatedAt ||
       (incomingUpdatedAt === existingUpdatedAt &&
-        buildItemHash({
-          id: itemId,
-          listId,
-          name: input.name,
-          iconName: input.iconName,
-          quantityOrUnit: input.quantityOrUnit,
-          category: input.category,
-          deleted: input.deleted,
-          updatedAt: incomingUpdatedAt,
-        }) >
-          buildItemHash({
-            id: existing.id,
-            listId: existing.listId,
-            name: existing.name,
-            iconName: existing.iconName,
-            quantityOrUnit: existing.quantityOrUnit,
-            category: existing.category,
-            deleted: existing.deleted,
-            updatedAt: existingUpdatedAt,
-          }))
+        buildItemHash(toItemSnapshot(itemId, listId, input)) > buildItemHash(toItemSnapshot(existing.id, existing.listId, existing)))
 
     if (!shouldUpdate) {
       return { outcome: 'ignored' }
@@ -229,6 +236,7 @@ export class InMemoryListRepository implements ListRepository {
       quantityOrUnit: input.quantityOrUnit,
       category: input.category,
       deleted: input.deleted,
+      ...todoFieldsOf(input),
       updatedAt: input.updatedAt,
     })
 

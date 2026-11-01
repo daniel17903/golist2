@@ -1,9 +1,33 @@
-import type { Item } from './types';
+import { defaultListType, type Item, type ListType } from './types';
 
-export type SyncItemSnapshot = Pick<Item, 'id' | 'listId' | 'name' | 'iconName' | 'quantityOrUnit' | 'category' | 'deleted' | 'updatedAt'>;
+export type SyncItemSnapshot = Pick<
+  Item,
+  | 'id'
+  | 'listId'
+  | 'name'
+  | 'iconName'
+  | 'quantityOrUnit'
+  | 'category'
+  | 'deleted'
+  | 'updatedAt'
+  | 'description'
+  | 'points'
+  | 'completedAt'
+  | 'dueDate'
+  | 'assignedTo'
+  | 'recurrence'
+>;
 
-const stableSerializeItem = (item: SyncItemSnapshot): string =>
-  JSON.stringify({
+/**
+ * Todo fields are appended only when set, in a fixed order. A shopping item
+ * (no todo fields) therefore serializes exactly as it did before todo lists
+ * existed, so stored items, older clients and the server keep agreeing on
+ * every existing item hash.
+ */
+const TODO_HASH_FIELDS = ['description', 'points', 'completedAt', 'dueDate', 'assignedTo', 'recurrence'] as const;
+
+const stableSerializeItem = (item: SyncItemSnapshot): string => {
+  const serialized: Record<string, unknown> = {
     id: item.id,
     listId: item.listId,
     name: item.name,
@@ -12,7 +36,15 @@ const stableSerializeItem = (item: SyncItemSnapshot): string =>
     category: item.category,
     deleted: item.deleted,
     updatedAt: item.updatedAt,
-  });
+  };
+  for (const field of TODO_HASH_FIELDS) {
+    const value = item[field];
+    if (value !== undefined && value !== null) {
+      serialized[field] = value;
+    }
+  }
+  return JSON.stringify(serialized);
+};
 
 const stringHash = (value: string): string => {
   let hash = 5381;
@@ -65,6 +97,8 @@ export const shouldAcceptItem = (incoming: SyncItemSnapshot, current: SyncItemSn
 
 export type ListMetadataSnapshot = {
   name: string;
+  /** Unset means `shopping` (lists from before list types existed). */
+  listType?: ListType;
   updatedAt: number;
 };
 
@@ -77,7 +111,8 @@ export type ListMetadataSnapshot = {
  * falling back to a deterministic comparison when timestamps tie): when two
  * offline devices rename the same list within the same millisecond, the
  * lexicographically greater name wins on every peer, so all devices converge
- * on one final name regardless of message arrival order.
+ * on one final name regardless of message arrival order. When the names are
+ * equal too, the greater list type wins (`todo` over `shopping`).
  */
 export const shouldAcceptListMetadata = (
   incoming: ListMetadataSnapshot,
@@ -89,5 +124,8 @@ export const shouldAcceptListMetadata = (
   if (incoming.updatedAt < current.updatedAt) {
     return false;
   }
-  return incoming.name > current.name;
+  if (incoming.name !== current.name) {
+    return incoming.name > current.name;
+  }
+  return (incoming.listType ?? defaultListType) > (current.listType ?? defaultListType);
 };

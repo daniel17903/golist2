@@ -1,7 +1,8 @@
 import { create } from "zustand";
-import type { AppMetadata, Item, List } from "@golist/shared/domain/types";
+import { defaultListType, type AppMetadata, type Item, type List, type ListType } from "@golist/shared/domain/types";
 import { shouldAcceptItem, shouldAcceptListMetadata } from "@golist/shared/domain/sync";
 import { getCategoryAndIcon, getItemIconName } from "../domain/categories";
+import { computeNextDueDate } from "../domain/recurrence";
 import { db as defaultDb, type GoListDatabase } from "../storage/db";
 import { t } from "../i18n";
 import type { Locale } from "../i18n/config";
@@ -42,6 +43,16 @@ export type GoListStoreEnvironment = {
   appVersion: string;
 };
 
+/** The editable fields of a todo (its title is stored as the item `name`). */
+export type TodoInput = {
+  title: string;
+  description?: string;
+  points?: number;
+  dueDate?: number;
+  assignedTo?: string;
+  recurrence?: string;
+};
+
 export type StoreState = {
   lists: List[];
   items: Item[];
@@ -54,8 +65,9 @@ export type StoreState = {
   backendSharingEnabled: boolean;
   isLoaded: boolean;
   load: () => Promise<void>;
-  addList: (name: string) => Promise<void>;
+  addList: (name: string, listType?: ListType) => Promise<void>;
   renameList: (listId: string, name: string) => Promise<void>;
+  setListType: (listId: string, listType: ListType) => Promise<void>;
   deleteList: (listId: string) => Promise<void>;
   setActiveList: (listId: string) => void;
   addItem: (listId: string, name: string, quantityOrUnit?: string) => Promise<void>;
@@ -65,6 +77,16 @@ export type StoreState = {
   ) => Promise<void>;
   toggleItem: (itemId: string) => Promise<void>;
   updateItem: (itemId: string, name: string, quantityOrUnit?: string) => Promise<void>;
+  addTodo: (listId: string, input: TodoInput) => Promise<void>;
+  updateTodo: (itemId: string, input: TodoInput) => Promise<void>;
+  /**
+   * Checks a todo off (or reopens it). Completing a recurring todo with a due
+   * date also creates its next occurrence, whose id is returned so an undo
+   * can remove it again.
+   */
+  toggleTodoCompleted: (itemId: string) => Promise<{ spawnedItemId?: string }>;
+  /** Reverts `toggleTodoCompleted`: reopens the todo and deletes the spawned occurrence. */
+  undoTodoCompleted: (itemId: string, spawnedItemId?: string) => Promise<void>;
   ensureShareToken: (listId: string) => Promise<string>;
   joinSharedList: (rawShareValue: string) => Promise<string>;
   syncAllLists: () => Promise<void>;
@@ -110,7 +132,7 @@ export const createGoListStore = (env: GoListStoreEnvironment) => {
     storage.setItem(selectedListStorageKey, listId);
   };
 
-  const syncListNameImmediately = async (listId: string, listName: string, updatedAt: number) => {
+  const syncListNameImmediately = async (listId: string, listName: string, updatedAt: number, listType?: ListType) => {
     const state = store.getState();
     if (!state.metadata?.deviceId) {
       logSkippedBackendCall("List name sync skipped: device metadata missing.");
@@ -122,6 +144,7 @@ export const createGoListStore = (env: GoListStoreEnvironment) => {
       listId,
       body: {
         name: listName,
+        listType,
         updatedAt: new Date(updatedAt).toISOString(),
       },
     });
@@ -249,6 +272,45 @@ export const createGoListStore = (env: GoListStoreEnvironment) => {
     changedItems.forEach((item) => sync.queueLocalItemPatch(item));
   };
 
+  // Shared write path for list metadata (name + type): both sync together as
+  // one last-write-wins record.
+  const updateListMetadata = async (listId: string, changes: { name?: string; listType?: ListType }) => {
+    const current = store.getState().lists.find((list) => list.id === listId);
+    if (!current) {
+      return;
+    }
+    const next: List = {
+      ...current,
+      name: changes.name ?? current.name,
+      listType: changes.listType ?? current.listType,
+      updatedAt: nextUpdatedAt(current.updatedAt),
+    };
+    await db.lists.update(listId, { name: next.name, listType: next.listType, updatedAt: next.updatedAt });
+    store.setState((state) => ({
+      lists: state.lists.map((list) => (list.id === listId ? next : list)),
+    }));
+    runBackendSyncInBackground(
+      () => syncListNameImmediately(listId, next.name, next.updatedAt, next.listType),
+      t("sync.offline"),
+    );
+    sync.queueLocalListMetadataPatch(listId, {
+      name: next.name,
+      listType: next.listType,
+      updatedAt: next.updatedAt,
+    });
+  };
+
+  // Todo fields from a form, with empty values dropped so they stay unset
+  // (unset fields are left out of the sync hash).
+  const todoFieldsFromInput = (input: TodoInput) => ({
+    name: input.title,
+    description: input.description?.trim() || undefined,
+    points: input.points !== undefined && input.points > 1 ? input.points : undefined,
+    dueDate: input.dueDate,
+    assignedTo: input.assignedTo?.trim() || undefined,
+    recurrence: input.dueDate !== undefined ? input.recurrence || undefined : undefined,
+  });
+
   const store = create<StoreState>((set, get) => ({
     lists: [],
     items: [],
@@ -356,11 +418,12 @@ export const createGoListStore = (env: GoListStoreEnvironment) => {
         );
       });
     },
-    addList: async (name: string) => {
+    addList: async (name: string, listType: ListType = defaultListType) => {
       const now = clock();
       const list: List = {
         id: createId(),
         name,
+        listType,
         createdAt: now,
         updatedAt: now,
       };
@@ -372,28 +435,17 @@ export const createGoListStore = (env: GoListStoreEnvironment) => {
       }));
 
       runBackendSyncInBackground(
-        () => syncListNameImmediately(list.id, list.name, list.updatedAt),
+        () => syncListNameImmediately(list.id, list.name, list.updatedAt, list.listType),
         t("sync.offline"),
       );
 
       sync.setActiveList(list.id);
     },
     renameList: async (listId: string, name: string) => {
-      const now = nextUpdatedAt(get().lists.find((list) => list.id === listId)?.updatedAt ?? 0);
-      await db.lists.update(listId, { name, updatedAt: now });
-      set((state) => ({
-        lists: state.lists.map((list) =>
-          list.id === listId ? { ...list, name, updatedAt: now } : list,
-        ),
-      }));
-      runBackendSyncInBackground(
-        () => syncListNameImmediately(listId, name, now),
-        t("sync.offline"),
-      );
-      sync.queueLocalListMetadataPatch(listId, {
-        name,
-        updatedAt: now,
-      });
+      await updateListMetadata(listId, { name });
+    },
+    setListType: async (listId: string, listType: ListType) => {
+      await updateListMetadata(listId, { listType });
     },
     deleteList: async (listId: string) => {
       await db.transaction("rw", db.items, db.lists, db.listShares, async () => {
@@ -487,6 +539,88 @@ export const createGoListStore = (env: GoListStoreEnvironment) => {
       };
       await applyLocalItemChanges([updated]);
     },
+    addTodo: async (listId: string, input: TodoInput) => {
+      const now = clock();
+      // Todos get an icon/category too, so they look right in the grid if the
+      // list is switched to a shopping list.
+      const { category: resolvedCategory, iconName: resolvedIcon } = getCategoryAndIcon(input.title);
+      const item: Item = {
+        id: createId(),
+        listId,
+        iconName: resolvedIcon ?? "default",
+        category: resolvedCategory ?? "other",
+        deleted: false,
+        createdByDeviceId: get().metadata?.deviceId,
+        createdAt: now,
+        updatedAt: now,
+        ...todoFieldsFromInput(input),
+      };
+      await applyLocalItemChanges([item]);
+    },
+    updateTodo: async (itemId: string, input: TodoInput) => {
+      const item = findItemById(get().items, itemId);
+      if (!item) {return;}
+      const renamed = item.name !== input.title;
+      const { category: resolvedCategory, iconName: resolvedIcon } = renamed
+        ? getCategoryAndIcon(input.title)
+        : { category: item.category, iconName: item.iconName };
+      const updated: Item = {
+        ...item,
+        ...todoFieldsFromInput(input),
+        iconName: resolvedIcon ?? "default",
+        category: resolvedCategory ?? "other",
+        updatedAt: nextUpdatedAt(item.updatedAt),
+      };
+      await applyLocalItemChanges([updated]);
+    },
+    toggleTodoCompleted: async (itemId: string) => {
+      const item = findItemById(get().items, itemId);
+      if (!item) {return {};}
+      const now = clock();
+      const completing = item.completedAt === undefined;
+      const updated: Item = {
+        ...item,
+        completedAt: completing ? now : undefined,
+        updatedAt: nextUpdatedAt(item.updatedAt),
+      };
+      const changed: Item[] = [updated];
+
+      let spawnedItemId: string | undefined;
+      if (completing && item.recurrence && item.dueDate !== undefined) {
+        const nextDueDate = computeNextDueDate(item.recurrence, item.dueDate, now);
+        if (nextDueDate !== null) {
+          spawnedItemId = createId();
+          changed.push({
+            ...item,
+            id: spawnedItemId,
+            deleted: false,
+            completedAt: undefined,
+            dueDate: nextDueDate,
+            createdByDeviceId: get().metadata?.deviceId,
+            createdAt: now,
+            updatedAt: now,
+          });
+        }
+      }
+
+      await applyLocalItemChanges(changed);
+      return { spawnedItemId };
+    },
+    undoTodoCompleted: async (itemId: string, spawnedItemId?: string) => {
+      const { items } = get();
+      const changed: Item[] = [];
+      const item = findItemById(items, itemId);
+      if (item && item.completedAt !== undefined) {
+        changed.push({ ...item, completedAt: undefined, updatedAt: nextUpdatedAt(item.updatedAt) });
+      }
+      const spawned = spawnedItemId ? findItemById(items, spawnedItemId) : undefined;
+      if (spawned && !spawned.deleted) {
+        changed.push({ ...spawned, deleted: true, updatedAt: nextUpdatedAt(spawned.updatedAt) });
+      }
+      if (changed.length > 0) {
+        await applyLocalItemChanges(changed);
+      }
+    },
     ensureShareToken: async (listId: string) => {
       const state = get();
       if (!backendSharingEnabled) {
@@ -501,7 +635,7 @@ export const createGoListStore = (env: GoListStoreEnvironment) => {
       await api.upsertList({
         deviceId: state.metadata.deviceId,
         listId: list.id,
-        body: { name: list.name, updatedAt: new Date(list.updatedAt).toISOString() },
+        body: { name: list.name, listType: list.listType, updatedAt: new Date(list.updatedAt).toISOString() },
       });
 
       const tokenResponse = await api.createShareToken({
@@ -541,6 +675,7 @@ export const createGoListStore = (env: GoListStoreEnvironment) => {
         const localList: List = {
           id: remoteList.listId,
           name: remoteList.name,
+          listType: remoteList.listType ?? defaultListType,
           createdAt: toMillis(remoteList.createdAt),
           updatedAt: toMillis(remoteList.updatedAt),
         };
@@ -554,6 +689,12 @@ export const createGoListStore = (env: GoListStoreEnvironment) => {
           category: item.category,
           deleted: item.deleted,
           createdByDeviceId: item.createdByDeviceId,
+          description: item.description,
+          points: item.points,
+          completedAt: item.completedAt ? toMillis(item.completedAt) : undefined,
+          dueDate: item.dueDate ? toMillis(item.dueDate) : undefined,
+          assignedTo: item.assignedTo,
+          recurrence: item.recurrence,
           createdAt: toMillis(item.createdAt),
           updatedAt: toMillis(item.updatedAt),
         }));
