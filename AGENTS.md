@@ -42,7 +42,8 @@
 ## Key behaviors
 - Backend sharing auth: protected sharing endpoints require an `X-Device-Id` header and a prior token redemption record for that device/token pair.
 - **Multi-list** support with a list selector and inline rename. The lists drawer shows the most recently used list
-  first (per device; a never-opened list counts as used at creation; `domain/listRecency.ts`).
+  first (per device; opening the app counts as using its restored list, a never-opened list counts as used at
+  creation; `domain/listRecency.ts`).
 - **List types**: every list is a `shopping` list (icon grid, check-off deletes the item and it comes back as a
   suggestion) or a `todo` list (rows with due date, assignee, points and recurrence; check-off sets `completedAt`;
   ported from the former DoList app). The type is chosen in the create dialog and switched from the header's inline
