@@ -898,6 +898,32 @@ const categoryEntriesDe: CategoryEntry[] = [
     ],
     "category": "fruitsVegetables",
   },
+  {
+    "assetFileName": "persimmon",
+    "matchingNames": [
+      "kaki",
+      "kakis",
+      "kakifrucht",
+      "kakifrüchte",
+      "kakifruechte",
+      "sharonfrucht",
+      "sharonfrüchte",
+      "sharonfruechte",
+      "persimone",
+      "persimonen",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "baking_wafers",
+    "matchingNames": [
+      "oblaten",
+      "oblate",
+      "backoblaten",
+      "backoblate",
+    ],
+    "category": "spicesCanned",
+  },
 ];
 
 const categoryEntriesEn: CategoryEntry[] = [
@@ -1796,6 +1822,29 @@ const categoryEntriesEn: CategoryEntry[] = [
       "fennel",
     ],
     "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "persimmon",
+    "matchingNames": [
+      "persimmon",
+      "persimmons",
+      "kaki",
+      "kakis",
+      "sharon fruit",
+      "sharon fruits",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "baking_wafers",
+    "matchingNames": [
+      "baking wafers",
+      "baking wafer",
+      "wafer paper",
+      "edible wafer paper",
+      "oblaten",
+    ],
+    "category": "spicesCanned",
   },
 ];
 
@@ -2733,6 +2782,28 @@ const categoryEntriesEs: CategoryEntry[] = [
       "hinojo",
     ],
     "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "persimmon",
+    "matchingNames": [
+      "caqui",
+      "caquis",
+      "kaki",
+      "kakis",
+      "persimón",
+      "persimon",
+      "persimones",
+    ],
+    "category": "fruitsVegetables",
+  },
+  {
+    "assetFileName": "baking_wafers",
+    "matchingNames": [
+      "obleas",
+      "oblea",
+      "obleas para hornear",
+    ],
+    "category": "spicesCanned",
   },
 ];
 
