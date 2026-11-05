@@ -488,8 +488,13 @@ export const createGoListStore = (env: GoListStoreEnvironment) => {
           state.activeListId === listId ? remainingLists[0]?.id : state.activeListId;
         persistSelectedListId(nextActiveListId);
         sync.setActiveList(nextActiveListId);
-        const otherLastUsedAt = { ...state.listLastUsedAt };
-        delete otherLastUsedAt[listId];
+        const remainingLastUsedAt = { ...state.listLastUsedAt };
+        delete remainingLastUsedAt[listId];
+        // Deleting the active list opens another one, which counts as using it.
+        const otherLastUsedAt =
+          nextActiveListId !== state.activeListId
+            ? markListUsed(remainingLastUsedAt, nextActiveListId)
+            : remainingLastUsedAt;
         persistListLastUsedAt(otherLastUsedAt);
         return {
           lists: remainingLists,

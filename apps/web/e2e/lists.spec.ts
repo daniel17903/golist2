@@ -56,6 +56,18 @@ test.describe("lists", () => {
     await expect(app.drawerListNames()).toHaveText(["Hardware store", "Shopping list", "Party"]);
   });
 
+  test("puts the list opened by deleting the active list at the top of the drawer", async ({ app }) => {
+    await app.createList("Hardware store");
+    await app.createList("Party");
+    await app.openDrawer();
+    await app.drawer.getByRole("button", { name: "Delete: Party" }).click();
+    await app.drawer.getByRole("button", { name: "Confirm delete: Party" }).click();
+    await expect(app.listTitle).toHaveText("Shopping list");
+
+    await app.openDrawer();
+    await expect(app.drawerListNames()).toHaveText(["Shopping list", "Hardware store"]);
+  });
+
   test("keeps items scoped to their list", async ({ app }) => {
     await app.addItem("milk");
     await app.createList("Party");
