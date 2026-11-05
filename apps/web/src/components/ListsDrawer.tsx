@@ -1,5 +1,6 @@
 import { memo, useMemo, useRef, useState, type PointerEvent, type TransitionEvent } from "react";
 import { resolveListType, type Item, type List, type ListType } from "@golist/shared/domain/types";
+import { sortListsByLastUsed } from "../domain/listRecency";
 import { formatRelativeElapsedTime } from "../domain/relativeTime";
 import { useI18n } from "../i18n";
 import { useStore } from "../state/useStore";
@@ -75,6 +76,20 @@ const ListsDrawer = memo(function ListsDrawer({
     setIsShown(true);
   }
   const items = useStore((s) => (isShown ? s.items : noItems));
+
+  // Most recently used list first. The order is taken when the drawer starts
+  // to open, so picking a list doesn't reshuffle the rows as it slides out.
+  const liveLastUsedAt = useStore((s) => s.listLastUsedAt);
+  const isAppearing = isOpen || isDragging;
+  const [wasAppearing, setWasAppearing] = useState(isAppearing);
+  const [shownLastUsedAt, setShownLastUsedAt] = useState(liveLastUsedAt);
+  if (isAppearing !== wasAppearing) {
+    setWasAppearing(isAppearing);
+    if (isAppearing) {
+      setShownLastUsedAt(liveLastUsedAt);
+    }
+  }
+  const sortedLists = useMemo(() => sortListsByLastUsed(lists, shownLastUsedAt), [lists, shownLastUsedAt]);
 
   const lastUpdatedAtByList = useMemo(() => {
     const updatedAtByList = new Map<string, number>();
@@ -247,7 +262,7 @@ const ListsDrawer = memo(function ListsDrawer({
           <div className="drawer__section">
             <p className="drawer__title">{t("drawer.myLists")}</p>
             <div className="drawer__list">
-              {lists.map((list) => {
+              {sortedLists.map((list) => {
                 const isConfirmingDelete = confirmDeleteListId === list.id;
                 const listType = resolveListType(list);
 
