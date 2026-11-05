@@ -26,7 +26,8 @@
 - **Domain logic**: `apps/web/src/domain/` (categories, sorting, input parsing, list stats) plus shared types in `packages/shared/src/domain/types.ts`.
 - **UI composition**: `apps/web/src/components/` (shared UI building blocks, including the `Modal.tsx` scaffold all dialogs build on) + `apps/web/src/hooks/` (one hook per feature: popup stack, toasts, dialogs, pull-to-refresh, back-gesture trap, item exit animation, share flow, app bootstrap).
 - **Styling**: `apps/web/src/styles.css`.
-- **localStorage keys**: `golist.deviceId`, `golist.selectedListId`, plus the i18n keys defined in `apps/web/src/i18n/config.ts`.
+- **localStorage keys**: `golist.deviceId`, `golist.selectedListId`, `golist.listLastUsedAt` (when this device last
+  opened each list; orders the lists drawer, never synced), plus the i18n keys defined in `apps/web/src/i18n/config.ts`.
 
 ## Quickstart
 - Requires Node `>= 24.22.1` (see `engines` in the root `package.json`): the first Node 24 release with the fix for
@@ -40,7 +41,8 @@
 
 ## Key behaviors
 - Backend sharing auth: protected sharing endpoints require an `X-Device-Id` header and a prior token redemption record for that device/token pair.
-- **Multi-list** support with a list selector and inline rename.
+- **Multi-list** support with a list selector and inline rename. The lists drawer shows the most recently used list
+  first (per device; a never-opened list counts as used at creation; `domain/listRecency.ts`).
 - **List types**: every list is a `shopping` list (icon grid, check-off deletes the item and it comes back as a
   suggestion) or a `todo` list (rows with due date, assignee, points and recurrence; check-off sets `completedAt`;
   ported from the former DoList app). The type is chosen in the create dialog and switched from the header's inline

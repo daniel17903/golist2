@@ -20,7 +20,7 @@ test.describe("lists", () => {
   test("creates, switches and remembers the selected list across reloads", async ({ app, backend }) => {
     await app.createList("Hardware store");
     await app.openDrawer();
-    await expect(app.drawerListNames()).toHaveText(["Shopping list", "Hardware store"]);
+    await expect(app.drawerListNames()).toHaveText(["Hardware store", "Shopping list"]);
     await app.page.keyboard.press("Escape");
 
     const deviceId = await app.deviceId();
@@ -33,6 +33,27 @@ test.describe("lists", () => {
     await app.selectList("Shopping list");
     await app.reload();
     await expect(app.listTitle).toHaveText("Shopping list");
+  });
+
+  test("orders the drawer by when each list was last used, across reloads", async ({ app }) => {
+    const pickFromOpenDrawer = async (name: string) => {
+      await app.drawer.locator(".drawer__item-label", { hasText: new RegExp(`^${name}$`) }).click();
+      await expect(app.listTitle).toHaveText(name);
+    };
+
+    await app.createList("Hardware store");
+    await app.createList("Party");
+    await app.openDrawer();
+    await expect(app.drawerListNames()).toHaveText(["Party", "Hardware store", "Shopping list"]);
+    await pickFromOpenDrawer("Shopping list");
+
+    await app.openDrawer();
+    await expect(app.drawerListNames()).toHaveText(["Shopping list", "Party", "Hardware store"]);
+    await pickFromOpenDrawer("Hardware store");
+
+    await app.reload();
+    await app.openDrawer();
+    await expect(app.drawerListNames()).toHaveText(["Hardware store", "Shopping list", "Party"]);
   });
 
   test("keeps items scoped to their list", async ({ app }) => {

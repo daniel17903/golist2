@@ -3,6 +3,7 @@ import { defaultListType, type AppMetadata, type Item, type List, type ListType 
 import { shouldAcceptItem, shouldAcceptListMetadata } from "@golist/shared/domain/sync";
 import { getCategoryAndIcon, getItemIconName } from "../domain/categories";
 import { computeNextDueDate, nextOccurrenceId } from "../domain/recurrence";
+import { parseListLastUsedAt, type ListLastUsedAt } from "../domain/listRecency";
 import { db as defaultDb, type GoListDatabase } from "../storage/db";
 import { t } from "../i18n";
 import type { Locale } from "../i18n/config";
@@ -18,6 +19,7 @@ import { socketSyncManager, type SocketSyncManager } from "../sharing/socketSync
 import { createStoreSyncCallbacks } from "../sharing/storeSyncBridge";
 
 const selectedListStorageKey = "golist.selectedListId";
+const listLastUsedAtStorageKey = "golist.listLastUsedAt";
 
 const toMillis = (value: string) => new Date(value).getTime();
 
@@ -58,6 +60,8 @@ export type StoreState = {
   items: Item[];
   metadata?: AppMetadata;
   activeListId?: string;
+  /** When this device last opened each list; orders the lists drawer. Device-local, never synced. */
+  listLastUsedAt: ListLastUsedAt;
   backendConnection: "unknown" | "online" | "offline";
   syncNotice?: { id: string; message: string };
   backendLogs: Array<{ id: string; message: string; outcome: "success" | "error" | "skipped" }>;
@@ -130,6 +134,20 @@ export const createGoListStore = (env: GoListStoreEnvironment) => {
     }
 
     storage.setItem(selectedListStorageKey, listId);
+  };
+
+  const persistListLastUsedAt = (lastUsedAt: ListLastUsedAt) => {
+    storage.setItem(listLastUsedAtStorageKey, JSON.stringify(lastUsedAt));
+  };
+
+  // Records that this device just opened `listId` and returns the new map.
+  const markListUsed = (lastUsedAt: ListLastUsedAt, listId: string | undefined): ListLastUsedAt => {
+    if (!listId) {
+      return lastUsedAt;
+    }
+    const next = { ...lastUsedAt, [listId]: clock() };
+    persistListLastUsedAt(next);
+    return next;
   };
 
   const syncListNameImmediately = async (listId: string, listName: string, updatedAt: number, listType?: ListType) => {
@@ -324,6 +342,7 @@ export const createGoListStore = (env: GoListStoreEnvironment) => {
     items: [],
     isLoaded: false,
     activeListId: undefined,
+    listLastUsedAt: {},
     backendConnection: backendSharingEnabled ? "unknown" : "offline",
     syncNotice: undefined,
     backendLogs: [],
@@ -362,6 +381,7 @@ export const createGoListStore = (env: GoListStoreEnvironment) => {
         lists: sortedLists,
         items: activeListItems,
         activeListId: initialActiveListId,
+        listLastUsedAt: markListUsed(parseListLastUsedAt(storage.getItem(listLastUsedAtStorageKey)), initialActiveListId),
         metadata,
         isLoaded: true,
       });
@@ -440,6 +460,7 @@ export const createGoListStore = (env: GoListStoreEnvironment) => {
       set((state) => ({
         lists: [...state.lists, list],
         activeListId: list.id,
+        listLastUsedAt: markListUsed(state.listLastUsedAt, list.id),
       }));
 
       runBackendSyncInBackground(
@@ -467,16 +488,20 @@ export const createGoListStore = (env: GoListStoreEnvironment) => {
           state.activeListId === listId ? remainingLists[0]?.id : state.activeListId;
         persistSelectedListId(nextActiveListId);
         sync.setActiveList(nextActiveListId);
+        const otherLastUsedAt = { ...state.listLastUsedAt };
+        delete otherLastUsedAt[listId];
+        persistListLastUsedAt(otherLastUsedAt);
         return {
           lists: remainingLists,
           items: state.items.filter((item) => item.listId !== listId),
           activeListId: nextActiveListId,
+          listLastUsedAt: otherLastUsedAt,
         };
       });
     },
     setActiveList: (listId: string) => {
       persistSelectedListId(listId);
-      set({ activeListId: listId });
+      set((state) => ({ activeListId: listId, listLastUsedAt: markListUsed(state.listLastUsedAt, listId) }));
       sync.setActiveList(listId);
     },
     addItem: async (listId: string, name: string, quantityOrUnit?: string) => {
@@ -745,6 +770,7 @@ export const createGoListStore = (env: GoListStoreEnvironment) => {
             lists: [...withoutList, localList].sort((a, b) => a.createdAt - b.createdAt),
             items: [...withoutListItems, ...localItems],
             activeListId: localList.id,
+            listLastUsedAt: markListUsed(current.listLastUsedAt, localList.id),
           };
         });
 

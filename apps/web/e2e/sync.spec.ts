@@ -31,7 +31,7 @@ test.describe("sharing and realtime sync", () => {
 
     // The joining device keeps its own default list too.
     await device.openDrawer();
-    await expect(device.drawerListNames()).toHaveText(["Family groceries", "Shopping list"].sort());
+    await expect(device.drawerListNames()).toHaveText(["Family groceries", "Shopping list"]);
   });
 
   test("joins via the join dialog using a pasted link or a bare token", async ({ app, newDevice }) => {
